@@ -92,55 +92,55 @@ async function load() {
           zoom,
         })
 
-      const imgsData: HTMLImageElement[] = []
-      const svgsData: HTMLImageElement[] = []
-      const fontLoaders: Promise<void>[] = []
-      const fontContent: Record<string, string> = {}
-      let fontData: string[] = []
-      widgets.forEach((item: any) => {
-        if (item.fontClass && item.fontClass.value) {
-          const loader = new FontFaceObserver(item.fontClass.value)
-          fontData.push(item.fontClass)
-          fontLoaders.push(loader.load(null, 30000)) // 延长超时让检测不会丢失字体
-          // 按字体来收集所有文字
-          if (fontContent[item.fontClass.value]) {
-            fontContent[item.fontClass.value] += item.text
-          } else {
-            fontContent[item.fontClass.value] = item.text
-          }
-        }
-        // 收集图片元素、svg元素
-        try {
-          if (item.svgUrl && item.type === 'w-svg') {
-            const cNodes: any = (window as any).document.getElementById(item.uuid).childNodes
-            svgsData.push(cNodes)
-          } else if (item.imgUrl && !item.isNinePatch) {
-            const cNodes: any = (window as any).document.getElementById(item.uuid).childNodes
-            for (const el of cNodes) {
-              if (el.className && el.className.includes('img__box')) {
-                imgsData.push(el.firstChild)
-              }
+        const imgsData: HTMLImageElement[] = []
+        const svgsData: HTMLImageElement[] = []
+        const fontLoaders: Promise<void>[] = []
+        const fontContent: Record<string, string> = {}
+        let fontData: string[] = []
+        widgets.forEach((item: any) => {
+          if (item.fontClass && item.fontClass.value) {
+            const loader = new FontFaceObserver(item.fontClass.value)
+            fontData.push(item.fontClass)
+            fontLoaders.push(loader.load(null, 30000)) // 延长超时让检测不会丢失字体
+            // 按字体来收集所有文字
+            if (fontContent[item.fontClass.value]) {
+              fontContent[item.fontClass.value] += item.text
+            } else {
+              fontContent[item.fontClass.value] = item.text
             }
           }
-        } catch (e) {}
-      })
-      // 背景图无法检测是否加载完毕，所以单独做判断
-      if (backgroundImage) {
-        const preloadBg = new Preload([backgroundImage])
-        await preloadBg.imgs()
-      }
-      try {
-        fontMinWithDraw && (await font2style(fontContent, fontData))
-        // console.log('1. base64 yes')
-        const preload = new Preload(imgsData)
-        await preload.doms()
-        // console.log('2. image yes')
-        const preload2 = new Preload(svgsData)
-        await preload2.svgs()
-        // console.log('3. svg yes')
-      } catch (e) {
-        console.log('资源加载失败:', e)
-      }
+          // 收集图片元素、svg元素
+          try {
+            if (item.svgUrl && item.type === 'w-svg') {
+              const cNodes: any = (window as any).document.getElementById(item.uuid).childNodes
+              svgsData.push(cNodes)
+            } else if (item.imgUrl && !item.isNinePatch) {
+              const cNodes: any = (window as any).document.getElementById(item.uuid).childNodes
+              for (const el of cNodes) {
+                if (el.className && el.className.includes('img__box')) {
+                  imgsData.push(el.firstChild)
+                }
+              }
+            }
+          } catch (e) {}
+        })
+        // 背景图无法检测是否加载完毕，所以单独做判断
+        if (backgroundImage) {
+          const preloadBg = new Preload([backgroundImage])
+          await preloadBg.imgs()
+        }
+        try {
+          fontMinWithDraw && (await font2style(fontContent, fontData))
+          // console.log('1. base64 yes')
+          const preload = new Preload(imgsData)
+          await preload.doms()
+          // console.log('2. image yes')
+          const preload2 = new Preload(svgsData)
+          await preload2.svgs()
+          // console.log('3. svg yes')
+        } catch (e) {
+          console.log('资源加载失败:', e)
+        }
       }
     } catch (error) {
       console.error('加载模板失败:', error)
@@ -174,14 +174,13 @@ async function load() {
         console.error('回退API也失败:', fallbackError)
       }
     }
-      loadFlag = true
-      console.log('--> now u can start generate artboard to html!')
-      setTimeout(() => {
-        try {
-          ;(window as any).loadFinishToInject('done')
-        } catch (err) {}
-      }, 100)
-    }
+    loadFlag = true
+    console.log('--> now u can start generate artboard to html!')
+    setTimeout(() => {
+      try {
+        ;(window as any).loadFinishToInject('done')
+      } catch (err) {}
+    }, 100)
   }
   // 超时
   setTimeout(() => {
