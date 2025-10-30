@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新后端模板API测试工具</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+        }
+        .section h2 {
+            color: #666;
+            margin-top: 0;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .success {
+            border-left-color: #28a745;
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .loading {
+            color: #007bff;
+        }
+        .token-info {
+            background-color: #e7f3ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+        .template-item {
+            border: 1px solid #ddd;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: #fafafa;
+        }
+        .template-item h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .template-item p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 14px;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>新后端模板API测试工具</h1>
+        
+        <!-- API配置区域 -->
+        <div class="section">
+            <h2>1. API配置</h2>
+            <div class="form-group">
+                <label for="apiUrl">API地址:</label>
+                <select id="apiUrl" onchange="switchApiUrl()">
+                    <option value="http://localhost:48080/admin-api">新后端 (localhost:48080)</option>
+                    <option value="custom">自定义</option>
+                </select>
+            </div>
+            <div class="form-group" id="customApiGroup" style="display: none;">
+                <label for="customApiUrl">自定义API地址:</label>
+                <input type="text" id="customApiUrl" placeholder="http://localhost:48080/admin-api">
+                <button onclick="applyCustomApiUrl()" style="margin-top: 10px;">应用自定义地址</button>
+            </div>
+            <div id="apiConfigResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 登录区域 -->
+        <div class="section">
+            <h2>2. 用户登录</h2>
+            <div class="form-group">
+                <label for="username">用户名:</label>
+                <input type="text" id="username" value="ling1" placeholder="请输入用户名">
+            </div>
+            <div class="form-group">
+                <label for="password">密码:</label>
+                <input type="password" id="password" value="2262870473" placeholder="请输入密码">
+            </div>
+            <div class="form-group">
+                <label for="tenantId">租户ID:</label>
+                <input type="text" id="tenantId" value="1" placeholder="请输入租户ID">
+            </div>
+            <button onclick="login()">登录</button>
+            <button onclick="logout()">退出登录</button>
+            <div id="loginResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Token信息显示 -->
+        <div id="tokenInfo" class="token-info" style="display: none;">
+            <strong>当前Token信息:</strong>
+            <div id="tokenDetails"></div>
+        </div>
+
+        <!-- 模板接口测试区域 -->
+        <div class="section">
+            <h2>3. 模板接口测试</h2>
+            
+            <!-- 获取所有模板列表 -->
+            <div style="margin-bottom: 20px;">
+                <h3>获取所有模板列表</h3>
+                <button onclick="getTemplateList()">获取所有模板</button>
+                <div id="templateListResult" class="result" style="display: none;"></div>
+            </div>
+
+            <!-- 分页查询模板 -->
+            <div style="margin-bottom: 20px;">
+                <h3>分页查询模板</h3>
+                <div class="form-group">
+                    <label for="pageNo">页码:</label>
+                    <input type="number" id="pageNo" value="1" min="1">
+                </div>
+                <div class="form-group">
+                    <label for="pageSize">每页大小:</label>
+                    <input type="number" id="pageSize" value="10" min="1">
+                </div>
+                <div class="form-group">
+                    <label for="state">状态:</label>
+                    <select id="state">
+                        <option value="">全部</option>
+                        <option value="1">启用</option>
+                        <option value="0">禁用</option>
+                    </select>
+                </div>
+                <button onclick="getTemplatePage()">分页查询</button>
+                <div id="templatePageResult" class="result" style="display: none;"></div>
+            </div>
+
+            <!-- 根据ID获取模板 -->
+            <div style="margin-bottom: 20px;">
+                <h3>根据ID获取模板</h3>
+                <div class="form-group">
+                    <label for="templateId">模板ID:</label>
+                    <input type="text" id="templateId" placeholder="请输入模板ID">
+                </div>
+                <button onclick="getTemplateById()">获取模板详情</button>
+                <div id="templateByIdResult" class="result" style="display: none;"></div>
+            </div>
+
+            <!-- 根据状态获取模板 -->
+            <div style="margin-bottom: 20px;">
+                <h3>根据状态获取模板</h3>
+                <div class="form-group">
+                    <label for="stateFilter">状态:</label>
+                    <select id="stateFilter">
+                        <option value="1">启用</option>
+                        <option value="0">禁用</option>
+                    </select>
+                </div>
+                <button onclick="getTemplateByState()">根据状态获取</button>
+                <div id="templateByStateResult" class="result" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- 接口状态显示 -->
+        <div class="section">
+            <h2>4. 接口状态</h2>
+            <div id="apiStatus" class="result">
+                <p>等待测试...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 配置
+        let API_BASE_URL = 'http://localhost:48080/admin-api'; // 当前使用的API地址
+        let accessToken = '';
+        let refreshToken = '';
+        let tenantId = '1';
+
+        // 切换API地址
+        function switchApiUrl() {
+            const selectElement = document.getElementById('apiUrl');
+            const customGroup = document.getElementById('customApiGroup');
+            const customInput = document.getElementById('customApiUrl');
+            
+            if (selectElement.value === 'custom') {
+                customGroup.style.display = 'block';
+                customInput.focus();
+            } else {
+                customGroup.style.display = 'none';
+                API_BASE_URL = selectElement.value;
+                showResult('apiConfigResult', `已切换到: ${API_BASE_URL}`);
+                
+                // 清除之前的登录状态
+                logout();
+            }
+        }
+
+        // 应用自定义API地址
+        function applyCustomApiUrl() {
+            const customInput = document.getElementById('customApiUrl');
+            const customUrl = customInput.value.trim();
+            
+            if (customUrl) {
+                API_BASE_URL = customUrl;
+                showResult('apiConfigResult', `已切换到自定义地址: ${API_BASE_URL}`);
+                
+                // 清除之前的登录状态
+                logout();
+            } else {
+                showResult('apiConfigResult', '请输入有效的API地址', true);
+            }
+        }
+
+        // 显示结果
+        function showResult(elementId, content, isError = false) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `result ${isError ? 'error' : 'success'}`;
+            element.innerHTML = content;
+        }
+
+        // 显示加载状态
+        function showLoading(elementId) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = 'result loading';
+            element.innerHTML = '请求中...';
+        }
+
+        // 更新Token信息显示
+        function updateTokenInfo() {
+            const tokenInfo = document.getElementById('tokenInfo');
+            const tokenDetails = document.getElementById('tokenDetails');
+            
+            if (accessToken) {
+                tokenInfo.style.display = 'block';
+                tokenDetails.innerHTML = `
+                    <div><strong>API地址:</strong> ${API_BASE_URL}</div>
+                    <div><strong>Access Token:</strong> ${accessToken.substring(0, 50)}...</div>
+                    <div><strong>Refresh Token:</strong> ${refreshToken ? refreshToken.substring(0, 50) + '...' : '无'}</div>
+                    <div><strong>租户ID:</strong> ${tenantId}</div>
+                `;
+            } else {
+                tokenInfo.style.display = 'none';
+            }
+        }
+
+        // 通用请求函数
+        async function request(url, options = {}) {
+            const config = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'tenant-id': tenantId,
+                    ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
+                    ...options.headers,
+                },
+                ...options,
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}${url}`, config);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.msg || `HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return data;
+            } catch (error) {
+                console.error('API请求错误:', error);
+                throw error;
+            }
+        }
+
+        // 登录
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const tenantIdInput = document.getElementById('tenantId').value;
+            
+            if (!username || !password) {
+                showResult('loginResult', '请输入用户名和密码', true);
+                return;
+            }
+
+            tenantId = tenantIdInput || '1';
+            showLoading('loginResult');
+
+            try {
+                const response = await request('/system/auth/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ username, password }),
+                });
+
+                if (response.code === 0) {
+                    accessToken = response.data.accessToken;
+                    refreshToken = response.data.refreshToken;
+                    
+                    // 保存到localStorage
+                    localStorage.setItem('accessToken', accessToken);
+                    localStorage.setItem('refreshToken', refreshToken);
+                    localStorage.setItem('tenantId', tenantId);
+                    localStorage.setItem('userInfo', JSON.stringify(response.data.user || {}));
+
+                    updateTokenInfo();
+                    
+                    // 安全地获取用户信息
+                    const userInfo = response.data.user || {};
+                    const username = userInfo.username || userInfo.nickname || '未知用户';
+                    const expiresTime = response.data.expiresTime ? new Date(response.data.expiresTime).toLocaleString() : '未知';
+                    
+                    showResult('loginResult', `
+                        <strong>登录成功!</strong><br>
+                        用户: ${username}<br>
+                        Token: ${accessToken.substring(0, 50)}...<br>
+                        过期时间: ${expiresTime}<br>
+                        <details>
+                            <summary>完整响应数据 (点击展开)</summary>
+                            <pre>${JSON.stringify(response, null, 2)}</pre>
+                        </details>
+                    `);
+                } else {
+                    throw new Error(response.msg);
+                }
+            } catch (error) {
+                showResult('loginResult', `登录失败: ${error.message}`, true);
+            }
+        }
+
+        // 退出登录
+        function logout() {
+            accessToken = '';
+            refreshToken = '';
+            tenantId = '1';
+            
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('tenantId');
+            localStorage.removeItem('userInfo');
+            
+            updateTokenInfo();
+            showResult('loginResult', '已退出登录');
+        }
+
+        // 获取所有模板列表
+        async function getTemplateList() {
+            if (!accessToken) {
+                showResult('templateListResult', '请先登录', true);
+                return;
+            }
+
+            showLoading('templateListResult');
+
+            try {
+                const response = await request('/temu/auto-template/template/list');
+                
+                if (response.code === 0) {
+                    const templates = response.data;
+                    let html = `<strong>获取成功! 共 ${templates.length} 个模板</strong><br><br>`;
+                    
+                    templates.forEach((template, index) => {
+                        html += `
+                            <div class="template-item">
+                                <h4>${template.title || '无标题'} (ID: ${template.id})</h4>
+                                <p><strong>尺寸:</strong> ${template.width} x ${template.height}</p>
+                                <p><strong>状态:</strong> ${template.state === 1 ? '启用' : '禁用'}</p>
+                                <p><strong>名称:</strong> ${template.name || '无'}</p>
+                                <p><strong>创建时间:</strong> ${template.createTime || '无'}</p>
+                                ${template.cover ? `<p><strong>封面:</strong> <a href="${template.cover}" target="_blank">查看</a></p>` : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    showResult('templateListResult', html);
+                } else {
+                    throw new Error(response.msg);
+                }
+            } catch (error) {
+                showResult('templateListResult', `获取失败: ${error.message}`, true);
+            }
+        }
+
+        // 分页查询模板
+        async function getTemplatePage() {
+            if (!accessToken) {
+                showResult('templatePageResult', '请先登录', true);
+                return;
+            }
+
+            const pageNo = document.getElementById('pageNo').value;
+            const pageSize = document.getElementById('pageSize').value;
+            const state = document.getElementById('state').value;
+
+            showLoading('templatePageResult');
+
+            try {
+                const params = new URLSearchParams();
+                if (pageNo) params.append('pageNo', pageNo);
+                if (pageSize) params.append('pageSize', pageSize);
+                if (state) params.append('state', state);
+
+                const response = await request(`/temu/auto-template/template/page?${params.toString()}`);
+                
+                if (response.code === 0) {
+                    const data = response.data;
+                    const templates = data.list;
+                    let html = `<strong>分页查询成功!</strong><br>`;
+                    html += `总记录数: ${data.total}, 当前页: ${pageNo}, 每页: ${pageSize}<br><br>`;
+                    
+                    templates.forEach((template, index) => {
+                        html += `
+                            <div class="template-item">
+                                <h4>${template.title || '无标题'} (ID: ${template.id})</h4>
+                                <p><strong>尺寸:</strong> ${template.width} x ${template.height}</p>
+                                <p><strong>状态:</strong> ${template.state === 1 ? '启用' : '禁用'}</p>
+                                <p><strong>名称:</strong> ${template.name || '无'}</p>
+                                <p><strong>创建时间:</strong> ${template.createTime || '无'}</p>
+                            </div>
+                        `;
+                    });
+                    
+                    showResult('templatePageResult', html);
+                } else {
+                    throw new Error(response.msg);
+                }
+            } catch (error) {
+                showResult('templatePageResult', `查询失败: ${error.message}`, true);
+            }
+        }
+
+        // 根据ID获取模板
+        async function getTemplateById() {
+            if (!accessToken) {
+                showResult('templateByIdResult', '请先登录', true);
+                return;
+            }
+
+            const templateId = document.getElementById('templateId').value;
+            if (!templateId) {
+                showResult('templateByIdResult', '请输入模板ID', true);
+                return;
+            }
+
+            showLoading('templateByIdResult');
+
+            try {
+                const response = await request(`/temu/auto-template/template/${templateId}`);
+                
+                if (response.code === 0) {
+                    const template = response.data;
+                    let html = `<strong>获取成功!</strong><br><br>`;
+                    html += `
+                        <div class="template-item">
+                            <h4>${template.title || '无标题'} (ID: ${template.id})</h4>
+                            <p><strong>尺寸:</strong> ${template.width} x ${template.height}</p>
+                            <p><strong>状态:</strong> ${template.state === 1 ? '启用' : '禁用'}</p>
+                            <p><strong>名称:</strong> ${template.name || '无'}</p>
+                            <p><strong>边距:</strong> 上${template.marginTop} 下${template.marginBottom} 左${template.marginLeft} 右${template.marginRight}</p>
+                            <p><strong>创建时间:</strong> ${template.createTime || '无'}</p>
+                            <p><strong>更新时间:</strong> ${template.updateTime || '无'}</p>
+                            ${template.cover ? `<p><strong>封面:</strong> <a href="${template.cover}" target="_blank">查看</a></p>` : ''}
+                            <details>
+                                <summary>模板数据 (点击展开)</summary>
+                                <pre>${JSON.stringify(JSON.parse(template.data || '{}'), null, 2)}</pre>
+                            </details>
+                        </div>
+                    `;
+                    
+                    showResult('templateByIdResult', html);
+                } else {
+                    throw new Error(response.msg);
+                }
+            } catch (error) {
+                showResult('templateByIdResult', `获取失败: ${error.message}`, true);
+            }
+        }
+
+        // 根据状态获取模板
+        async function getTemplateByState() {
+            if (!accessToken) {
+                showResult('templateByStateResult', '请先登录', true);
+                return;
+            }
+
+            const state = document.getElementById('stateFilter').value;
+            showLoading('templateByStateResult');
+
+            try {
+                const response = await request(`/temu/auto-template/template/list-by-state?state=${state}`);
+                
+                if (response.code === 0) {
+                    const templates = response.data;
+                    let html = `<strong>根据状态获取成功! 状态: ${state === '1' ? '启用' : '禁用'}, 共 ${templates.length} 个模板</strong><br><br>`;
+                    
+                    templates.forEach((template, index) => {
+                        html += `
+                            <div class="template-item">
+                                <h4>${template.title || '无标题'} (ID: ${template.id})</h4>
+                                <p><strong>尺寸:</strong> ${template.width} x ${template.height}</p>
+                                <p><strong>状态:</strong> ${template.state === 1 ? '启用' : '禁用'}</p>
+                                <p><strong>名称:</strong> ${template.name || '无'}</p>
+                                <p><strong>创建时间:</strong> ${template.createTime || '无'}</p>
+                            </div>
+                        `;
+                    });
+                    
+                    showResult('templateByStateResult', html);
+                } else {
+                    throw new Error(response.msg);
+                }
+            } catch (error) {
+                showResult('templateByStateResult', `获取失败: ${error.message}`, true);
+            }
+        }
+
+        // 检查接口状态
+        async function checkApiStatus() {
+            const statusElement = document.getElementById('apiStatus');
+            
+            try {
+                // 尝试访问登录接口
+                const response = await fetch(`${API_BASE_URL}/system/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'tenant-id': '1'
+                    },
+                    body: JSON.stringify({ username: 'test', password: 'test' })
+                });
+                
+                if (response.ok) {
+                    statusElement.innerHTML = '<p style="color: green;">✓ 后端服务连接正常</p>';
+                } else {
+                    statusElement.innerHTML = `<p style="color: orange;">⚠ 后端服务可访问，但返回状态码: ${response.status}</p>`;
+                }
+            } catch (error) {
+                statusElement.innerHTML = `<p style="color: red;">✗ 后端服务连接失败: ${error.message}</p>`;
+            }
+        }
+
+        // 页面加载时检查状态
+        window.onload = function() {
+            // 显示当前API地址
+            showResult('apiConfigResult', `当前API地址: ${API_BASE_URL}`);
+            
+            checkApiStatus();
+            
+            // 尝试从localStorage恢复登录状态
+            const savedToken = localStorage.getItem('accessToken');
+            const savedRefreshToken = localStorage.getItem('refreshToken');
+            const savedTenantId = localStorage.getItem('tenantId');
+            
+            if (savedToken && savedRefreshToken) {
+                accessToken = savedToken;
+                refreshToken = savedRefreshToken;
+                tenantId = savedTenantId || '1';
+                updateTokenInfo();
+            }
+        };
+    </script>
+</body>
+</html>

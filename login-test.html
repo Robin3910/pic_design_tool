@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录测试 - 迅排设计</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        input {
+            width: 200px;
+            padding: 8px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: inline-block;
+            width: 80px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 登录功能测试</h1>
+        
+        <div class="test-section">
+            <h3>1. 登录测试</h3>
+            <div class="form-group">
+                <label>用户名:</label>
+                <input type="text" id="username" placeholder="请输入用户名" value="test">
+            </div>
+            <div class="form-group">
+                <label>密码:</label>
+                <input type="password" id="password" placeholder="请输入密码" value="123456">
+            </div>
+            <button onclick="testLogin()">测试登录</button>
+            <button onclick="testLogout()">测试登出</button>
+            <div id="loginResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. 用户信息测试</h3>
+            <button onclick="getUserInfo()">获取用户信息</button>
+            <button onclick="refreshToken()">刷新Token</button>
+            <div id="userResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Token状态</h3>
+            <button onclick="checkTokenStatus()">检查Token状态</button>
+            <button onclick="clearToken()">清除Token</button>
+            <div id="tokenResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. 页面跳转测试</h3>
+            <button onclick="goToLogin()">跳转到登录页</button>
+            <button onclick="goToHome()">跳转到首页</button>
+            <div id="navResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:48080/admin-api';
+        
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `result ${type}`;
+            element.textContent = message;
+        }
+        
+        async function testLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                showResult('loginResult', '请输入用户名和密码', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/system/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'tenant-id': '1'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.code === 0) {
+                    localStorage.setItem('xp_token', data.data.accessToken);
+                    showResult('loginResult', `登录成功！\nToken: ${data.data.accessToken}\n用户信息: ${JSON.stringify(data.data.user, null, 2)}`, 'success');
+                } else {
+                    showResult('loginResult', `登录失败: ${data.msg}`, 'error');
+                }
+            } catch (error) {
+                showResult('loginResult', `请求失败: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testLogout() {
+            const token = localStorage.getItem('xp_token');
+            if (!token) {
+                showResult('loginResult', '没有找到Token，请先登录', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/system/auth/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                        'tenant-id': '1'
+                    }
+                });
+                
+                const data = await response.json();
+                localStorage.removeItem('xp_token');
+                showResult('loginResult', '登出成功！', 'success');
+            } catch (error) {
+                localStorage.removeItem('xp_token');
+                showResult('loginResult', `登出失败: ${error.message}`, 'error');
+            }
+        }
+        
+        async function getUserInfo() {
+            const token = localStorage.getItem('xp_token');
+            if (!token) {
+                showResult('userResult', '没有找到Token，请先登录', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/system/auth/get-permission-info`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'tenant-id': '1'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.code === 0) {
+                    showResult('userResult', `用户信息获取成功！\n${JSON.stringify(data.data, null, 2)}`, 'success');
+                } else {
+                    showResult('userResult', `获取用户信息失败: ${data.msg}`, 'error');
+                }
+            } catch (error) {
+                showResult('userResult', `请求失败: ${error.message}`, 'error');
+            }
+        }
+        
+        async function refreshToken() {
+            const token = localStorage.getItem('xp_token');
+            if (!token) {
+                showResult('userResult', '没有找到Token，请先登录', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/system/auth/refresh-token`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                        'tenant-id': '1'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.code === 0) {
+                    localStorage.setItem('xp_token', data.data.accessToken);
+                    showResult('userResult', `Token刷新成功！\n新Token: ${data.data.accessToken}`, 'success');
+                } else {
+                    showResult('userResult', `Token刷新失败: ${data.msg}`, 'error');
+                }
+            } catch (error) {
+                showResult('userResult', `请求失败: ${error.message}`, 'error');
+            }
+        }
+        
+        function checkTokenStatus() {
+            const token = localStorage.getItem('xp_token');
+            if (token) {
+                showResult('tokenResult', `Token存在: ${token}\n长度: ${token.length} 字符`, 'success');
+            } else {
+                showResult('tokenResult', '没有找到Token', 'info');
+            }
+        }
+        
+        function clearToken() {
+            localStorage.removeItem('xp_token');
+            showResult('tokenResult', 'Token已清除', 'info');
+        }
+        
+        function goToLogin() {
+            window.location.href = '/login';
+        }
+        
+        function goToHome() {
+            window.location.href = '/';
+        }
+        
+        // 页面加载时检查Token状态
+        window.onload = function() {
+            checkTokenStatus();
+        };
+    </script>
+</body>
+</html>
