@@ -65,6 +65,7 @@ const columnHeights: number[] = [] // 列的高度
 const columnNums = 2 // 总共有多少列
 const gap = 7 // 图片之间的间隔
 const titleHeight = 32 // 标题高度（包括间距）
+const maxHeight = 220 // 图片最大高度限制
 
 watch(
   () => props.listData,
@@ -76,6 +77,10 @@ watch(
       let index = i % columnNums
       const item = cloneList[i]
       item.height = (item.height / item.width) * state.width // 图片高度
+      // 限制最大高度，避免素材过长
+      if (item.height > maxHeight) {
+        item.height = maxHeight
+      }
       const itemTotalHeight = item.height + (item.title ? titleHeight : 0) // 图片高度 + 标题高度
       item.left = index * (widthLimit / columnNums + gap) // 定位
       item.top = columnHeights[index] + gap || 0 // 定位
@@ -131,7 +136,14 @@ defineExpose({
   .img-box {
     position: relative;
     width: 100%;
-    background-color: #808080;
+    background-color: #ffffff;
+    background-image: 
+      linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+      linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+      linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+    background-size: 12px 12px;
+    background-position: 0 0, 0 6px, 6px -6px, -6px 0px;
     border: 1px solid #e0e5ea;
     overflow: hidden;
     .img {

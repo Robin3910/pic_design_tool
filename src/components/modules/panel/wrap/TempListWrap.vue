@@ -7,7 +7,7 @@
 -->
 <template>
   <div class="wrap">
-    <el-divider v-show="state.title" style="margin-top: 1.7rem" content-position="left">
+    <el-divider v-show="state.title" style="margin-top: 1.7rem" content-position="center">
       <span style="font-weight: bold">{{ state.title }}</span>
     </el-divider>
 
@@ -55,7 +55,7 @@ const templateStore = useTemplateStore()
 const state = reactive<TState>({
   loading: false,
   loadDone: false,
-  title: '已存模板',
+  title: '模板',
   searchKeyword: '',
 })
 

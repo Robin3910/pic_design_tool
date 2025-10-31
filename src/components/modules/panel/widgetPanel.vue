@@ -3,11 +3,19 @@
     <div class="widget-classify">
       <ul class="classify-wrap">
         <li v-for="(item, index) in state.widgetClassifyList" :key="index" :class="['classify-item', { 'active-classify-item': state.activeWidgetClassify === index && state.active }]" @click="clickClassify(index)">
-          <div class="icon-box"><i :class="['iconfont', 'icon', item.icon]" :style="item.style" /></div>
+          <div class="icon-box">
+            <component 
+              v-if="item.iconComponent" 
+              :is="item.iconComponent" 
+              :size="24" 
+              :color="state.activeWidgetClassify === index && state.active ? '#2254f4' : '#070707'"
+              :class="{ 'svg-icon': true }"
+            />
+            <i v-else :class="['iconfont', 'icon', item.icon]" :style="item.style" />
+          </div>
           <p>{{ item.name }}</p>
         </li>
       </ul>
-      <a href="https://github.com/palxiao/poster-design" target="_blank" class="github"><img src="https://fe-doc.palxp.cn/images/github.svg" alt="Github" title="Github" /> 源码</a>
     </div>
     <div v-show="state.active" class="widget-wrap">
       <keep-alive>
@@ -27,12 +35,22 @@
 // 组件面板
 // const NAME = 'widget-panel'
 import widgetClassifyListData from '@/assets/data/WidgetClassifyList'
-import { reactive, onMounted, watch, nextTick, } from 'vue'
+import { reactive, onMounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { UploadIcon } from '@/components/common/Icon'
 
 const route = useRoute()
+
+// 图标组件映射
+const iconComponents: Record<string, any> = {
+  UploadIcon,
+}
+
 const state = reactive({
-  widgetClassifyList: widgetClassifyListData,
+  widgetClassifyList: widgetClassifyListData.map(item => ({
+    ...item,
+    iconComponent: item.iconComponent ? iconComponents[item.iconComponent] : null,
+  })),
   activeWidgetClassify: 0,
   active: true,
 })
@@ -115,9 +133,6 @@ defineExpose({
           color: #070707;
         }
       }
-      .classify-item:hover > .icon {
-        transform: scale3d(1.2, 1.2, 1);
-      }
       .active-classify-item {
         position: relative;
         .icon,
@@ -185,22 +200,6 @@ defineExpose({
       color: rgba(0, 0, 0, 0.9);
       opacity: 0.9;
     }
-  }
-}
-
-.github {
-  cursor: pointer;
-  position: absolute;
-  bottom: 12px;
-  font-size: 12px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  width: 100%;
-  img {
-    width: 21px;
-    height: 21px;
-    margin: 0 2px;
   }
 }
 </style>

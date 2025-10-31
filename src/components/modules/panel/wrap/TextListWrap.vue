@@ -7,9 +7,9 @@
 -->
 <template>
   <div class="wrap">
-    <div class="text-materials-header">
-      <h3>文字</h3>
-    </div>
+    <el-divider style="margin-top: 1.7rem" content-position="center">
+      <span style="font-weight: bold">文字</span>
+    </el-divider>
     <div style="height: 0.5rem" />
     <div class="text-materials-container">
       <div v-if="state.textList.length === 0" class="empty-state">
@@ -226,24 +226,6 @@ defineExpose({
   flex-direction: column;
 }
 
-.text-materials-header {
-  text-align: center;
-  margin-bottom: 1rem;
-  
-  h3 {
-    margin: 0 0 0.5rem 0;
-    color: #333;
-    font-size: 1.2rem;
-    font-weight: 600;
-  }
-  
-  p {
-    margin: 0;
-    color: #666;
-    font-size: 0.9rem;
-  }
-}
-
 .text-materials-container {
   width: 100%;
   flex: 1;
@@ -263,7 +245,7 @@ defineExpose({
 
 .texts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
   padding: 0.5rem 0;
 }
@@ -288,7 +270,7 @@ defineExpose({
 
 .text-content {
   width: 100%;
-  height: 120px;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -296,7 +278,7 @@ defineExpose({
   color: #fff;
   font-size: 14px;
   font-weight: normal;
-  padding: 1rem;
+  padding: 0.75rem;
   text-align: center;
   word-break: break-word;
   overflow: hidden;

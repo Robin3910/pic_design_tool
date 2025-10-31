@@ -65,7 +65,7 @@ const state = reactive<TState>({
 })
 
 if (props.type != 'none') {
-  state.materialCates = [{ id: 0, name: '已存模板' }]
+  state.materialCates = [{ id: 0, name: '模板' }]
   // api.home.getCategories({ type: 1 }).then((list: any) => {
   //   list.unshift({ id: 0, name: '全部' })
   //   state.materialCates = list

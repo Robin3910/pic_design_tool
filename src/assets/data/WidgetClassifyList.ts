@@ -14,6 +14,7 @@ export type TWidgetClassifyData = {
   show: boolean
   component: string
   style?: StyleValue
+  iconComponent?: string
 }
 
 export default [
@@ -35,6 +36,13 @@ export default [
     icon: 'icon-gallery',
     show: false,
     component: 'photo-list-wrap',
+  },
+  {
+    name: '替换',
+    icon: 'icon-refresh',
+    show: false,
+    component: 'replace-list-wrap',
+    iconComponent: 'UploadIcon',
   },
   // 注释掉素材管理相关功能 - 依赖后端服务
   // {

@@ -1,20 +1,19 @@
 <!--
- * @Author: ShawnPhang
- * @Date: 2022-02-11 18:48:23
- * @Description: 本地图片库 - 显示public/images目录中的图片
- * @LastEditors: ShawnPhang <https://m.palxp.cn>
- * @LastEditTime: 2024-08-14 18:50:09
+ * @Author: AI Assistant
+ * @Date: 2025-01-XX
+ * @Description: 替换素材列表 - 显示newSetImageUrls字段中的替换图片
 -->
 <template>
   <div class="wrap">
-    <el-divider style="margin-top: 1.7rem" content-position="center">
-      <span style="font-weight: bold">图片</span>
-    </el-divider>
+    <div class="header-wrapper">
+      <el-divider style="margin-top: 1.7rem" content-position="center">
+        <span style="font-weight: bold">替换</span>
+      </el-divider>
+    </div>
     <div style="height: 0.5rem" />
     <div class="local-images-container">
       <div v-if="state.localImages.length === 0" class="empty-state">
-        <p>暂无图片</p>
-        <p>尝试刷新或检查接口数据</p>
+        <p>暂无替换素材</p>
       </div>
       <div v-else class="images-grid">
         <div 
@@ -50,13 +49,14 @@
 </template>
 
 <script setup lang="ts">
-// 从接口加载图片
+// 从接口加载替换素材图片
 import { reactive, onMounted } from 'vue'
 import wImageSetting from '../../widgets/wImage/wImageSetting'
 import setItem2Data from '@/common/methods/DesignFeatures/setImage'
 import { storeToRefs } from 'pinia'
 import { useControlStore, useCanvasStore, useWidgetStore } from '@/store'
 import api from '@/api'
+import { ElMessage } from 'element-plus'
 
 type TProps = {
   active?: boolean
@@ -91,58 +91,23 @@ const loadImagesFromApi = async () => {
     const res = await api.redrawTask.getRedrawTaskPage({ pageNo: 1, pageSize: 20 })
     const list = res.data?.list || []
     const results: TLocalImage[] = []
-    // 提取 URL 文件名结尾的数字作为序号（如 xxx_12.jpg => 12）
-    const extractIndexFromUrl = (u: string): number | null => {
-      try {
-        const withoutQuery = u.split('?')[0]
-        const lastSlash = withoutQuery.lastIndexOf('/')
-        const fileName = lastSlash >= 0 ? withoutQuery.slice(lastSlash + 1) : withoutQuery
-        const nameOnly = fileName.replace(/\.[^.]*$/, '')
-        const match = nameOnly.match(/(\d+)$/)
-        return match ? parseInt(match[1], 10) : null
-      } catch (e) {
-        return null
-      }
-    }
 
     list.forEach((item: any) => {
-      // 优先使用 hdImages，如果为空则使用 customImageUrls
-      let str = item.hdImages
-      if (typeof str !== 'string' || str.trim().length === 0) {
-        str = item.customImageUrls ?? item.custom_image_urls
-      }
+      // 从 newSetImageUrls 字段获取替换素材
+      let str = item.newSetImageUrls ?? item.new_set_image_urls
       if (typeof str !== 'string' || str.trim().length === 0) return
 
-      // 解析需重制序号（支持 number、字符串"1,2,3"、数组）
-      const raw = (item as any).need_redraw_index ?? (item as any).needRedrawIndex
-      let indices: number[] = []
-      if (Array.isArray(raw)) {
-        indices = raw.map((n) => parseInt(n, 10)).filter((n) => !isNaN(n))
-      } else if (typeof raw === 'string') {
-        indices = raw
-          .split(',')
-          .map((s) => parseInt(s.trim(), 10))
-          .filter((n) => !isNaN(n))
-      } else if (typeof raw === 'number') {
-        indices = [raw]
-      }
-
-      if (indices.length === 0) return
-      const indexSet = new Set(indices)
-
+      // 解析替换素材URL列表（逗号分隔）
       const imageList: string[] = str
         .split(',')
         .map((s: string) => s.trim())
         .filter((s: string) => s.length > 0)
 
-      imageList.forEach((u) => {
-        const idx = extractIndexFromUrl(u)
-        if (idx != null && indexSet.has(idx)) {
-          const name = `${item.id ?? ''}_${idx}`
-          // 去重：如果该 URL 已添加则跳过
-          if (!results.find((r) => r.url === u)) {
-            results.push({ name, url: u, thumb: u })
-          }
+      imageList.forEach((u, idx) => {
+        const name = `${item.id ?? ''}_replace_${idx + 1}`
+        // 去重：如果该 URL 已添加则跳过
+        if (!results.find((r) => r.url === u)) {
+          results.push({ name, url: u, thumb: u })
         }
       })
     })
@@ -150,6 +115,7 @@ const loadImagesFromApi = async () => {
     state.localImages = [...results].reverse()
   } catch (e) {
     state.localImages = []
+    ElMessage.error('加载替换素材失败')
   }
 }
 

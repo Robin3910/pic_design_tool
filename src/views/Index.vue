@@ -11,7 +11,7 @@
     <div :style="state.style" class="top-nav">
       <div class="top-nav-wrap">
         <div class="top-left">
-          <div class="name" @click="jump2home">{{ state.APP_NAME }}</div>
+          <div class="name">{{ state.APP_NAME }}</div>
           <div class="operation">
             <div :class="['operation-item', { disable: !undoable }]" @click="undoable ? handleHistory('undo') : ''"><i class="iconfont icon-undo" /></div>
             <div :class="['operation-item', { disable: !redoable }]" @click="redoable ? handleHistory('redo') : ''"><i class="iconfont icon-redo" /></div>
@@ -163,12 +163,6 @@ if (!_config.isDev) {
   })
 }
 
-function jump2home() {
-  // const fullPath = window.location.href.split('/')
-  // window.open(fullPath[0] + '//' + fullPath[2])
-  window.open('https://xp.palxp.cn/')
-}
-
 const undoable = computed(() => {
   return dHistoryParams.value.stackPointer >= 0
   // return !(
@@ -279,7 +273,6 @@ const dealWith = (fnName: string, params?: any) => {
 }
 
 defineExpose({
-  jump2home,
 })
 </script>
 
