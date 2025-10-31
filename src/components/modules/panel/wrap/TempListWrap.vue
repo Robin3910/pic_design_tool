@@ -71,7 +71,8 @@ edit && userStore.managerEdit(true)
 
 // 将新后端的模板数据转换为旧格式，以兼容现有的imgWaterFall组件
 const convertedList = computed(() => {
-  return templateStore.templates.map((template: Template) => ({
+  // 反转数组以倒序显示
+  return [...templateStore.templates].reverse().map((template: Template) => ({
     id: template.id,
     title: template.title || template.name || '未命名模板',
     cover: template.cover || getDefaultCover(template),

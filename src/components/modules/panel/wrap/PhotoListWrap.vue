@@ -146,7 +146,8 @@ const loadImagesFromApi = async () => {
         }
       })
     })
-    state.localImages = results
+    // 反转数组以倒序显示（使用展开运算符避免修改原数组）
+    state.localImages = [...results].reverse()
   } catch (e) {
     state.localImages = []
   }

@@ -174,7 +174,8 @@ const loadTextsFromApi = async () => {
     })
 
     console.log('最终文字素材列表:', results)
-    state.textList = results
+    // 反转数组以倒序显示（使用展开运算符避免修改原数组）
+    state.textList = [...results].reverse()
   } catch (e) {
     console.error('加载文字素材失败:', e)
     state.textList = []
