@@ -9,7 +9,6 @@
   <div class="wrap">
   <div class="local-images-header">
       <h3>图片</h3>
-      <p>从接口加载高清图片（hdImages）</p>
     </div>
     <div style="height: 0.5rem" />
     <div class="local-images-container">
@@ -107,10 +106,14 @@ const loadImagesFromApi = async () => {
     }
 
     list.forEach((item: any) => {
-      const str = item.hdImages
+      // 优先使用 hdImages，如果为空则使用 customImageUrls
+      let str = item.hdImages
+      if (typeof str !== 'string' || str.trim().length === 0) {
+        str = item.customImageUrls ?? item.custom_image_urls
+      }
       if (typeof str !== 'string' || str.trim().length === 0) return
 
-      // 解析需重制序号（支持 number、字符串“1,2,3”、数组）
+      // 解析需重制序号（支持 number、字符串"1,2,3"、数组）
       const raw = (item as any).need_redraw_index ?? (item as any).needRedrawIndex
       let indices: number[] = []
       if (Array.isArray(raw)) {
@@ -127,12 +130,12 @@ const loadImagesFromApi = async () => {
       if (indices.length === 0) return
       const indexSet = new Set(indices)
 
-      const hdList: string[] = str
+      const imageList: string[] = str
         .split(',')
         .map((s: string) => s.trim())
         .filter((s: string) => s.length > 0)
 
-      hdList.forEach((u) => {
+      imageList.forEach((u) => {
         const idx = extractIndexFromUrl(u)
         if (idx != null && indexSet.has(idx)) {
           const name = `${item.id ?? ''}_${idx}`

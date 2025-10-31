@@ -7,13 +7,9 @@
 -->
 <template>
   <div class="wrap">
-    <search-header v-model="state.searchKeyword" @change="cateChange" />
-
     <el-divider v-show="state.title" style="margin-top: 1.7rem" content-position="left">
       <span style="font-weight: bold">{{ state.title }}</span>
     </el-divider>
-
-    <el-button class="upload-psd" plain type="primary" @click="openPSD">导入 PSD 创建模板</el-button>
 
     <ul ref="listRef" v-infinite-scroll="load" class="infinite-list" :infinite-scroll-distance="150" style="overflow: auto">
       <img-water-fall :listData="convertedList" @select="selectItem" />
@@ -26,7 +22,6 @@
 <script lang="ts" setup>
 import { reactive, ref, computed, onMounted } from 'vue'
 import { LocationQueryValue, useRoute, useRouter } from 'vue-router'
-import searchHeader from './components/searchHeader.vue'
 import useConfirm from '@/common/methods/confirm'
 import imgWaterFall from './components/imgWaterFall.vue'
 import { useControlStore, useCanvasStore, useUserStore, useHistoryStore, useWidgetStore, useForceStore, useTemplateStore, useAuthStore } from '@/store'
@@ -60,7 +55,7 @@ const templateStore = useTemplateStore()
 const state = reactive<TState>({
   loading: false,
   loadDone: false,
-  title: '示例模板',
+  title: '已存模板',
   searchKeyword: '',
 })
 
@@ -281,10 +276,6 @@ function setTempId(tempId: number | string) {
   router.push({ path: '/home', query: { tempid: tempId, id }, replace: true })
 }
 
-const openPSD = () => {
-  window.open(router.resolve('/psd').href, '_blank')
-}
-
 defineExpose({
   load,
   cateChange,
@@ -340,10 +331,5 @@ defineExpose({
   text-align: center;
   font-size: 14px;
   color: #999;
-}
-
-.upload-psd {
-  margin: 0 1rem;
-  width: calc(100% - 2rem);
 }
 </style>

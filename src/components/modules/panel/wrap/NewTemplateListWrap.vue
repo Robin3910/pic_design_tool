@@ -5,13 +5,9 @@
 -->
 <template>
   <div class="wrap">
-    <search-header v-model="state.searchKeyword" @change="cateChange" />
-
     <el-divider v-show="state.title" style="margin-top: 1.7rem" content-position="left">
       <span style="font-weight: bold">{{ state.title }}</span>
     </el-divider>
-
-    <el-button class="upload-psd" plain type="primary" @click="openPSD">导入 PSD 创建模板</el-button>
 
     <!-- 错误提示 -->
     <el-alert
@@ -79,7 +75,6 @@
 <script lang="ts" setup>
 import { reactive, ref, computed, onMounted } from 'vue'
 import { LocationQueryValue, useRoute, useRouter } from 'vue-router'
-import searchHeader from './components/searchHeader.vue'
 import useConfirm from '@/common/methods/confirm'
 import imgWaterFall from './components/imgWaterFall.vue'
 import TemplateDetailCard from './components/TemplateDetailCard.vue'
@@ -282,10 +277,6 @@ function setTempId(tempId: number | string) {
   router.push({ path: '/home', query: { tempid: tempId, id }, replace: true })
 }
 
-const openPSD = () => {
-  window.open(router.resolve('/psd').href, '_blank')
-}
-
 // 处理模板详情选择
 const handleTemplateSelect = (template: Template) => {
   selectedTemplate.value = template
@@ -354,11 +345,6 @@ defineExpose({
   text-align: center;
   font-size: 14px;
   color: #999;
-}
-
-.upload-psd {
-  margin: 0 1rem;
-  width: calc(100% - 2rem);
 }
 
 .template-stats {

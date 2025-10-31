@@ -69,10 +69,7 @@ const state = reactive<TState>({
   loadDone: false,
   searchValue: '',
   currentCategory: null,
-  types: [
-    { cate: 'text', name: '高级特效文字' },
-    { cate: 'comp', name: '示例组合模板' },
-  ],
+  types: [],
 })
 
 const controlStore = useControlStore()

@@ -29,6 +29,12 @@ export type RedrawTaskItem = {
   newSetImageUrls?: string | null
   // 高清图片 URL 列表（逗号分隔字符串）
   hdImages?: string
+  // 定制图片 URL 列表（逗号分隔字符串）
+  customImageUrls?: string
+  // 需重制图片的序号（逗号分隔，如1,3,5表示第1、3、5张）
+  needRedrawIndex?: string
+  // 定制文字列表（JSON字符串或数组）
+  custom_text_list?: string | string[]
 }
 
 export type PageResp<T> = {

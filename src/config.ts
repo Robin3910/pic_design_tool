@@ -15,7 +15,7 @@ export default {
   isDev,
   BASE_URL: isDev ? '/' : './',
   VERSION: version,
-  APP_NAME: '迅排设计',
+  APP_NAME: '禹链设计器',
   COPYRIGHT: 'ShawnPhang - Design.pPalxp.cn',
   API_URL: isDev ? 'http://localhost:7001' : '', // 后端地址
   SCREEN_URL: isDev ? 'http://localhost:7001' : '', // 截图服务地址

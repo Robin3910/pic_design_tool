@@ -6,7 +6,6 @@
  * @LastEditTime: 2024-08-17 09:49:01
 -->
 <template>
-  <div class="top-title"><el-input v-model="state.title" placeholder="未命名的设计" class="input-wrap" /></div>
   <div class="top-icon-wrap">
     <template v-if="tempEditing">
       <!-- 注释掉保存模板功能 - 依赖后端服务 -->
@@ -353,25 +352,6 @@ defineExpose({
     padding: 5px 8px;
     &:hover {
       background-color: rgba(0, 0, 0, 0.5);
-    }
-  }
-}
-.top-title {
-  color: @color-black;
-  flex: 1;
-  padding-left: 20px;
-  // font-weight: bold;
-  .input-wrap {
-    // box-shadow: none;
-    width: 15rem;
-    :deep(input) {
-      border-color: #ffffff;
-      // border-color: #e8eaec;
-    }
-  }
-  .input-wrap:hover {
-    :deep(input) {
-      // border-color: #e8eaec;
     }
   }
 }

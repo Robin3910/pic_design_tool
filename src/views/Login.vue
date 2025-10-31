@@ -125,6 +125,7 @@ const handleLogin = async () => {
   font-weight: 700;
   color: #2d3748;
   margin: 0 0 8px 0;
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', Arial, sans-serif;
 }
 
 .login-subtitle {

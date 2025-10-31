@@ -1,5 +1,5 @@
 <p align="center">
-<img style="height: 90px" src="https://github.com/user-attachments/assets/e2b8c788-aded-4b1a-83ee-9bde124f5808" alt="迅排设计 - Poster Design">
+<img style="height: 90px" src="https://github.com/user-attachments/assets/e2b8c788-aded-4b1a-83ee-9bde124f5808" alt="禹链设计器 - Poster Design">
 </p>
 <p align="center">
   <a href=""><img src="https://img.shields.io/github/stars/palxiao/poster-design?style=flat" alt="starts"></a>
