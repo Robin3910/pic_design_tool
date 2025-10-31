@@ -25,7 +25,7 @@
           <el-divider direction="vertical" />
         </div>
         <HeaderOptions ref="optionsRef" v-model="state.isContinue" @change="optionsChange">
-          <!-- <el-button size="large" class="primary-btn" @click="dealWith('save')">{{ $t('header.save') }}</el-button> -->
+          <el-button size="large" class="primary-btn" style="background-color: #67C23A; border-color: #67C23A; color: #fff;" @click="handleSave">保存</el-button>
           <el-button ref="ref4" size="large" class="primary-btn" type="primary" @click="dealWith('download')">{{ $t('header.download') }}</el-button>
         </HeaderOptions>
       </div>
@@ -189,6 +189,11 @@ function save() {
   // if (!optionsRef.value) return
   // optionsRef.value.save()
   console.log('保存功能已禁用 - 依赖后端服务')
+}
+
+function handleSave() {
+  // 保存功能暂时不实现，只显示样式
+  console.log('保存按钮点击（功能待实现）')
 }
 
 const { handleKeydowm, handleKeyup, dealCtrl } = shortcuts.methods
