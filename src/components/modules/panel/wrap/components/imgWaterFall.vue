@@ -10,16 +10,23 @@
     <!-- backgroundImage: `url(${item.cover})` -->
     <div
       v-for="(item, i) in state.list" :key="i + 'iwf'"
-      :style="{ top: item.top + 'px', left: item.left + 'px', width: state.width + 'px', height: item.height + 'px' }"
-      class="img-box" @click.stop="selectItem(item, i)"
+      :style="{ top: item.top + 'px', left: item.left + 'px', width: state.width + 'px' }"
+      class="img-box-wrapper" @click.stop="selectItem(item, i)"
     >
-      <edit-model v-if="edit" :options="props.edit" :data="{ item, i }">
-        {{ item.isDelect }}
-        <div v-if="item.isDelect" class="list__mask">已删除</div>
-        <el-image v-if="!item.fail" class="img" :src="item.cover" lazy loading="lazy" @error="loadError(item)" />
-        <div v-else class="fail_img">{{ item.title }}</div>
-      </edit-model>
-      <el-image v-else class="img" :src="item.cover" lazy loading="lazy" @error="loadError(item)" />
+      <div
+        class="img-box"
+        :style="{ height: item.height + 'px' }"
+      >
+        <edit-model v-if="edit" :options="props.edit" :data="{ item, i }">
+          {{ item.isDelect }}
+          <div v-if="item.isDelect" class="list__mask">已删除</div>
+          <el-image v-if="!item.fail" class="img" :src="item.cover" lazy loading="lazy" @error="loadError(item)" />
+          <div v-else class="fail_img">{{ item.title }}</div>
+        </edit-model>
+        <el-image v-else class="img" :src="item.cover" lazy loading="lazy" @error="loadError(item)" />
+      </div>
+      <!-- 模板标题显示在素材下方 -->
+      <div v-if="item.title" class="template-title">{{ item.title }}</div>
     </div>
   </div>
 </template>
@@ -57,6 +64,7 @@ const state = reactive<TState>({
 const columnHeights: number[] = [] // 列的高度
 const columnNums = 2 // 总共有多少列
 const gap = 7 // 图片之间的间隔
+const titleHeight = 32 // 标题高度（包括间距）
 
 watch(
   () => props.listData,
@@ -68,17 +76,18 @@ watch(
       let index = i % columnNums
       const item = cloneList[i]
       item.height = (item.height / item.width) * state.width // 图片高度
+      const itemTotalHeight = item.height + (item.title ? titleHeight : 0) // 图片高度 + 标题高度
       item.left = index * (widthLimit / columnNums + gap) // 定位
       item.top = columnHeights[index] + gap || 0 // 定位
       // columnHeights[index] = isNaN(columnHeights[index]) ? item.height : item.height + columnHeights[index] + gap // 记录列高度
       // 找出最短边
       if (isNaN(columnHeights[index])) {
-        columnHeights[index] = item.height
+        columnHeights[index] = itemTotalHeight
       } else {
         index = columnHeights.indexOf(Math.min(...columnHeights))
         item.left = index * (widthLimit / columnNums + gap)
         item.top = columnHeights[index] + gap || 0
-        columnHeights[index] = item.height + columnHeights[index] + gap
+        columnHeights[index] = itemTotalHeight + columnHeights[index] + gap
       }
     }
     state.countHeight = Math.max(...columnHeights)
@@ -115,12 +124,14 @@ defineExpose({
 .img-water-fall {
   position: relative;
   margin-left: 14px;
-  .img-box {
+  .img-box-wrapper {
     position: absolute !important;
     cursor: pointer;
+  }
+  .img-box {
     position: relative;
-    background-size: cover;
-    border-radius: 5px;
+    width: 100%;
+    background-color: #808080;
     border: 1px solid #e0e5ea;
     overflow: hidden;
     .img {
@@ -129,7 +140,7 @@ defineExpose({
       height: 100%;
     }
   }
-  .img-box:hover::before {
+  .img-box-wrapper:hover .img-box::before {
     content: ' ';
     background: rgba(0, 0, 0, 0.15);
     position: absolute;
@@ -139,6 +150,17 @@ defineExpose({
     height: 100%;
     z-index: 1;
     pointer-events: none;
+  }
+  .template-title {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #666;
+    line-height: 20px;
+    height: 20px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 2px;
   }
 }
 .list {
