@@ -10,6 +10,7 @@ import * as material from './material'
 import * as ai from './ai'
 import * as auth from './auth'
 import * as redrawTask from './redrawTask'
+import * as temu from './temu'
 
 export default {
   home,
@@ -17,4 +18,5 @@ export default {
   ai,
   auth,
   redrawTask,
+  temu,
 }
