@@ -1,12 +1,13 @@
 import { NavigationGuardNext, RouteLocationNormalized, Router } from "vue-router"
 import { useAuthStore } from '@/store'
+import { LocalStorageKey } from '@/config'
 
 export default (router: Router) => {
 
     router.beforeEach((to: RouteLocationNormalized, from: RouteLocationNormalized, next: NavigationGuardNext) => {
         // 认证检查
         const authStore = useAuthStore()
-        const token = localStorage.getItem('xp_token')
+        const token = localStorage.getItem(LocalStorageKey.tokenKey)
         const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
         
         // 如果有token但没有认证状态，尝试初始化认证

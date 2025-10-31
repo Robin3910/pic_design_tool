@@ -28,5 +28,7 @@ export default {
 }
 
 export const LocalStorageKey = {
-  tokenKey: "xp_token"
+  tokenKey: "xp_token",
+  refreshTokenKey: "xp_refresh_token",
+  expiresTimeKey: "xp_expires_time"
 }

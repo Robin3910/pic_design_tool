@@ -35,7 +35,7 @@
 // 组件面板
 // const NAME = 'widget-panel'
 import widgetClassifyListData from '@/assets/data/WidgetClassifyList'
-import { reactive, onMounted, watch, nextTick } from 'vue'
+import { reactive, onMounted, watch, nextTick, markRaw } from 'vue'
 import { useRoute } from 'vue-router'
 import { UploadIcon } from '@/components/common/Icon'
 
@@ -43,7 +43,7 @@ const route = useRoute()
 
 // 图标组件映射
 const iconComponents: Record<string, any> = {
-  UploadIcon,
+  UploadIcon: markRaw(UploadIcon),
 }
 
 const state = reactive({

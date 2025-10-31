@@ -141,7 +141,6 @@ const load = async (init: boolean = false, stat?: string) => {
   
   // 防止重复加载
   if (state.loadDone || state.loading) {
-    console.log('跳过加载: loadDone=', state.loadDone, 'loading=', state.loading)
     return
   }
 
@@ -154,8 +153,6 @@ const load = async (init: boolean = false, stat?: string) => {
       pageSize: pageOptions.pageSize,
       state: pageOptions.state
     })
-    
-    console.log('API响应结果:', result)
     
     // 检查是否还有更多数据
     if (templateStore.pageInfo) {
@@ -170,22 +167,8 @@ const load = async (init: boolean = false, stat?: string) => {
       const lastPageHasData = templateStore.templates.length >= currentPageSize
       
       state.loadDone = !hasData || !lastPageHasData || currentCount >= total
-      
-      console.log('分页信息:', { 
-        apiPageNo: templateStore.pageInfo.pageNo, 
-        apiPageSize: templateStore.pageInfo.pageSize,
-        requestPageNo: currentPageNo, 
-        requestPageSize: currentPageSize, 
-        total, 
-        currentCount, 
-        templatesCount: templateStore.templates.length,
-        hasData,
-        lastPageHasData,
-        loadDone: state.loadDone 
-      })
     } else {
       state.loadDone = true
-      console.log('没有分页信息，设置loadDone=true')
     }
     
     pageOptions.pageNo += 1
@@ -218,11 +201,8 @@ function checkHeight() {
   const containerHeight = listRef.value.offsetHeight
   const contentHeight = listRef.value.scrollHeight
   
-  console.log('检查高度:', { containerHeight, contentHeight, loadDone: state.loadDone, loading: state.loading })
-  
   // 只有当内容高度小于容器高度且还有更多数据时才继续加载
-  if (contentHeight < containerHeight && !state.loadDone) {
-    console.log('内容高度不足，继续加载下一页')
+  if (contentHeight < containerHeight && !state.loadDone && !state.loading) {
     load()
   }
 }

@@ -6,6 +6,7 @@
 
 import { defineStore } from 'pinia'
 import { login, logout, getUserInfo, refreshToken } from '@/api/auth'
+import { LocalStorageKey } from '@/config'
 
 export interface User {
   id: string
@@ -25,7 +26,7 @@ export const useAuthStore = defineStore('auth', {
   state: (): AuthState => ({
     isAuthenticated: false,
     user: null,
-    token: localStorage.getItem('xp_token'),
+    token: localStorage.getItem(LocalStorageKey.tokenKey),
     loading: false
   }),
   
@@ -44,7 +45,14 @@ export const useAuthStore = defineStore('auth', {
           this.token = response.data.accessToken
           this.isAuthenticated = true
           this.user = response.data.user
-          localStorage.setItem('xp_token', response.data.accessToken)
+          // token已在login函数中保存（包括refreshToken和expiresTime）
+          localStorage.setItem(LocalStorageKey.tokenKey, response.data.accessToken)
+          if (response.data.refreshToken) {
+            localStorage.setItem(LocalStorageKey.refreshTokenKey, response.data.refreshToken)
+          }
+          if (response.data.expiresTime) {
+            localStorage.setItem(LocalStorageKey.expiresTimeKey, response.data.expiresTime)
+          }
           return { success: true }
         } else {
           throw new Error(response.msg || '登录失败')
@@ -90,13 +98,24 @@ export const useAuthStore = defineStore('auth', {
     },
     
     async refreshTokenAction() {
-      if (!this.token) return
+      const refreshTokenValue = localStorage.getItem(LocalStorageKey.refreshTokenKey)
+      if (!refreshTokenValue) {
+        this.clearAuth()
+        return false
+      }
       
       try {
         const response = await refreshToken()
         if (response.code === 0) {
           this.token = response.data.accessToken
-          localStorage.setItem('xp_token', response.data.accessToken)
+          // token已在refreshToken函数中保存（包括refreshToken和expiresTime）
+          localStorage.setItem(LocalStorageKey.tokenKey, response.data.accessToken)
+          if (response.data.refreshToken) {
+            localStorage.setItem(LocalStorageKey.refreshTokenKey, response.data.refreshToken)
+          }
+          if (response.data.expiresTime) {
+            localStorage.setItem(LocalStorageKey.expiresTimeKey, response.data.expiresTime)
+          }
           return true
         } else {
           this.clearAuth()
@@ -109,7 +128,7 @@ export const useAuthStore = defineStore('auth', {
     },
     
     initializeAuth() {
-      const token = localStorage.getItem('xp_token')
+      const token = localStorage.getItem(LocalStorageKey.tokenKey)
       if (token) {
         this.token = token
         this.fetchUserInfo()
@@ -120,7 +139,9 @@ export const useAuthStore = defineStore('auth', {
       this.isAuthenticated = false
       this.user = null
       this.token = null
-      localStorage.removeItem('xp_token')
+      localStorage.removeItem(LocalStorageKey.tokenKey)
+      localStorage.removeItem(LocalStorageKey.refreshTokenKey)
+      localStorage.removeItem(LocalStorageKey.expiresTimeKey)
     }
   }
 })
