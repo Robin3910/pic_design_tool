@@ -7,7 +7,20 @@
 -->
 <template>
   <div class="wrap">
-    <search-header v-model="state.searchKeyword" type="none" @change="searchChange" />
+    <div class="header-with-refresh">
+      <search-header v-model="state.searchKeyword" type="none" @change="searchChange" />
+      <el-button 
+        text
+        size="small"
+        :loading="state.refreshing"
+        @click="handleRefresh"
+        class="refresh-btn"
+        title="刷新"
+      >
+        <RefreshIcon v-if="!state.refreshing" size="16" />
+        <i v-else class="el-icon-loading" />
+      </el-button>
+    </div>
     <div style="height: 0.5rem" />
     <!-- <div class="types">
       <div v-for="(t, ti) in types" :key="ti + 't'" :style="{ backgroundColor: colors[ti] }" :class="['types__item', { 'types--select': currentType === t.id }]" @click="selectType(t)"></div>
@@ -49,6 +62,7 @@ import { wSvgSetting } from '../../widgets/wSvg/wSvgSetting'
 import setImageData from '@/common/methods/DesignFeatures/setImage'
 import DragHelper from '@/common/hooks/dragHelper'
 import { TGetListData } from '@/api/material'
+import RefreshIcon from '@/components/common/Icon/RefreshIcon.vue'
 import { useControlStore, useCanvasStore, useWidgetStore } from '@/store'
 import { storeToRefs } from 'pinia'
 
@@ -68,6 +82,7 @@ type TState = {
   types: { cate: string, name: string }[]
   showList: TGetListData[][]
   searchKeyword: string
+  refreshing: boolean
 }
 
 type TCurrentCategory = {
@@ -100,10 +115,11 @@ const state = reactive<TState>({
   types: [],
   showList: [],
   searchKeyword: '',
+  refreshing: false,
 })
 const pageOptions = { page: 0, pageSize: 20 }
 
-onMounted(async () => {
+const loadTypes = async () => {
   if (state.types.length <= 0) {
     // const types = await api.material.getKinds({ type: 2 })
     state.types = [
@@ -111,6 +127,7 @@ onMounted(async () => {
       { cate: 'svg', name: 'SVG矢量元素，可编辑' },
       { cate: 'mask', name: '容器Mask，图形遮罩' },
     ]
+    state.showList = []
     for (const iterator of state.types) {
       const { list } = await api.material.getList({
         cate: iterator.cate,
@@ -118,6 +135,10 @@ onMounted(async () => {
       state.showList.push(list)
     }
   }
+}
+
+onMounted(async () => {
+  await loadTypes()
 })
 
 // const dragHelper = new DragHelper()
@@ -177,6 +198,24 @@ const back = () => {
   state.currentCategory = null
 }
 
+const handleRefresh = async () => {
+  if (state.refreshing || state.loading) return
+  state.refreshing = true
+  // 重置列表并重新加载
+  if (state.currentCategory) {
+    state.list = []
+    pageOptions.page = 0
+    state.loadDone = false
+    await load(true)
+  } else {
+    // 如果在分类页面，重新加载分类数据
+    state.types = []
+    state.showList = []
+    await loadTypes()
+  }
+  state.refreshing = false
+}
+
 defineExpose({
   load,
   searchChange,
@@ -184,6 +223,7 @@ defineExpose({
   back,
   mouseup,
   mousemove,
+  handleRefresh,
 })
 
 // computed: {
@@ -236,6 +276,7 @@ async function dragStart(e: MouseEvent, item: TGetListData) {
 .wrap {
   width: 100%;
   height: 100%;
+  position: relative;
 }
 .tags {
   padding: 20px 0 0 10px;
@@ -294,5 +335,27 @@ async function dragStart(e: MouseEvent, item: TGetListData) {
   text-align: center;
   font-size: 14px;
   color: #999;
+}
+
+.header-with-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 1.7rem 0 0.5rem 0;
+  padding: 0 1rem;
+  gap: 0.5rem;
+  
+  > *:first-child {
+    flex: 1;
+  }
+}
+
+.refresh-btn {
+  padding: 4px;
+  min-width: auto;
+  
+  &:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
 }
 </style>

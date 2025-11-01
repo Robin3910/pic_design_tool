@@ -7,9 +7,20 @@
 -->
 <template>
   <div class="wrap">
-    <el-divider v-show="state.title" style="margin-top: 1.7rem" content-position="center">
-      <span style="font-weight: bold">{{ state.title }}</span>
-    </el-divider>
+    <div v-show="state.title" class="header-with-refresh">
+      <span class="header-title">{{ state.title }}</span>
+      <el-button 
+        text
+        size="small"
+        :loading="state.refreshing"
+        @click="handleRefresh"
+        class="refresh-btn"
+        title="刷新"
+      >
+        <RefreshIcon v-if="!state.refreshing" size="16" />
+        <i v-else class="el-icon-loading" />
+      </el-button>
+    </div>
 
     <ul ref="listRef" v-infinite-scroll="load" class="infinite-list" :infinite-scroll-distance="150" style="overflow: auto">
       <img-water-fall :listData="convertedList" @select="selectItem" />
@@ -24,6 +35,7 @@ import { reactive, ref, computed, onMounted } from 'vue'
 import { LocationQueryValue, useRoute, useRouter } from 'vue-router'
 import useConfirm from '@/common/methods/confirm'
 import imgWaterFall from './components/imgWaterFall.vue'
+import RefreshIcon from '@/components/common/Icon/RefreshIcon.vue'
 import { useControlStore, useCanvasStore, useUserStore, useHistoryStore, useWidgetStore, useForceStore, useTemplateStore, useAuthStore } from '@/store'
 import { storeToRefs } from 'pinia'
 import type { Template } from '@/api/template'
@@ -33,6 +45,7 @@ type TState = {
   loadDone: boolean
   title: string
   searchKeyword: string
+  refreshing: boolean
 }
 
 type TPageOptions = {
@@ -57,6 +70,7 @@ const state = reactive<TState>({
   loadDone: false,
   title: '模板',
   searchKeyword: '',
+  refreshing: false,
 })
 
 // 防抖计时器
@@ -257,10 +271,22 @@ function setTempId(tempId: number | string) {
   router.push({ path: '/home', query: { tempid: tempId, id }, replace: true })
 }
 
+const handleRefresh = async () => {
+  if (state.refreshing || state.loading) return
+  state.refreshing = true
+  // 重置列表并重新加载
+  templateStore.templates = []
+  pageOptions.pageNo = 1
+  state.loadDone = false
+  await load(true)
+  state.refreshing = false
+}
+
 defineExpose({
   load,
   cateChange,
   listRef,
+  handleRefresh,
 })
 </script>
 
@@ -268,6 +294,7 @@ defineExpose({
 .wrap {
   width: 100%;
   height: 100%;
+  position: relative;
 }
 
 .infinite-list {
@@ -312,5 +339,27 @@ defineExpose({
   text-align: center;
   font-size: 14px;
   color: #999;
+}
+
+.header-with-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 1.7rem 0 0.5rem 0;
+  padding: 0 1rem;
+}
+
+.header-title {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.refresh-btn {
+  padding: 4px;
+  min-width: auto;
+  
+  &:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
 }
 </style>

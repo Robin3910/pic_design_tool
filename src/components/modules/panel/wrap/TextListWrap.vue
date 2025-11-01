@@ -7,9 +7,20 @@
 -->
 <template>
   <div class="wrap">
-    <el-divider style="margin-top: 1.7rem" content-position="center">
-      <span style="font-weight: bold">文字</span>
-    </el-divider>
+    <div class="header-with-refresh">
+      <span class="header-title">文字</span>
+      <el-button 
+        text
+        size="small"
+        :loading="state.refreshing"
+        @click="handleRefresh"
+        class="refresh-btn"
+        title="刷新"
+      >
+        <RefreshIcon v-if="!state.refreshing" size="16" />
+        <i v-else class="el-icon-loading" />
+      </el-button>
+    </div>
     <div style="height: 0.5rem" />
     <div class="text-materials-container">
       <div v-if="state.textList.length === 0" class="empty-state">
@@ -41,6 +52,7 @@
 import { reactive, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { wTextSetting } from '../../widgets/wText/wTextSetting'
+import RefreshIcon from '@/components/common/Icon/RefreshIcon.vue'
 import { useControlStore, useCanvasStore, useWidgetStore } from '@/store'
 import api from '@/api'
 
@@ -53,6 +65,7 @@ type TTextData = {
 
 type TState = {
   textList: TTextData[]
+  refreshing: boolean
 }
 
 const controlStore = useControlStore()
@@ -62,6 +75,7 @@ const { dPage } = storeToRefs(useCanvasStore())
 
 const state = reactive<TState>({
   textList: [],
+  refreshing: false,
 })
 
 onMounted(() => {
@@ -81,15 +95,39 @@ const loadTextsFromApi = async () => {
     const results: TTextData[] = []
 
     list.forEach((item: any) => {
-      // 支持驼峰和蛇形命名两种格式（API文档使用驼峰 customTextList，但后端可能返回蛇形 custom_text_list）
-      const customTextList = item.customTextList || item.custom_text_list
+      // 解析需重制序号（支持 number、字符串"1,2,3"、数组）
+      // 必须先检查 need_redraw_index，如果没有则跳过整个任务项
+      const raw = (item as any).need_redraw_index ?? (item as any).needRedrawIndex
       console.log('处理任务项:', {
         id: item.id,
         orderNo: item.orderNo || item.order_no,
-        customTextList,
-        'customTextList类型': typeof customTextList,
-        '是否为数组': Array.isArray(customTextList)
+        need_redraw_index: raw,
+        'need_redraw_index类型': typeof raw
       })
+      
+      let indices: number[] = []
+      if (Array.isArray(raw)) {
+        indices = raw.map((n) => parseInt(n, 10)).filter((n) => !isNaN(n))
+      } else if (typeof raw === 'string') {
+        indices = raw
+          .split(',')
+          .map((s) => parseInt(s.trim(), 10))
+          .filter((n) => !isNaN(n))
+      } else if (typeof raw === 'number') {
+        indices = [raw]
+      }
+
+      // 如果没有 need_redraw_index 或解析后为空，跳过整个任务项
+      if (!raw || indices.length === 0) {
+        console.log('任务项无need_redraw_index或解析为空，跳过整个任务项')
+        return
+      }
+      const indexSet = new Set(indices)
+      console.log('need_redraw_index解析后的索引集合:', Array.from(indexSet))
+
+      // 支持驼峰和蛇形命名两种格式（API文档使用驼峰 customTextList，但后端可能返回蛇形 custom_text_list）
+      const customTextList = item.customTextList || item.custom_text_list
+      console.log('customTextList:', customTextList, '类型:', typeof customTextList)
       
       if (!customTextList) {
         console.log('任务项无customTextList，跳过')
@@ -155,22 +193,31 @@ const loadTextsFromApi = async () => {
       
       console.log('解析后的文字列表:', textList, '数量:', textList.length)
 
-      // 将文字列表转换为文字素材，确保每个文本都可以单独选择
-      // 如果custom_text_list是逗号分隔的字符串（如 "文本1,文本2,文本3"），
-      // 这里会将它们拆分成独立的文本项，每个文本都可以单独点击选择
+      // 将文字列表转换为文字素材，只显示need_redraw_index中指定的文字
       // 命名规则和图片素材一样：{id}_{index}
+      // textIndex从0开始，但索引从1开始，所以需要 textIndex + 1
+      let addedCount = 0
       textList.forEach((text, textIndex) => {
-        const name = `${item.id ?? ''}_${textIndex + 1}`
-        // 去重：如果该名称已添加则跳过
-        if (!results.find((r) => r.name === name)) {
-          results.push({
-            name,
-            text,
-            fontSize: 24,
-            fontWeight: 'normal',
-          })
+        const idx = textIndex + 1
+        // 只显示need_redraw_index中包含的索引
+        if (indexSet.has(idx)) {
+          const name = `${item.id ?? ''}_${idx}`
+          // 去重：如果该名称已添加则跳过
+          if (!results.find((r) => r.name === name)) {
+            results.push({
+              name,
+              text,
+              fontSize: 24,
+              fontWeight: 'normal',
+            })
+            addedCount++
+            console.log(`添加文字素材: ${name}, 文本: ${text}, 索引: ${idx}`)
+          }
+        } else {
+          console.log(`跳过文字索引 ${idx}，不在need_redraw_index中`)
         }
       })
+      console.log(`任务项 ${item.id} 共添加了 ${addedCount} 个文字素材`)
     })
 
     console.log('最终文字素材列表:', results)
@@ -210,9 +257,17 @@ const dragStart = (event: MouseEvent, text: TTextData) => {
   widgetStore.setSelectItem({ data: { value: textData }, type: 'text' })
 }
 
+const handleRefresh = async () => {
+  if (state.refreshing) return
+  state.refreshing = true
+  await loadTextsFromApi()
+  state.refreshing = false
+}
+
 defineExpose({
   selectText,
   dragStart,
+  handleRefresh,
 })
 </script>
 
@@ -224,6 +279,7 @@ defineExpose({
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .text-materials-container {
@@ -301,5 +357,27 @@ defineExpose({
   margin-top: 1rem;
   flex-shrink: 0;
   width: 100%;
+}
+
+.header-with-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 1.7rem 0 0.5rem 0;
+  padding: 0 1rem;
+}
+
+.header-title {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.refresh-btn {
+  padding: 4px;
+  min-width: auto;
+  
+  &:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
 }
 </style>

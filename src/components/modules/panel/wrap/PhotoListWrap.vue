@@ -7,9 +7,20 @@
 -->
 <template>
   <div class="wrap">
-    <el-divider style="margin-top: 1.7rem" content-position="center">
-      <span style="font-weight: bold">图片</span>
-    </el-divider>
+    <div class="header-with-refresh">
+      <span class="header-title">图片</span>
+      <el-button 
+        text
+        size="small"
+        :loading="state.refreshing"
+        @click="handleRefresh"
+        class="refresh-btn"
+        title="刷新"
+      >
+        <RefreshIcon v-if="!state.refreshing" size="16" />
+        <i v-else class="el-icon-loading" />
+      </el-button>
+    </div>
     <div style="height: 0.5rem" />
     <div class="local-images-container">
       <div v-if="state.localImages.length === 0" class="empty-state">
@@ -54,6 +65,7 @@
 import { reactive, onMounted } from 'vue'
 import wImageSetting from '../../widgets/wImage/wImageSetting'
 import setItem2Data from '@/common/methods/DesignFeatures/setImage'
+import RefreshIcon from '@/components/common/Icon/RefreshIcon.vue'
 import { storeToRefs } from 'pinia'
 import { useControlStore, useCanvasStore, useWidgetStore } from '@/store'
 import api from '@/api'
@@ -70,6 +82,7 @@ type TLocalImage = {
 
 type TState = {
   localImages: TLocalImage[]
+  refreshing: boolean
 }
 
 const props = defineProps<TProps>()
@@ -80,6 +93,7 @@ const { dPage } = storeToRefs(useCanvasStore())
 
 const state = reactive<TState>({
   localImages: [],
+  refreshing: false,
 })
 
 onMounted(() => {
@@ -188,9 +202,17 @@ const dragStart = (event: MouseEvent, image: TLocalImage) => {
   widgetStore.setSelectItem({ data: { value: imageData }, type: 'image' })
 }
 
+const handleRefresh = async () => {
+  if (state.refreshing) return
+  state.refreshing = true
+  await loadImagesFromApi()
+  state.refreshing = false
+}
+
 defineExpose({
   selectLocalImage,
   dragStart,
+  handleRefresh,
 })
 </script>
 
@@ -200,6 +222,7 @@ defineExpose({
   height: 100%;
   padding: 1rem;
   overflow-y: auto;
+  position: relative;
 }
 
 .local-images-container {
@@ -274,5 +297,27 @@ defineExpose({
   overflow: hidden;
   text-overflow: ellipsis;
   background: #fafafa;
+}
+
+.header-with-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 1.7rem 0 0.5rem 0;
+  padding: 0 1rem;
+}
+
+.header-title {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.refresh-btn {
+  padding: 4px;
+  min-width: auto;
+  
+  &:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
 }
 </style>
