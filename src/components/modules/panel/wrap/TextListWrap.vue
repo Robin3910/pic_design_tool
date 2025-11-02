@@ -22,8 +22,13 @@
       </el-button>
     </div>
     <div style="height: 0.5rem" />
-    <div class="text-materials-container">
-      <div v-if="state.textList.length === 0" class="empty-state">
+    <div 
+      ref="scrollContainerRef"
+      v-infinite-scroll="load" 
+      class="text-materials-container infinite-list"
+      :infinite-scroll-distance="150"
+    >
+      <div v-if="state.textList.length === 0 && !state.loading" class="empty-state">
         <p>暂无文字素材</p>
         <p>尝试刷新或检查接口数据</p>
       </div>
@@ -41,15 +46,14 @@
           <div class="text-name">{{ text.name }}</div>
         </div>
       </div>
-    </div>
-    <div class="other-text-wrap">
-      <comp-list-wrap />
+      <div v-show="state.loading" class="loading"><i class="el-icon-loading" /> 拼命加载中</div>
+      <div v-show="state.loadDone && state.textList.length > 0" class="loading">全部加载完毕</div>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { reactive, onMounted } from 'vue'
+import { reactive, onMounted, ref, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { wTextSetting } from '../../widgets/wText/wTextSetting'
 import RefreshIcon from '@/components/common/Icon/RefreshIcon.vue'
@@ -61,11 +65,16 @@ type TTextData = {
   text: string
   fontSize: number
   fontWeight: string
+  // 排序字段（不显示）
+  sortId?: number | string
+  sortIndex?: number
 }
 
 type TState = {
   textList: TTextData[]
   refreshing: boolean
+  loading: boolean
+  loadDone: boolean
 }
 
 const controlStore = useControlStore()
@@ -76,15 +85,33 @@ const { dPage } = storeToRefs(useCanvasStore())
 const state = reactive<TState>({
   textList: [],
   refreshing: false,
+  loading: false,
+  loadDone: false,
 })
+
+const scrollContainerRef = ref<HTMLElement | null>(null)
+
+const pageOptions = { pageNo: 1, pageSize: 40 }
 
 onMounted(() => {
-  loadTextsFromApi()
+  loadTextsFromApi(true)
 })
 
-const loadTextsFromApi = async () => {
+const loadTextsFromApi = async (init: boolean = false) => {
+  if (init) {
+    state.textList = []
+    pageOptions.pageNo = 1
+    state.loadDone = false
+  }
+  if (state.loadDone || state.loading) {
+    return
+  }
+  state.loading = true
   try {
-    const res = await api.redrawTask.getRedrawTaskPage({ pageNo: 1, pageSize: 20 })
+    const res = await api.redrawTask.getRedrawTaskPage({ 
+      pageNo: pageOptions.pageNo, 
+      pageSize: pageOptions.pageSize 
+    })
     console.log('文字素材API响应:', res)
     
     // 根据API文档，返回格式为: {code: 0, data: {list: [...], total: ...}, msg: ...}
@@ -209,6 +236,8 @@ const loadTextsFromApi = async () => {
               text,
               fontSize: 24,
               fontWeight: 'normal',
+              sortId: item.id ?? '',
+              sortIndex: idx,
             })
             addedCount++
             console.log(`添加文字素材: ${name}, 文本: ${text}, 索引: ${idx}`)
@@ -221,12 +250,44 @@ const loadTextsFromApi = async () => {
     })
 
     console.log('最终文字素材列表:', results)
-    // 反转数组以倒序显示（使用展开运算符避免修改原数组）
-    state.textList = [...results].reverse()
+    // 不排序，保持接口输出的原始顺序
+    
+    if (init) {
+      state.textList = results
+      // 初始加载完成后，重置滚动位置到顶部
+      await nextTick()
+      if (scrollContainerRef.value) {
+        scrollContainerRef.value.scrollTop = 0
+      }
+    } else {
+      // 追加新数据，需要去重
+      results.forEach(newItem => {
+        if (!state.textList.find(existing => existing.name === newItem.name && existing.text === newItem.text)) {
+          state.textList.push(newItem)
+        }
+      })
+      // 不排序，保持接口输出的原始顺序
+    }
+    
+    // 判断是否还有更多数据
+    if (results.length === 0 || list.length < pageOptions.pageSize) {
+      state.loadDone = true
+    } else {
+      pageOptions.pageNo += 1
+    }
   } catch (e) {
     console.error('加载文字素材失败:', e)
-    state.textList = []
+    if (init) {
+      state.textList = []
+    }
+    state.loadDone = true
+  } finally {
+    state.loading = false
   }
+}
+
+const load = () => {
+  loadTextsFromApi(false)
 }
 
 const selectText = (text: TTextData) => {
@@ -260,7 +321,12 @@ const dragStart = (event: MouseEvent, text: TTextData) => {
 const handleRefresh = async () => {
   if (state.refreshing) return
   state.refreshing = true
-  await loadTextsFromApi()
+  await loadTextsFromApi(true)
+  // 刷新后重置滚动位置到顶部
+  await nextTick()
+  if (scrollContainerRef.value) {
+    scrollContainerRef.value.scrollTop = 0
+  }
   state.refreshing = false
 }
 
@@ -276,7 +342,6 @@ defineExpose({
   width: 100%;
   height: 100%;
   padding: 1rem;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -286,6 +351,12 @@ defineExpose({
   width: 100%;
   flex: 1;
   overflow-y: auto;
+  padding-bottom: 150px;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
+.text-materials-container::-webkit-scrollbar {
+  display: none; /* Chrome Safari */
 }
 
 .empty-state {
@@ -353,10 +424,11 @@ defineExpose({
   background: #fafafa;
 }
 
-.other-text-wrap {
-  margin-top: 1rem;
-  flex-shrink: 0;
-  width: 100%;
+.loading {
+  padding-top: 1rem;
+  text-align: center;
+  font-size: 14px;
+  color: #999;
 }
 
 .header-with-refresh {

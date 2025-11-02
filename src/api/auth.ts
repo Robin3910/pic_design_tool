@@ -4,7 +4,7 @@
  * @Description: 认证相关API接口
  */
 
-import axios, { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios'
+import axios, { AxiosRequestConfig } from 'axios'
 import { LocalStorageKey } from '@/config'
 
 // 新后端API配置
@@ -37,9 +37,9 @@ function redirectToLogin() {
 }
 
 // 设置请求头的工具函数
-function setAuthHeader(config: InternalAxiosRequestConfig, token?: string) {
+function setAuthHeader(config: AxiosRequestConfig | any, token?: string) {
   const accessToken = token || localStorage.getItem(LocalStorageKey.tokenKey)
-  if (accessToken) {
+  if (accessToken && config.headers) {
     config.headers['Authorization'] = `Bearer ${accessToken}`
   }
 }
@@ -86,7 +86,7 @@ authAxios.interceptors.response.use(
       if (isRefreshing) {
         return new Promise((resolve) => {
           requests.push((token: string) => {
-            setAuthHeader(config as InternalAxiosRequestConfig, token)
+            setAuthHeader(config as any, token)
             resolve(authAxios(config))
           })
         })
@@ -116,7 +116,7 @@ authAxios.interceptors.response.use(
           saveTokens(newAccessToken, newRefreshToken, expiresTime)
           
           // 更新请求头
-          setAuthHeader(config as InternalAxiosRequestConfig, newAccessToken)
+          setAuthHeader(config as any, newAccessToken)
           
           // 执行队列中的请求
           requests.forEach(cb => cb(newAccessToken))
@@ -171,7 +171,45 @@ export const login = async (username: string, password: string): Promise<ApiResp
     }
     return apiResponse
   } catch (error: any) {
-    throw new Error(error.response?.data?.msg || '登录失败')
+    // 处理各种错误情况
+    let errorMessage = '登录失败'
+    
+    if (error.response) {
+      // HTTP错误响应（如500, 400等）
+      const status = error.response.status
+      const data = error.response.data
+      
+      if (data?.msg) {
+        errorMessage = data.msg
+      } else if (data?.message) {
+        errorMessage = data.message
+      } else if (status === 500) {
+        errorMessage = '服务器内部错误，请稍后重试或联系管理员'
+      } else if (status === 404) {
+        errorMessage = '登录接口不存在，请检查API配置'
+      } else if (status === 401) {
+        errorMessage = '用户名或密码错误'
+      } else if (status === 403) {
+        errorMessage = '没有权限访问'
+      } else {
+        errorMessage = `请求失败 (${status})`
+      }
+    } else if (error.request) {
+      // 请求已发出但没有收到响应
+      errorMessage = '无法连接到服务器，请检查网络连接或确认后端服务是否运行'
+    } else if (error.message) {
+      // 其他错误
+      errorMessage = error.message
+    }
+    
+    console.error('Login API error:', {
+      error,
+      response: error.response,
+      status: error.response?.status,
+      data: error.response?.data
+    })
+    
+    throw new Error(errorMessage)
   }
 }
 

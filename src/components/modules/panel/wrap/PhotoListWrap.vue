@@ -22,8 +22,13 @@
       </el-button>
     </div>
     <div style="height: 0.5rem" />
-    <div class="local-images-container">
-      <div v-if="state.localImages.length === 0" class="empty-state">
+    <div 
+      ref="scrollContainerRef"
+      v-infinite-scroll="load" 
+      class="local-images-container infinite-list"
+      :infinite-scroll-distance="150"
+    >
+      <div v-if="state.localImages.length === 0 && !state.loading" class="empty-state">
         <p>暂无图片</p>
         <p>尝试刷新或检查接口数据</p>
       </div>
@@ -56,13 +61,15 @@
           <div class="image-name">{{ image.name }}</div>
         </div>
       </div>
+      <div v-show="state.loading" class="loading"><i class="el-icon-loading" /> 拼命加载中</div>
+      <div v-show="state.loadDone && state.localImages.length > 0" class="loading">全部加载完毕</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 // 从接口加载图片
-import { reactive, onMounted } from 'vue'
+import { reactive, onMounted, ref, nextTick } from 'vue'
 import wImageSetting from '../../widgets/wImage/wImageSetting'
 import setItem2Data from '@/common/methods/DesignFeatures/setImage'
 import RefreshIcon from '@/components/common/Icon/RefreshIcon.vue'
@@ -78,11 +85,16 @@ type TLocalImage = {
   name: string
   url: string
   thumb?: string
+  // 排序字段（不显示）
+  sortId?: number | string
+  sortIndex?: number
 }
 
 type TState = {
   localImages: TLocalImage[]
   refreshing: boolean
+  loading: boolean
+  loadDone: boolean
 }
 
 const props = defineProps<TProps>()
@@ -94,15 +106,33 @@ const { dPage } = storeToRefs(useCanvasStore())
 const state = reactive<TState>({
   localImages: [],
   refreshing: false,
+  loading: false,
+  loadDone: false,
 })
+
+const scrollContainerRef = ref<HTMLElement | null>(null)
+
+const pageOptions = { pageNo: 1, pageSize: 20 }
 
 onMounted(() => {
-  loadImagesFromApi()
+  loadImagesFromApi(true)
 })
 
-const loadImagesFromApi = async () => {
+const loadImagesFromApi = async (init: boolean = false) => {
+  if (init) {
+    state.localImages = []
+    pageOptions.pageNo = 1
+    state.loadDone = false
+  }
+  if (state.loadDone || state.loading) {
+    return
+  }
+  state.loading = true
   try {
-    const res = await api.redrawTask.getRedrawTaskPage({ pageNo: 1, pageSize: 20 })
+    const res = await api.redrawTask.getRedrawTaskPage({ 
+      pageNo: pageOptions.pageNo, 
+      pageSize: pageOptions.pageSize 
+    })
     const list = res.data?.list || []
     const results: TLocalImage[] = []
     // 提取 URL 文件名结尾的数字作为序号（如 xxx_12.jpg => 12）
@@ -155,16 +185,55 @@ const loadImagesFromApi = async () => {
           const name = `${item.id ?? ''}_${idx}`
           // 去重：如果该 URL 已添加则跳过
           if (!results.find((r) => r.url === u)) {
-            results.push({ name, url: u, thumb: u })
+            results.push({ 
+              name, 
+              url: u, 
+              thumb: u,
+              sortId: item.id ?? '',
+              sortIndex: idx,
+            })
           }
         }
       })
     })
-    // 反转数组以倒序显示（使用展开运算符避免修改原数组）
-    state.localImages = [...results].reverse()
+    
+    // 不排序，保持接口输出的原始顺序
+    if (init) {
+      state.localImages = results
+      // 初始加载完成后，重置滚动位置到顶部
+      await nextTick()
+      if (scrollContainerRef.value) {
+        scrollContainerRef.value.scrollTop = 0
+      }
+    } else {
+      // 追加新数据，需要去重
+      results.forEach(newItem => {
+        if (!state.localImages.find(existing => existing.name === newItem.name && existing.url === newItem.url)) {
+          state.localImages.push(newItem)
+        }
+      })
+      // 不排序，保持接口输出的原始顺序
+    }
+    
+    // 判断是否还有更多数据
+    if (results.length === 0 || list.length < pageOptions.pageSize) {
+      state.loadDone = true
+    } else {
+      pageOptions.pageNo += 1
+    }
   } catch (e) {
-    state.localImages = []
+    console.error('加载图片失败:', e)
+    if (init) {
+      state.localImages = []
+    }
+    state.loadDone = true
+  } finally {
+    state.loading = false
   }
+}
+
+const load = () => {
+  loadImagesFromApi(false)
 }
 
 const selectLocalImage = async (image: TLocalImage) => {
@@ -205,7 +274,12 @@ const dragStart = (event: MouseEvent, image: TLocalImage) => {
 const handleRefresh = async () => {
   if (state.refreshing) return
   state.refreshing = true
-  await loadImagesFromApi()
+  await loadImagesFromApi(true)
+  // 刷新后重置滚动位置到顶部
+  await nextTick()
+  if (scrollContainerRef.value) {
+    scrollContainerRef.value.scrollTop = 0
+  }
   state.refreshing = false
 }
 
@@ -221,12 +295,21 @@ defineExpose({
   width: 100%;
   height: 100%;
   padding: 1rem;
-  overflow-y: auto;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .local-images-container {
   width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding-bottom: 150px;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
+.local-images-container::-webkit-scrollbar {
+  display: none; /* Chrome Safari */
 }
 
 .empty-state {
@@ -297,6 +380,13 @@ defineExpose({
   overflow: hidden;
   text-overflow: ellipsis;
   background: #fafafa;
+}
+
+.loading {
+  padding-top: 1rem;
+  text-align: center;
+  font-size: 14px;
+  color: #999;
 }
 
 .header-with-refresh {
