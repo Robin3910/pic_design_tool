@@ -9,8 +9,11 @@ import fetch from '@/utils/axios'
 import _config from '@/config'
 import { IGetTempListData } from './home'
 
-// 获取素材分类：
-export const getKinds = (params: Type.Object = {}) => fetch('design/cate', params)
+// 获取素材分类：主后端服务已移除
+export const getKinds = (params: Type.Object = {}) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch('design/cate', params)
+}
 
 type TGetListParam = {
   first_id?: number
@@ -39,8 +42,11 @@ export type TGetListData = {
 
 export type TGetListResult = TPageRequestResult<TGetListData[]>
 
-// 获取素材列表：
-export const getList = (params: TGetListParam) => fetch<TGetListResult>('design/material', params)
+// 获取素材列表：主后端服务已移除
+export const getList = (params: TGetListParam) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<TGetListResult>('design/material', params)
+}
 
 export type TGetFontParam = {
   pageSize?: number
@@ -57,8 +63,11 @@ export type TGetFontItemData = {
   lang: string
 }
 
-// 获取字体
-export const getFonts = (params: TGetFontParam = {}) => fetch<TPageRequestResult<TGetFontItemData[]>>('design/fonts', params)
+// 获取字体：主后端服务已移除
+export const getFonts = (params: TGetFontParam = {}) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<TPageRequestResult<TGetFontItemData[]>>('design/fonts', params)
+}
 
 type TGetFontSubParam = {
   font_id: string | number
@@ -70,7 +79,10 @@ type TGetFontSubExtra = {
   responseType?: string
 }
 
-export const getFontSub = (params: TGetFontSubParam, extra: TGetFontSubExtra = {}) => fetch<Blob | string>('design/font_sub', params, 'get', {}, extra)
+export const getFontSub = (params: TGetFontSubParam, extra: TGetFontSubExtra = {}) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<Blob | string>('design/font_sub', params, 'get', {}, extra)
+}
 
 type TGetImageListParams = {
   page?: number
@@ -88,8 +100,11 @@ export type TGetImageListResult = {
   thumb?: string
 } & Partial<IGetTempListData>
 
-// 图库列表
-export const getImagesList = (params: TGetImageListParams) => fetch<TPageRequestResult<TGetImageListResult[]>>('design/imgs', params, 'get')
+// 图库列表：主后端服务已移除
+export const getImagesList = (params: TGetImageListParams) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<TPageRequestResult<TGetImageListResult[]>>('design/imgs', params, 'get')
+}
 
 type TMyPhotoParams = {
   
@@ -107,21 +122,30 @@ export type TMyPhotoResult = {
   width: number
 } & IGetTempListData
 
-// 我的上传列表
-export const getMyPhoto = (params: TMyPhotoParams) => fetch<TPageRequestResult<TMyPhotoResult[]>>('design/user/image', params)
+// 我的上传列表：主后端服务已移除
+export const getMyPhoto = (params: TMyPhotoParams) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<TPageRequestResult<TMyPhotoResult[]>>('design/user/image', params)
+}
 
 type TDeleteMyPhotoParams = {
   id: string | number
   key: string
 }
 
-export const deleteMyPhoto = (params: TDeleteMyPhotoParams) => fetch<void>('design/user/image/del', params, 'post')
+export const deleteMyPhoto = (params: TDeleteMyPhotoParams) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<void>('design/user/image/del', params, 'post')
+}
 
 type TDeleteMyWorksParams = {
   id: string | number
 }
 
-export const deleteMyWorks = (params: TDeleteMyWorksParams) => fetch<void>('design/poster/del', params, 'post')
+export const deleteMyWorks = (params: TDeleteMyWorksParams) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<void>('design/poster/del', params, 'post')
+}
 
 type TAddMyPhotoParam = {
   width: number
@@ -129,22 +153,26 @@ type TAddMyPhotoParam = {
   url: string
 }
 
-// 添加图片
-export const addMyPhoto = (params: TAddMyPhotoParam) => fetch<void>('design/user/add_image', params)
+// 添加图片：主后端服务已移除
+export const addMyPhoto = (params: TAddMyPhotoParam) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<void>('design/user/add_image', params)
+}
 
-// 上传接口
+// 上传接口：主后端服务已移除
 export const upload = ({ file, folder = 'user' }: any, cb: Function) => {
-  const formData = new FormData()
-  formData.append('file', file)
-  formData.append('folder', folder)
-  const extra = {
-    responseType: 'application/json',
-    onUploadProgress: (progress: any) => {
-      cb(Math.floor((progress.loaded / progress.total) * 100), 0)
-    },
-    onDownloadProgress: (progress: any) => {
-      cb(100, Math.floor((progress.loaded / progress.total) * 100))
-    },
-  }
-  return fetch(`${_config.SCREEN_URL}/api/file/upload`, formData, 'post', {}, extra)
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // const formData = new FormData()
+  // formData.append('file', file)
+  // formData.append('folder', folder)
+  // const extra = {
+  //   responseType: 'application/json',
+  //   onUploadProgress: (progress: any) => {
+  //     cb(Math.floor((progress.loaded / progress.total) * 100), 0)
+  //   },
+  //   onDownloadProgress: (progress: any) => {
+  //     cb(100, Math.floor((progress.loaded / progress.total) * 100))
+  //   },
+  // }
+  // return fetch(`${_config.SCREEN_URL}/api/file/upload`, formData, 'post', {}, extra)
 }

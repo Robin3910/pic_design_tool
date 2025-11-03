@@ -13,7 +13,11 @@ function serialize(obj: any) {
 }
 
 // const screenshot_url = window.location.protocol + '//' + window.location.host + '/draw'
-export const download = (params: Type.Object = {}) => `${_config.SCREEN_URL}/api/screenshots?${serialize(params)}`
+// 主后端服务已移除
+export const download = (params: Type.Object = {}) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return `${_config.SCREEN_URL}/api/screenshots?${serialize(params)}`
+}
 
 type IGetTempListParam = {
   search: string
@@ -42,8 +46,11 @@ export type IGetTempListData = {
 }
 type IGetTempListResult = TPageRequestResult<IGetTempListData[]>
 
-// 获取模板列表
-export const getTempList = (params: IGetTempListParam) => fetch<IGetTempListResult>('design/list', params, 'get')
+// 获取模板列表：主后端服务已移除（请使用 src/api/template.ts）
+export const getTempList = (params: IGetTempListParam) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用 src/api/template.ts 中的模板API')
+  // return fetch<IGetTempListResult>('design/list', params, 'get')
+}
 
 export type TGetTempDetail = {
   id: number
@@ -72,7 +79,11 @@ export type TTempDetail = {
   width: number
 }
 
-export const getTempDetail = (params: TGetTempDetail) => fetch<TTempDetail>('design/temp', params, 'get')
+// 主后端服务已移除（请使用 src/api/template.ts）
+export const getTempDetail = (params: TGetTempDetail) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用 src/api/template.ts 中的模板API')
+  // return fetch<TTempDetail>('design/temp', params, 'get')
+}
 
 type TGetCategoriesParams = {
   type?: number
@@ -85,11 +96,18 @@ export type TGetCategoriesData = {
 }
 type TgetCategoriesResult = TCommResResult<TGetCategoriesData>
 
-export const getCategories = (params: TGetCategoriesParams) => fetch<TgetCategoriesResult[]>('design/cate', params, 'get')
+// 主后端服务已移除
+export const getCategories = (params: TGetCategoriesParams) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<TgetCategoriesResult[]>('design/cate', params, 'get')
+}
 
 
-// 保存模板
-export const saveTemp = (params: Type.Object = {}) => fetch('design/edit', params, 'post')
+// 保存模板：主后端服务已移除
+export const saveTemp = (params: Type.Object = {}) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch('design/edit', params, 'post')
+}
 // export const delTemp = (params: Type.Object = {}) => fetch('/api/template/temp_del', params)
 
 type TGetCompListParam = {
@@ -114,14 +132,20 @@ export type TGetCompListResult = {
 
 type getCompListReturn = TPageRequestResult<TGetCompListResult[]>
 
-// 组件相关接口
-export const getCompList = (params: TGetCompListParam) => fetch<getCompListReturn>('design/list', params, 'get')
+// 组件相关接口：主后端服务已移除
+export const getCompList = (params: TGetCompListParam) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<getCompListReturn>('design/list', params, 'get')
+}
 
 type TRemoveComp = {
   id: string | number
 }
 
-export const removeComp = (params: TRemoveComp) => fetch<void>('design/del', params, 'post')
+export const removeComp = (params: TRemoveComp) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<void>('design/del', params, 'post')
+}
 // export const getCompDetail = (params: Type.Object = {}) => fetch('/api/template/temp_info', params, 'get')
 
 type TSaveWorksParams = {
@@ -140,14 +164,23 @@ export type TSaveWorksResult = {
   msg: string
 }
 
-// 保存作品
-export const saveWorks = (params: TSaveWorksParams) => fetch<TSaveWorksResult>('design/save', params, 'post')
+// 保存作品：主后端服务已移除
+export const saveWorks = (params: TSaveWorksParams) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<TSaveWorksResult>('design/save', params, 'post')
+}
 
-// 保存个人模板
-export const saveMyTemp = (params: Type.Object = {}) => fetch('design/user/temp', params, 'post')
+// 保存个人模板：主后端服务已移除
+export const saveMyTemp = (params: Type.Object = {}) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch('design/user/temp', params, 'post')
+}
 
-// 获取作品
-export const getWorks = (params: TGetTempDetail) => fetch<TTempDetail>('design/poster', params, 'get')
+// 获取作品：主后端服务已移除
+export const getWorks = (params: TGetTempDetail) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<TTempDetail>('design/poster', params, 'get')
+}
 
 type TGetMyDesignParams = {
   page: number
@@ -156,5 +189,8 @@ type TGetMyDesignParams = {
 
 type TGetMyDesignResult = TPageRequestResult<IGetTempListData[]>
 
-// 作品列表
-export const getMyDesign = (params: TGetMyDesignParams) => fetch<TGetMyDesignResult>('design/my', params, 'get')
+// 作品列表：主后端服务已移除
+export const getMyDesign = (params: TGetMyDesignParams) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<TGetMyDesignResult>('design/my', params, 'get')
+}

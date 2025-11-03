@@ -7,7 +7,8 @@
  */
 import fetch from '@/utils/axios'
 import _config from '@/config'
-const prefix = _config.API_URL + '/'
+// 主后端服务已移除
+const prefix = '' // _config.API_URL + '/'
 const API = {
   init: prefix + 'pic/init',
   getList: prefix + 'pic/list',
@@ -17,22 +18,46 @@ const API = {
   del: prefix + 'pic/del',
 }
 
-export const init = (params: Type.Object = {}) => fetch(API.init, params, 'post')
+// 主后端服务已移除
+export const init = (params: Type.Object = {}) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch(API.init, params, 'post')
+}
 
-export const getPicList = (params: Type.Object = {}) => fetch(API.getList, params)
+// 主后端服务已移除
+export const getPicList = (params: Type.Object = {}) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch(API.getList, params)
+}
 
 type TGetTokenParam = {
   bucket: string,
   name: string
 }
 
-export const getToken = (params: TGetTokenParam) => fetch<string>(API.getToken, params)
+// 主后端服务已移除
+export const getToken = (params: TGetTokenParam) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch<string>(API.getToken, params)
+}
 
-export const deletePic = (params: Type.Object = {}) => fetch(API.delOne, params, 'post')
+// 主后端服务已移除
+export const deletePic = (params: Type.Object = {}) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch(API.delOne, params, 'post')
+}
 
-export const delPics = (params: Type.Object = {}) => fetch(API.del, params, 'post')
+// 主后端服务已移除
+export const delPics = (params: Type.Object = {}) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch(API.del, params, 'post')
+}
 
-export const reName = (params: Type.Object = {}) => fetch(API.rename, params, 'post')
+// 主后端服务已移除
+export const reName = (params: Type.Object = {}) => {
+  throw new Error('主后端服务(端口7001)已移除，请使用新后端服务(端口48080)')
+  // return fetch(API.rename, params, 'post')
+}
 
 export default {
   init,

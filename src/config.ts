@@ -17,8 +17,8 @@ export default {
   VERSION: version,
   APP_NAME: '禹链设计器',
   COPYRIGHT: 'ShawnPhang - Design.pPalxp.cn',
-  API_URL: isDev ? 'http://localhost:7001' : '', // 后端地址
-  SCREEN_URL: isDev ? 'http://localhost:7001' : '', // 截图服务地址
+  API_URL: '', // 主后端地址（已移除）
+  SCREEN_URL: '', // 截图服务地址（已移除）
   IMG_URL: 'https://store.palxp.cn/', // 七牛云资源地址
   // ICONFONT_URL: '//at.alicdn.com/t/font_3223711_74mlzj4jdue.css',
   ICONFONT_URL: '//at.alicdn.com/t/font_2717063_ypy8vprc3b.css?display=swap',

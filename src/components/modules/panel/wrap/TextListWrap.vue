@@ -35,7 +35,7 @@
       <div v-else class="texts-grid">
         <div 
           v-for="(text, index) in state.textList" 
-          :key="index"
+        :key="index"
           class="text-item"
           @click="selectText(text)"
           @mousedown="dragStart($event, text)"
@@ -360,7 +360,7 @@ defineExpose({
 }
 
 .empty-state {
-  text-align: center;
+      text-align: center;
   padding: 2rem;
   color: #999;
   
@@ -373,8 +373,8 @@ defineExpose({
 .texts-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  padding: 0.5rem 0;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
 }
 
 .text-item {
@@ -397,15 +397,15 @@ defineExpose({
 
 .text-content {
   width: 100%;
-  height: 80px;
+  height: 65px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #0d737a 0%, #35a6aa 100%);
+  color: #ffffff;
   font-size: 14px;
   font-weight: normal;
-  padding: 0.75rem;
+  padding: 0.5rem;
   text-align: center;
   word-break: break-word;
   overflow: hidden;
@@ -414,7 +414,7 @@ defineExpose({
 }
 
 .text-name {
-  padding: 0.5rem;
+  padding: 0.35rem;
   font-size: 0.8rem;
   color: #666;
   text-align: center;

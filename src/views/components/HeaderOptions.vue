@@ -318,8 +318,8 @@ function jump2Edit() {
 function checkDownloadPoster({ layers }: any) {
   let backEndCapture = false
   for (let i = 0; i < layers.length; i++) {
-    const { type, mask, textEffects } = layers[i]
-    if ((type === 'w-image' && mask) || type === 'w-svg' || type === 'w-qrcode' || (textEffects && textEffects.length > 0)) {
+    const { type, mask } = layers[i]
+    if ((type === 'w-image' && mask) || type === 'w-svg' || type === 'w-qrcode') {
       backEndCapture = true
       break
     }

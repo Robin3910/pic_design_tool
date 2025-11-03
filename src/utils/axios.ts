@@ -13,16 +13,18 @@ axios.defaults.timeout = 30000
 // axios.defaults.headers.authorization = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MTAwMDEsImV4cCI6MTc4ODU3NDc1MDU4NX0.L_t6DFD48Dm6rUPfgIgOWJkz18En1m_-hhMHcpbxliY';
 const defaultToken = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MTAwMDEsImV4cCI6MTc4ODU3NDc1MDU4NX0.L_t6DFD48Dm6rUPfgIgOWJkz18En1m_-hhMHcpbxliY';
 // const version = app_config.VERSION;
-const baseUrl = app_config.API_URL
+// 主后端服务已移除
+const baseUrl = ''
 
 // 请求拦截器
 axios.interceptors.request.use(
   (config: AxiosRequestConfig) => {
     const url = config.url ?? ""
     const values = {}
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      config.url = url.startsWith('/') ? baseUrl + url : config.url = baseUrl + '/' + url
-    }
+    // 主后端服务已移除，只处理绝对URL
+    // if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    //   config.url = url.startsWith('/') ? baseUrl + url : config.url = baseUrl + '/' + url
+    // }
 
     if (config.method === 'get') {
       //  config.params = utils.extend(config.params, values)

@@ -28,24 +28,6 @@
     }"
     @dblclick="(e) => dblclickText(e)"
   >
-    <template v-if="params.textEffects && !state.editable">
-      <div
-        v-for="(ef, efi) in params.textEffects"
-        :key="efi + 'effect'"
-        :style="{
-          fontFamily: `'${params.fontClass.value}'`,
-          color: ef.filling && ef.filling.enable && ef.filling.type === 0 ? ef.filling.color : 'transparent',
-          WebkitTextStroke: ef.stroke && ef.stroke.enable ? `${ef.stroke.width}px ${ef.stroke.color}` : undefined,
-          textShadow: ef.shadow && ef.shadow.enable ? `${ef.shadow.offsetX}px ${ef.shadow.offsetY}px ${ef.shadow.blur}px ${ef.shadow.color}` : undefined,
-          backgroundImage: ef.filling && ef.filling.enable ? (ef.filling.type === 0 ? undefined : getGradientOrImg(ef)) : undefined,
-          WebkitBackgroundClip: ef.filling && ef.filling.enable ? (ef.filling.type === 0 ? undefined : 'text') : undefined,
-          transform: ef.offset && ef.offset.enable ? `translate(${ef.offset.x}px, ${ef.offset.y}px)` : undefined,
-        }"
-        class="edit-text effect-text"
-        spellcheck="false"
-        v-html="params.text"
-      ></div>
-    </template>
     <div ref="editWrap" :style="{ fontFamily: `'${params.fontClass.value}'` }" class="edit-text" spellcheck="false" :contenteditable="state.editable ? 'plaintext-only' : false" @input="writingText($event)" @blur="writeDone($event)" v-html="params.text"></div>
   </div>
 </template>
@@ -57,7 +39,6 @@
 import { reactive, toRefs, computed, onUpdated, watch, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { fontMinWithDraw } from '@/utils/widgets/loadFontRule'
-import getGradientOrImg from './getGradientOrImg'
 import { wTextSetting } from './wTextSetting'
 import { useForceStore, useHistoryStore, useWidgetStore } from '@/store'
 
@@ -209,7 +190,6 @@ function dblclickText(_: MouseEvent) {
 }
 
 defineExpose({
-  getGradientOrImg,
   updateRecord,
   writingText,
   updateText,
@@ -234,12 +214,5 @@ defineExpose({
   word-break: break-word;
   white-space: pre-wrap;
   margin: 0;
-}
-.effect-text {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
 }
 </style>

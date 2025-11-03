@@ -33,9 +33,6 @@
         <color-select v-model="state.innerElement.color" label="颜色" @finish="(value) => finish('color', value)" />
         <!-- <color-select v-model="innerElement.backgroundColor" label="背景颜色" @finish="(value) => finish('backgroundColor', value)" /> -->
       </div>
-      <div class="line-layout style-item">
-        <effect-wrap v-model="state.innerElement.textEffects" :data="state.innerElement" :degree="state.innerElement.degree" @select="selectTextEffect" />
-      </div>
       <icon-item-select class="style-item" :data="layerIconList" @finish="layerAction" />
       <icon-item-select class="style-item" :data="alignIconList" @finish="alignAction" />
 
@@ -61,7 +58,6 @@ import colorSelect from '../../settings/colorSelect.vue'
 import iconItemSelect, { TIconItemSelectData } from '../../settings/iconItemSelect.vue'
 import textInputArea from '../../settings/textInputArea.vue'
 import valueSelect from '../../settings/valueSelect.vue'
-import effectWrap from '../../settings/EffectSelect/TextWrap.vue'
 import { useFontStore } from '@/common/methods/fonts'
 import usePageFontsFilter from './pageFontsFilter'
 import { wTextSetting, TwTextData } from './wTextSetting'
@@ -169,14 +165,6 @@ function changeValue() {
   }
 }
 
-function selectTextEffect({ key, value, style }: any) {
-  const uuid = dActiveElement.value?.uuid || ''
-  widgetStore.setWidgetStyle({ uuid, key, value })
-  // store.commit('setWidgetStyle', { uuid, key, value })
-  if (style) {
-    finish('color', style.color || '')
-  }
-}
 
 function loadFonts() {
   const localFonts = useFontStore.list
@@ -280,7 +268,6 @@ function relationChange() {
 }
 
 defineExpose({
-  selectTextEffect,
   textStyleAction,
   finish,
   layerAction,
