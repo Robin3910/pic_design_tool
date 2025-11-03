@@ -89,7 +89,7 @@
         />
         <el-button 
           class="nav-btn next-btn"
-          :disabled="state.previewIndex >= state.localImages.length - 1 && (state.loadDone || state.loading)"
+          :disabled="state.previewIndex >= state.total - 1"
           @click="handleNextImage"
           circle
         >
@@ -108,8 +108,8 @@
         <p v-if="state.previewImage.sortIndex != null">
           <strong>需重制图片的序号:</strong> {{ state.previewImage.sortIndex }}
         </p>
-        <p v-if="state.localImages.length > 1" class="image-counter">
-          {{ state.previewIndex + 1 }} / {{ state.localImages.length }}
+        <p v-if="state.total > 0" class="image-counter">
+          {{ state.previewIndex + 1 }} / {{ state.total }}
         </p>
       </div>
       <template #footer>
@@ -154,6 +154,7 @@ type TState = {
   previewVisible: boolean
   previewImage: TLocalImage | null
   previewIndex: number
+  total: number
 }
 
 const props = defineProps<TProps>()
@@ -166,6 +167,7 @@ const state = reactive<TState>({
   previewVisible: false,
   previewImage: null,
   previewIndex: -1,
+  total: 0,
 })
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
@@ -192,6 +194,10 @@ const loadImagesFromApi = async (init: boolean = false) => {
       pageSize: pageOptions.pageSize 
     })
     const list = res.data?.list || []
+    // 保存总数（只在初始化时更新）
+    if (init) {
+      state.total = res.data?.total ?? 0
+    }
     const results: TLocalImage[] = []
     // 提取 URL 文件名结尾的数字作为序号（如 xxx_12.jpg => 12）
     const extractIndexFromUrl = (u: string): number | null => {
@@ -324,22 +330,25 @@ const handlePrevImage = () => {
 
 // 切换到下一张图片
 const handleNextImage = async () => {
-  // 如果已经到了当前列表的末尾
-  if (state.previewIndex >= state.localImages.length - 1) {
-    // 如果还有更多数据未加载，则先加载
-    if (!state.loadDone && !state.loading) {
-      await loadImagesFromApi(false)
-      // 加载完成后，检查是否有新数据
-      if (state.previewIndex < state.localImages.length - 1) {
-        state.previewIndex++
-        state.previewImage = state.localImages[state.previewIndex]
+  // 如果还没到总数
+  if (state.previewIndex < state.total - 1) {
+    // 检查下一张是否已在已加载的列表中
+    const nextIndex = state.previewIndex + 1
+    if (nextIndex < state.localImages.length) {
+      // 下一张已经在列表中，直接切换
+      state.previewIndex = nextIndex
+      state.previewImage = state.localImages[nextIndex]
+    } else {
+      // 下一张不在列表中，需要加载更多数据
+      if (!state.loadDone && !state.loading) {
+        await loadImagesFromApi(false)
+        // 加载完成后，检查是否有新数据
+        if (nextIndex < state.localImages.length) {
+          state.previewIndex = nextIndex
+          state.previewImage = state.localImages[nextIndex]
+        }
       }
     }
-    // 如果没有更多数据，则不进行任何操作（按钮会被禁用）
-  } else {
-    // 正常切换到下一张
-    state.previewIndex++
-    state.previewImage = state.localImages[state.previewIndex]
   }
 }
 
