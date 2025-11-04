@@ -135,10 +135,17 @@ templateAxios.interceptors.response.use(
       }
       
       try {
-        // 调用刷新token接口
-        const refreshRes = await axios.post(`${API_BASE_URL}/system/auth/refresh-token`, null, {
-          params: { refreshToken: refreshTokenValue }
-        })
+        // 调用刷新token接口 - 使用POST body传递refreshToken
+        const refreshRes = await axios.post(
+          `${API_BASE_URL}/system/auth/refresh-token`,
+          { refreshToken: refreshTokenValue },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'tenant-id': '1'
+            }
+          }
+        )
         
         if (refreshRes.data.code === 0) {
           // 保存新的token

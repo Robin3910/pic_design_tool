@@ -40,13 +40,14 @@ import _config from '@/config'
 import downloadBlob from '@/common/methods/download/downloadBlob'
 import { useControlStore, useHistoryStore, useCanvasStore, useUserStore, useWidgetStore, useTemplateStore } from '@/store/index'
 import { storeToRefs } from 'pinia'
+import { uploadToOSS } from '@/api/temu'
 
 type TProps = {
   modelValue?: boolean
 }
 
 type TEmits = {
-  (event: 'change', data: { downloadPercent: number; downloadText: string }): void
+  (event: 'change', data: { downloadPercent: number; downloadText: string; downloadMsg?: string }): void
   (event: 'update:modelValue', data: boolean): void
 }
 
@@ -327,9 +328,98 @@ function checkDownloadPoster({ layers }: any) {
   return backEndCapture
 }
 
+// 保存到OSS - 上传成品到阿里云
+async function save() {
+  if (state.loading === true) {
+    useNotification('作品处理中', '当前有作品正在处理，请稍候再试')
+    return
+  }
+  state.loading = true
+  emit('update:modelValue', true)
+  emit('change', { downloadPercent: 1, downloadText: '正在生成图片,请稍候..' })
+  
+  try {
+    const currentRecord = pageStore.dCurrentPage
+    const backEndCapture: boolean = checkDownloadPoster(dLayouts.value[currentRecord])
+    const fileName = `${state.title || '未命名作品'}.png`
+    
+    let blob: Blob
+    
+    if (!backEndCapture) {
+      // 无特殊条件命中则直接从前端出图
+      emit('change', { downloadPercent: 10, downloadText: '正在生成图片...' })
+      const result = await canvasImage.value?.createPoster()
+      if (!result || !result.blob) {
+        throw new Error('图片生成失败')
+      }
+      blob = result.blob
+    } else {
+      // 从服务端生成图片
+      const { id, tempid } = route.query
+      if (!id && !tempid) {
+        throw new Error('请先选择模板或作品')
+      }
+      
+      const { width, height } = dPage.value
+      emit('change', { downloadPercent: 1, downloadText: '正在处理数据...' })
+      let timerCount = 0
+      const animation = setInterval(() => {
+        if (props.modelValue && timerCount < 75) {
+          timerCount += RandomNumber(1, 10)
+          emit('change', { downloadPercent: 1 + timerCount, downloadText: '正在合成图片' })
+        } else {
+          clearInterval(animation)
+        }
+      }, 800)
+      
+      // 从后端获取图片blob
+      const imageUrl = api.home.download({ id, tempid, width, height, index: pageStore.dCurrentPage }) + '&r=' + Math.random()
+      const response = await fetch(imageUrl)
+      if (!response.ok) {
+        clearInterval(animation)
+        throw new Error('图片生成失败')
+      }
+      clearInterval(animation)
+      blob = await response.blob()
+    }
+    
+    // 将Blob转换为File对象
+    const file = new File([blob], fileName, { type: 'image/png' })
+    
+    // 上传到OSS
+    emit('change', { downloadPercent: 80, downloadText: '正在上传到OSS...' })
+    const url = await uploadToOSS(file, (progress: number) => {
+      // 上传进度：80% + 实际进度 * 20%
+      const totalProgress = 80 + Math.floor(progress * 0.2)
+      emit('change', { 
+        downloadPercent: totalProgress, 
+        downloadText: `正在上传到OSS... ${progress}%` 
+      })
+    })
+    
+    // 上传成功
+    emit('change', { downloadPercent: 100, downloadText: '上传成功', downloadMsg: url })
+    useNotification('上传成功', `图片已上传到OSS，URL已复制到剪贴板`, { type: 'success' })
+    
+    // 复制URL到剪贴板
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch (err) {
+      console.warn('复制到剪贴板失败:', err)
+    }
+    
+    state.loading = false
+  } catch (error: any) {
+    console.error('保存到OSS失败:', error)
+    emit('change', { downloadPercent: 0, downloadText: '上传失败', downloadMsg: error.message || '未知错误' })
+    useNotification('上传失败', error.message || '请稍后重试', { type: 'error' })
+    state.loading = false
+  }
+}
+
 defineExpose({
   download,
-  // save, // 已注释，依赖后端服务
+  save,
   // saveTemp, // 已注释，依赖后端服务
   // stateChange, // 已注释，依赖后端服务
   load,

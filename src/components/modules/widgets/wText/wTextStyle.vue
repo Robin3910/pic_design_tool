@@ -207,8 +207,6 @@ async function textStyleAction(item: TIconItemSelectData) {
   item.key === 'textAlignLast' && innerText[item.key] === value && (value = undefined)
   // 设置属性
   item.key && (innerText[item.key] = value)
-  // 对竖版文字特殊处理
-  item.key === 'writingMode' && relationChange()
   await nextTick()
   forceStore.setUpdateRect()
 }
@@ -234,15 +232,9 @@ function changeStyleIconList() {
     const [unchecked, checked] = state.styleIconList1[i].value
     switch (key) {
       case 'fontWeight':
-      case 'textDecoration':
       case 'fontStyle':
         if (state.innerElement[key] !== unchecked && state.innerElement[key] == checked) {
           state.styleIconList1[i].select = !state.styleIconList1[i].select
-        }
-        break
-      case 'writingMode':
-        if (state.innerElement[key] !== unchecked) {
-          state.styleIconList1[i].select = true
         }
         break
     }
@@ -255,16 +247,6 @@ function changeStyleIconList() {
       continue
     }
   }
-}
-
-function relationChange() {
-  setTimeout(() => {
-    if (dActiveElement.value && dActiveElement.value.writingMode) {
-      const w_record = dActiveElement.value.width
-      state.innerElement.width = dActiveElement.value.height
-      state.innerElement.height = w_record
-    }
-  }, 10)
 }
 
 defineExpose({

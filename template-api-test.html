@@ -121,6 +121,41 @@
             overflow-x: auto;
             font-size: 12px;
         }
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+        .file-input-wrapper input[type="file"] {
+            padding: 10px;
+            cursor: pointer;
+        }
+        .preview-image {
+            max-width: 100%;
+            max-height: 400px;
+            margin-top: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+            background-color: #fff;
+        }
+        .upload-progress {
+            margin-top: 10px;
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .upload-progress-bar {
+            height: 100%;
+            background-color: #007bff;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -171,9 +206,29 @@
             <div id="tokenDetails"></div>
         </div>
 
+        <!-- OSS上传测试区域 -->
+        <div class="section" style="border: 2px solid #007bff; background-color: #f0f8ff;">
+            <h2 style="color: #007bff;">3. 阿里云OSS上传测试 📤</h2>
+            <div class="form-group">
+                <label for="ossFile" style="font-weight: bold; font-size: 16px;">选择图片文件:</label>
+                <div class="file-input-wrapper">
+                    <input type="file" id="ossFile" accept="image/*" style="padding: 15px; font-size: 14px; border: 2px dashed #007bff; border-radius: 5px; width: 100%; max-width: 400px;">
+                </div>
+                <div id="fileInfo" style="margin-top: 10px; font-size: 14px; color: #666; padding: 10px; background-color: #fff; border-radius: 4px;"></div>
+            </div>
+            <div style="margin-top: 15px;">
+                <button onclick="uploadToOSS()" style="background-color: #007bff; color: white; padding: 12px 24px; font-size: 16px; font-weight: bold; margin-right: 10px;">📤 上传到OSS</button>
+                <button onclick="clearOSSFile()" style="background-color: #6c757d; color: white; padding: 12px 24px; font-size: 16px;">清空文件</button>
+            </div>
+            <div id="uploadProgress" class="upload-progress" style="display: none; margin-top: 15px;">
+                <div id="uploadProgressBar" class="upload-progress-bar" style="width: 0%;">0%</div>
+            </div>
+            <div id="ossUploadResult" class="result" style="display: none; margin-top: 15px;"></div>
+        </div>
+
         <!-- 模板接口测试区域 -->
         <div class="section">
-            <h2>3. 模板接口测试</h2>
+            <h2>4. 模板接口测试</h2>
             
             <!-- 获取所有模板列表 -->
             <div style="margin-bottom: 20px;">
@@ -233,7 +288,7 @@
 
         <!-- 接口状态显示 -->
         <div class="section">
-            <h2>4. 接口状态</h2>
+            <h2>5. 接口状态</h2>
             <div id="apiStatus" class="result">
                 <p>等待测试...</p>
             </div>
@@ -609,6 +664,148 @@
             }
         }
 
+        // 显示文件信息
+        function updateFileInfo() {
+            const fileInput = document.getElementById('ossFile');
+            const fileInfo = document.getElementById('fileInfo');
+            
+            if (fileInput.files && fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                fileInfo.innerHTML = `
+                    <strong>已选择文件:</strong> ${file.name}<br>
+                    <strong>文件大小:</strong> ${fileSize} MB<br>
+                    <strong>文件类型:</strong> ${file.type}
+                `;
+            } else {
+                fileInfo.innerHTML = '';
+            }
+        }
+
+        // 监听文件选择
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('ossFile');
+            if (fileInput) {
+                fileInput.addEventListener('change', updateFileInfo);
+            }
+        });
+
+        // 清空OSS文件
+        function clearOSSFile() {
+            const fileInput = document.getElementById('ossFile');
+            const fileInfo = document.getElementById('fileInfo');
+            const uploadResult = document.getElementById('ossUploadResult');
+            const uploadProgress = document.getElementById('uploadProgress');
+            
+            fileInput.value = '';
+            fileInfo.innerHTML = '';
+            uploadResult.style.display = 'none';
+            uploadProgress.style.display = 'none';
+        }
+
+        // 上传到OSS
+        async function uploadToOSS() {
+            if (!accessToken) {
+                showResult('ossUploadResult', '请先登录', true);
+                return;
+            }
+
+            const fileInput = document.getElementById('ossFile');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showResult('ossUploadResult', '请先选择文件', true);
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const uploadProgress = document.getElementById('uploadProgress');
+            const uploadProgressBar = document.getElementById('uploadProgressBar');
+            const uploadResult = document.getElementById('ossUploadResult');
+
+            // 显示进度条
+            uploadProgress.style.display = 'block';
+            uploadProgressBar.style.width = '0%';
+            uploadProgressBar.textContent = '0%';
+            
+            // 显示加载状态
+            uploadResult.style.display = 'block';
+            uploadResult.className = 'result loading';
+            uploadResult.innerHTML = '上传中...';
+
+            try {
+                // 创建FormData
+                const formData = new FormData();
+                formData.append('file', file);
+
+                // 模拟上传进度（后端代理上传无法获取真实进度）
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += 10;
+                    if (progress <= 90) {
+                        uploadProgressBar.style.width = progress + '%';
+                        uploadProgressBar.textContent = progress + '%';
+                    }
+                }, 200);
+
+                // 发送请求
+                const response = await fetch(`${API_BASE_URL}/temu/oss/upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'tenant-id': tenantId
+                        // 注意：不要设置 Content-Type，让浏览器自动设置 multipart/form-data boundary
+                    },
+                    body: formData
+                });
+
+                clearInterval(progressInterval);
+                uploadProgressBar.style.width = '100%';
+                uploadProgressBar.textContent = '100%';
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.msg || `HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                // 处理响应格式
+                let imageUrl = '';
+                if (data.code === 0) {
+                    if (typeof data.data === 'string') {
+                        imageUrl = data.data;
+                    } else if (data.data && typeof data.data === 'object' && 'url' in data.data) {
+                        imageUrl = data.data.url;
+                    } else {
+                        throw new Error('响应格式错误：无法获取文件URL');
+                    }
+                } else {
+                    throw new Error(data.msg || '上传失败');
+                }
+
+                // 显示成功结果
+                uploadResult.className = 'result success';
+                uploadResult.innerHTML = `
+                    <strong>上传成功!</strong><br><br>
+                    <strong>文件URL:</strong> <a href="${imageUrl}" target="_blank">${imageUrl}</a><br><br>
+                    <strong>预览:</strong><br>
+                    <img src="${imageUrl}" alt="上传的图片" class="preview-image" onerror="this.style.display='none'; this.parentElement.innerHTML += '<p style=\\'color:red;\\'>图片加载失败</p>';"><br><br>
+                    <details>
+                        <summary>完整响应数据 (点击展开)</summary>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </details>
+                `;
+
+                // 3秒后隐藏进度条
+                setTimeout(() => {
+                    uploadProgress.style.display = 'none';
+                }, 3000);
+
+            } catch (error) {
+                uploadProgress.style.display = 'none';
+                showResult('ossUploadResult', `上传失败: ${error.message}`, true);
+                console.error('OSS上传错误:', error);
+            }
+        }
+
         // 页面加载时检查状态
         window.onload = function() {
             // 显示当前API地址
@@ -626,6 +823,12 @@
                 refreshToken = savedRefreshToken;
                 tenantId = savedTenantId || '1';
                 updateTokenInfo();
+            }
+
+            // 初始化文件选择监听
+            const fileInput = document.getElementById('ossFile');
+            if (fileInput) {
+                fileInput.addEventListener('change', updateFileInfo);
             }
         };
     </script>

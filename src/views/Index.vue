@@ -192,8 +192,9 @@ function save() {
 }
 
 function handleSave() {
-  // 保存功能暂时不实现，只显示样式
-  console.log('保存按钮点击（功能待实现）')
+  // 调用HeaderOptions的save方法上传到OSS
+  if (!optionsRef.value) return
+  optionsRef.value.save()
 }
 
 const { handleKeydowm, handleKeyup, dealCtrl } = shortcuts.methods

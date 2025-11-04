@@ -6,6 +6,7 @@
 
 import axios, { AxiosRequestConfig } from 'axios'
 import { LocalStorageKey } from '@/config'
+import { useAuthStore } from '@/store'
 
 // 新后端API配置
 const API_BASE_URL = 'http://localhost:48080/admin-api'
@@ -75,8 +76,14 @@ authAxios.interceptors.response.use(
     
     // 如果是401错误（未授权/Token过期）
     if (response && response.status === 401) {
+      // 如果没有config（请求配置丢失），直接拒绝
+      if (!config) {
+        console.error('Token refresh failed: config is missing', error)
+        return Promise.reject(error)
+      }
+      
       // 如果是刷新token的接口失败，直接跳转登录
-      if (config.url && config.url.includes('/refresh-token')) {
+      if (config.url && (config.url.includes('/refresh-token') || config.url.endsWith('refresh-token'))) {
         clearTokens()
         redirectToLogin()
         return Promise.reject(error)
@@ -84,8 +91,12 @@ authAxios.interceptors.response.use(
       
       // 如果正在刷新token，将请求加入队列
       if (isRefreshing) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
           requests.push((token: string) => {
+            if (!token) {
+              reject(new Error('Token refresh failed'))
+              return
+            }
             setAuthHeader(config as any, token)
             resolve(authAxios(config))
           })
@@ -105,15 +116,36 @@ authAxios.interceptors.response.use(
       }
       
       try {
-        // 调用刷新token接口
-        const refreshRes = await axios.post(`${API_BASE_URL}/system/auth/refresh-token`, null, {
-          params: { refreshToken }
-        })
+        // 调用刷新token接口 - 使用独立请求避免触发拦截器循环
+        // 尝试使用POST body传递refreshToken（更常见的方式）
+        const refreshRes = await axios.post(
+          `${API_BASE_URL}/system/auth/refresh-token`,
+          { refreshToken },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'tenant-id': '1'
+            }
+          }
+        )
         
-        if (refreshRes.data.code === 0) {
+        if (refreshRes.data && refreshRes.data.code === 0) {
           // 保存新的token
           const { accessToken: newAccessToken, refreshToken: newRefreshToken, expiresTime } = refreshRes.data.data
-          saveTokens(newAccessToken, newRefreshToken, expiresTime)
+          if (!newAccessToken) {
+            throw new Error('刷新token返回的accessToken为空')
+          }
+          
+          saveTokens(newAccessToken, newRefreshToken || refreshToken, expiresTime)
+          
+          // 同步更新Store的token状态（避免循环依赖，使用try-catch包装）
+          try {
+            const authStore = useAuthStore()
+            authStore.token = newAccessToken
+          } catch (storeError) {
+            // Store可能未初始化，忽略错误
+            console.warn('Failed to update auth store token:', storeError)
+          }
           
           // 更新请求头
           setAuthHeader(config as any, newAccessToken)
@@ -122,14 +154,24 @@ authAxios.interceptors.response.use(
           requests.forEach(cb => cb(newAccessToken))
           requests = []
           
-          // 重试原请求
-          return authAxios(config)
+          // 重试原请求（需要复制config避免引用问题）
+          const retryConfig = {
+            ...config,
+            headers: {
+              ...config.headers,
+              'Authorization': `Bearer ${newAccessToken}`
+            }
+          }
+          return authAxios(retryConfig)
         } else {
           // 刷新token失败（业务错误码）
-          throw new Error(refreshRes.data.msg || '刷新token失败')
+          const errorMsg = refreshRes.data?.msg || refreshRes.data?.message || '刷新token失败'
+          console.error('Token refresh failed:', errorMsg, refreshRes.data)
+          throw new Error(errorMsg)
         }
       } catch (refreshError: any) {
         // 刷新token失败，跳转登录
+        console.error('Token refresh error:', refreshError)
         clearTokens()
         
         // 执行队列中的请求（但会失败）
@@ -141,6 +183,16 @@ authAxios.interceptors.response.use(
       } finally {
         isRefreshing = false
       }
+    }
+    
+    // 处理其他HTTP错误
+    if (response) {
+      const { status, data } = response
+      console.error('API request error:', {
+        status,
+        url: config?.url,
+        message: data?.msg || data?.message || error.message
+      })
     }
     
     return Promise.reject(error)
@@ -258,9 +310,17 @@ export const refreshToken = async (): Promise<ApiResponse> => {
   }
   
   try {
-    const response = await axios.post(`${API_BASE_URL}/system/auth/refresh-token`, null, {
-      params: { refreshToken: refreshTokenValue }
-    })
+    // 使用POST body传递refreshToken
+    const response = await axios.post(
+      `${API_BASE_URL}/system/auth/refresh-token`,
+      { refreshToken: refreshTokenValue },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'tenant-id': '1'
+        }
+      }
+    )
     const apiResponse = response.data as ApiResponse
     if (apiResponse.code === 0 && apiResponse.data) {
       const { accessToken, refreshToken: newRefreshToken, expiresTime } = apiResponse.data

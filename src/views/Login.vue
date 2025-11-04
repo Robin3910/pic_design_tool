@@ -121,11 +121,36 @@ const handleLogin = async () => {
 }
 
 .login-title {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 700;
-  color: #2d3748;
   margin: 0 0 8px 0;
   font-family: 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', Arial, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 2px;
+  position: relative;
+  display: inline-block;
+  
+  &::before {
+    content: '';
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    margin-right: 10px;
+    vertical-align: middle;
+    position: relative;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='translate(12,12)'%3E%3Ccircle cx='0' cy='-6' r='2.5'/%3E%3Ccircle cx='5.2' cy='-3' r='2.5'/%3E%3Ccircle cx='5.2' cy='3' r='2.5'/%3E%3Ccircle cx='0' cy='6' r='2.5'/%3E%3Ccircle cx='-5.2' cy='3' r='2.5'/%3E%3Ccircle cx='-5.2' cy='-3' r='2.5'/%3E%3Ccircle cx='0' cy='0' r='2'/%3E%3C/g%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='translate(12,12)'%3E%3Ccircle cx='0' cy='-6' r='2.5'/%3E%3Ccircle cx='5.2' cy='-3' r='2.5'/%3E%3Ccircle cx='5.2' cy='3' r='2.5'/%3E%3Ccircle cx='0' cy='6' r='2.5'/%3E%3Ccircle cx='-5.2' cy='3' r='2.5'/%3E%3Ccircle cx='-5.2' cy='-3' r='2.5'/%3E%3Ccircle cx='0' cy='0' r='2'/%3E%3C/g%3E%3C/svg%3E");
+    mask-size: contain;
+    -webkit-mask-size: contain;
+    mask-repeat: no-repeat;
+    -webkit-mask-repeat: no-repeat;
+    mask-position: center;
+    -webkit-mask-position: center;
+  }
 }
 
 .login-subtitle {

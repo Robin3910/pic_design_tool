@@ -32,27 +32,6 @@ export const styleIconList1 = [
     value: ['normal', 'italic'],
     select: false,
   },
-  {
-    key: 'textDecoration',
-    icon: 'icon-underline',
-    tip: '下划线',
-    value: ['none', 'underline'],
-    select: false,
-  },
-  {
-    key: 'textDecoration',
-    icon: 'icon-strikethrough',
-    tip: '删除线',
-    value: ['none', 'line-through'],
-    select: false,
-  },
-  {
-    key: 'writingMode',
-    icon: 'icon-textorientation',
-    tip: '竖版文字',
-    value: ['horizontal-tb', 'vertical-rl'], // tb-rl
-    select: false,
-  },
 ] as TStyleIconData[]
 
 export type TStyleIconData2 = {

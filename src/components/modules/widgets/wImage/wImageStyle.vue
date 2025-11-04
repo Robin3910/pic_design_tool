@@ -18,17 +18,17 @@
       </el-collapse-item>
       <el-collapse-item title="设置" name="2">
         <!-- <el-button size="mini" style="width: 100%; margin-top: 0.5rem" plain @click="openCropper">替换图片</el-button> -->
-        <el-button style="width: 100%; margin-bottom: 12px" plain @click="openPicBox">替换图片</el-button>
+        <!-- <el-button style="width: 100%; margin-bottom: 12px" plain @click="openPicBox">替换图片</el-button> -->
         <div class="options">
           <el-button v-if="state.innerElement.cropEdit" plain type="primary" @click="imgCrop(false)">完成</el-button>
           <el-button v-else plain type="primary" @click="imgCrop(true)"><i class="icon sd-caijian" /> 裁剪</el-button>
-          <el-button plain @click="openImageCutout"><i class="icon sd-AIkoutu" /> 抠图</el-button>
+          <!-- <el-button plain @click="openImageCutout"><i class="icon sd-AIkoutu" /> 抠图</el-button> -->
           <!-- <uploader class="options__upload" @done="uploadImgDone">
             <el-button size="small" plain>替换图片</el-button>
           </uploader> -->
-          <el-button size="small" disabled plain @click="openCropper">美化</el-button>
+          <!-- <el-button size="small" disabled plain @click="openCropper">美化</el-button> -->
         </div>
-        <container-wrap @change="changeContainer" />
+        <!-- <container-wrap @change="changeContainer" /> -->
         <div class="slide-wrap">
           <number-slider v-model="state.innerElement.opacity" style="font-size: 14px" label="不透明" :step="0.05" :maxValue="1" @finish="(value) => finish('opacity', value)" />
           <number-slider v-model="state.innerElement.radius" style="font-size: 14px" label="圆角" :maxValue="Math.min(Number(state.innerElement.record?.width), Number(state.innerElement.record?.height))" @finish="(value) => finish('radius', value)" />
