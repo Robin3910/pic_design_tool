@@ -6,7 +6,12 @@
 
 import axios, { AxiosRequestConfig } from 'axios'
 import { LocalStorageKey } from '@/config'
-import { useAuthStore } from '@/store'
+import { 
+  refreshTokenIfNeeded, 
+  handle401Error, 
+  saveTokens,
+  clearTokens 
+} from '@/utils/tokenRefreshManager'
 
 // 新后端API配置
 const API_BASE_URL = 'http://localhost:48080/admin-api'
@@ -21,22 +26,6 @@ const authAxios = axios.create({
   }
 })
 
-// Token刷新相关状态
-let isRefreshing = false
-let requests: Array<(token: string) => void> = []
-
-// 清除token的工具函数
-function clearTokens() {
-  localStorage.removeItem(LocalStorageKey.tokenKey)
-  localStorage.removeItem(LocalStorageKey.refreshTokenKey)
-  localStorage.removeItem(LocalStorageKey.expiresTimeKey)
-}
-
-// 跳转到登录页
-function redirectToLogin() {
-  window.location.href = '/login'
-}
-
 // 设置请求头的工具函数
 function setAuthHeader(config: AxiosRequestConfig | any, token?: string) {
   const accessToken = token || localStorage.getItem(LocalStorageKey.tokenKey)
@@ -45,20 +34,17 @@ function setAuthHeader(config: AxiosRequestConfig | any, token?: string) {
   }
 }
 
-// 保存token的工具函数
-function saveTokens(accessToken: string, refreshToken: string, expiresTime?: string) {
-  localStorage.setItem(LocalStorageKey.tokenKey, accessToken)
-  localStorage.setItem(LocalStorageKey.refreshTokenKey, refreshToken)
-  if (expiresTime) {
-    localStorage.setItem(LocalStorageKey.expiresTimeKey, expiresTime)
-  }
-}
-
 // 请求拦截器
 authAxios.interceptors.request.use(
-  (config) => {
-    // 添加token
-    setAuthHeader(config)
+  async (config) => {
+    // 在发送请求前，检查 token 是否即将过期，如果是则主动刷新
+    const token = await refreshTokenIfNeeded()
+    if (token) {
+      setAuthHeader(config, token)
+    } else {
+      // 如果刷新失败或没有 token，仍然尝试使用现有的 token
+      setAuthHeader(config)
+    }
     return config
   },
   (error) => {
@@ -82,106 +68,27 @@ authAxios.interceptors.response.use(
         return Promise.reject(error)
       }
       
-      // 如果是刷新token的接口失败，直接跳转登录
-      if (config.url && (config.url.includes('/refresh-token') || config.url.endsWith('refresh-token'))) {
-        clearTokens()
-        redirectToLogin()
-        return Promise.reject(error)
-      }
-      
-      // 如果正在刷新token，将请求加入队列
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          requests.push((token: string) => {
-            if (!token) {
-              reject(new Error('Token refresh failed'))
-              return
-            }
-            setAuthHeader(config as any, token)
-            resolve(authAxios(config))
-          })
-        })
-      }
-      
-      // 开始刷新token
-      isRefreshing = true
-      const refreshToken = localStorage.getItem(LocalStorageKey.refreshTokenKey)
-      
-      if (!refreshToken) {
-        // 没有refreshToken，跳转登录
-        clearTokens()
-        redirectToLogin()
-        isRefreshing = false
-        return Promise.reject(error)
-      }
-      
       try {
-        // 调用刷新token接口 - 使用独立请求避免触发拦截器循环
-        // 尝试使用POST body传递refreshToken（更常见的方式）
-        const refreshRes = await axios.post(
-          `${API_BASE_URL}/system/auth/refresh-token`,
-          { refreshToken },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'tenant-id': '1'
-            }
-          }
-        )
+        // 使用共享的 token 刷新管理器处理 401 错误
+        const newToken = await handle401Error(config)
         
-        if (refreshRes.data && refreshRes.data.code === 0) {
-          // 保存新的token
-          const { accessToken: newAccessToken, refreshToken: newRefreshToken, expiresTime } = refreshRes.data.data
-          if (!newAccessToken) {
-            throw new Error('刷新token返回的accessToken为空')
-          }
-          
-          saveTokens(newAccessToken, newRefreshToken || refreshToken, expiresTime)
-          
-          // 同步更新Store的token状态（避免循环依赖，使用try-catch包装）
-          try {
-            const authStore = useAuthStore()
-            authStore.token = newAccessToken
-          } catch (storeError) {
-            // Store可能未初始化，忽略错误
-            console.warn('Failed to update auth store token:', storeError)
-          }
-          
-          // 更新请求头
-          setAuthHeader(config as any, newAccessToken)
-          
-          // 执行队列中的请求
-          requests.forEach(cb => cb(newAccessToken))
-          requests = []
-          
-          // 重试原请求（需要复制config避免引用问题）
+        if (newToken) {
+          // 更新请求头并重试原请求
           const retryConfig = {
             ...config,
             headers: {
               ...config.headers,
-              'Authorization': `Bearer ${newAccessToken}`
+              'Authorization': `Bearer ${newToken}`
             }
           }
           return authAxios(retryConfig)
         } else {
-          // 刷新token失败（业务错误码）
-          const errorMsg = refreshRes.data?.msg || refreshRes.data?.message || '刷新token失败'
-          console.error('Token refresh failed:', errorMsg, refreshRes.data)
-          throw new Error(errorMsg)
+          // 刷新失败，已跳转登录，直接拒绝
+          return Promise.reject(error)
         }
       } catch (refreshError: any) {
-        // 刷新token失败，跳转登录
-        console.error('Token refresh error:', refreshError)
-        clearTokens()
-        
-        // 执行队列中的请求（但会失败）
-        requests.forEach(cb => cb(''))
-        requests = []
-        
-        redirectToLogin()
+        // 刷新token失败，已跳转登录
         return Promise.reject(refreshError)
-      } finally {
-        isRefreshing = false
       }
     }
     
@@ -304,32 +211,21 @@ export const logout = async (): Promise<ApiResponse> => {
 
 // 刷新token（手动调用，通常由拦截器自动调用）
 export const refreshToken = async (): Promise<ApiResponse> => {
-  const refreshTokenValue = localStorage.getItem(LocalStorageKey.refreshTokenKey)
-  if (!refreshTokenValue) {
-    throw new Error('刷新令牌不存在')
+  const { refreshToken: refreshTokenFromManager } = await import('@/utils/tokenRefreshManager')
+  const newToken = await refreshTokenFromManager()
+  
+  if (!newToken) {
+    throw new Error('刷新token失败')
   }
   
-  try {
-    // 使用POST body传递refreshToken
-    const response = await axios.post(
-      `${API_BASE_URL}/system/auth/refresh-token`,
-      { refreshToken: refreshTokenValue },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'tenant-id': '1'
-        }
-      }
-    )
-    const apiResponse = response.data as ApiResponse
-    if (apiResponse.code === 0 && apiResponse.data) {
-      const { accessToken, refreshToken: newRefreshToken, expiresTime } = apiResponse.data
-      saveTokens(accessToken, newRefreshToken || refreshTokenValue, expiresTime)
+  // 返回格式化的响应
+  return {
+    code: 0,
+    data: {
+      accessToken: newToken,
+      refreshToken: localStorage.getItem(LocalStorageKey.refreshTokenKey) || '',
+      expiresTime: localStorage.getItem(LocalStorageKey.expiresTimeKey) || ''
     }
-    return apiResponse
-  } catch (error: any) {
-    clearTokens()
-    throw new Error(error.response?.data?.msg || '刷新token失败')
   }
 }
 
