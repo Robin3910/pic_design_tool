@@ -50,11 +50,12 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import config from '@/config'
 import { useAuthStore } from '@/store'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 const errorMessage = ref('')
@@ -75,8 +76,9 @@ const handleLogin = async () => {
   try {
     await authStore.loginAction(loginForm.username, loginForm.password)
     
-    // 登录成功，跳转到主页面
-    router.push('/')
+    // 登录成功，跳转到 redirect 参数指定的页面，如果没有则跳转到首页
+    const redirect = (route.query.redirect as string) || '/'
+    router.push(redirect)
   } catch (error: any) {
     console.error('Login error:', error)
     errorMessage.value = error.message || '登录失败，请检查网络连接'

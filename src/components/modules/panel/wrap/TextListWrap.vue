@@ -108,7 +108,7 @@ const loadTextsFromApi = async (init: boolean = false) => {
   }
   state.loading = true
   try {
-    const res = await api.redrawTask.getRedrawTaskPage({ 
+    const res = await api.redrawTask.getRedrawTaskPageWithCustomText({ 
       pageNo: pageOptions.pageNo, 
       pageSize: pageOptions.pageSize 
     })

@@ -25,17 +25,17 @@ export default [
     component: 'temp-list-wrap',
   },
   {
+    name: '图片',
+    icon: 'icon-gallery',
+    show: false,
+    component: 'photo-list-wrap',
+  },
+  {
     name: '文字',
     icon: 'icon-wenzi',
     show: false,
     style: { fontWeight: 600 },
     component: 'text-list-wrap',
-  },
-  {
-    name: '图片',
-    icon: 'icon-gallery',
-    show: false,
-    component: 'photo-list-wrap',
   },
   {
     name: '替换',

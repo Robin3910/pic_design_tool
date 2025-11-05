@@ -57,7 +57,12 @@ export const useTemplateStore = defineStore('template', () => {
   }
   
   const addTemplates = (newTemplates: Template[]) => {
-    templates.value.push(...newTemplates)
+    // 去重：只添加不存在的模板（基于ID）
+    const existingIds = new Set(templates.value.map(t => t.id))
+    const uniqueTemplates = newTemplates.filter(t => !existingIds.has(t.id))
+    if (uniqueTemplates.length > 0) {
+      templates.value.push(...uniqueTemplates)
+    }
   }
   
   const setCurrentTemplate = (template: Template | null) => {
@@ -100,8 +105,10 @@ export const useTemplateStore = defineStore('template', () => {
       if (response.code === 0) {
         const { list, total, pageNo, pageSize } = response.data
         
-        // 如果是第一页，替换数据；否则追加数据
-        if (pageNo === 1) {
+        // 使用请求参数的 pageNo 判断，如果未提供则使用响应中的 pageNo
+        // 如果是第一页，替换数据；否则追加数据（会自动去重）
+        const requestPageNo = params.pageNo ?? pageNo ?? 1
+        if (requestPageNo === 1) {
           setTemplates(list)
         } else {
           addTemplates(list)

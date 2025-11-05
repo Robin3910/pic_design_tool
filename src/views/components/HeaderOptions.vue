@@ -22,6 +22,14 @@
     <slot />
     <!-- <el-button :loading="state.loading" size="large" class="primary-btn" :disabled="tempEditing" plain type="primary" @click="download">下载作品</el-button> -->
     <!-- </copyRight> -->
+    <!-- 登出按钮 -->
+    <el-button 
+      v-if="authStore.isLoggedIn"
+      class="logout-btn"
+      @click="handleLogout"
+    >
+      登出
+    </el-button>
   </div>
   <!-- 生成图片组件 -->
   <SaveImage ref="canvasImage" />
@@ -29,7 +37,7 @@
 
 <script lang="ts" setup>
 import api from '@/api'
-import { reactive, toRefs, ref } from 'vue'
+import { reactive, toRefs, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import _dl from '@/common/methods/download'
 import useNotification from '@/common/methods/notification'
@@ -39,6 +47,7 @@ import { useFontStore } from '@/common/methods/fonts'
 import _config from '@/config'
 import downloadBlob from '@/common/methods/download/downloadBlob'
 import { useControlStore, useHistoryStore, useCanvasStore, useUserStore, useWidgetStore, useTemplateStore } from '@/store/index'
+import { useAuthStore } from '@/store/auth'
 import { storeToRefs } from 'pinia'
 import { uploadToOSS } from '@/api/temu'
 
@@ -64,8 +73,24 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const widgetStore = useWidgetStore()
+const authStore = useAuthStore()
 
 const canvasImage = ref<typeof SaveImage | null>(null)
+
+// 获取用户头像 - 使用 computed 使其响应式
+const userAvatar = computed(() => authStore.user?.avatar)
+
+// 登出按钮点击事件
+async function handleLogout() {
+  try {
+    await authStore.logoutAction()
+    // 登出成功后跳转到登录页
+    router.push('/login')
+  } catch (error) {
+    console.error('登出失败:', error)
+    useNotification('登出失败', '请重试', { type: 'error' })
+  }
+}
 
 // const {
 //   dWidgets, tempEditing
@@ -430,6 +455,7 @@ defineExpose({
 .top-icon-wrap {
   display: flex;
   align-items: center;
+  flex: 1;
   padding-right: 20px;
   height: 54px;
   .top-icon {
@@ -442,6 +468,15 @@ defineExpose({
     padding: 5px 8px;
     &:hover {
       background-color: rgba(0, 0, 0, 0.5);
+    }
+  }
+  
+  .logout-btn {
+    margin-left: auto;
+    border-radius: 4px;
+    
+    &:hover {
+      opacity: 0.8;
     }
   }
 }

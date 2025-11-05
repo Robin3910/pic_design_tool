@@ -134,6 +134,18 @@ function getDefaultCover(template: Template): string {
   `)}`
 }
 
+// 刷新模板列表
+const handleRefresh = async () => {
+  if (state.refreshing || state.loading) return
+  state.refreshing = true
+  // 重置列表并重新加载
+  templateStore.templates = []
+  pageOptions.pageNo = 1
+  state.loadDone = false
+  await load(true)
+  state.refreshing = false
+}
+
 onMounted(async () => {
   // 检查认证状态，如果未登录则不加载数据
   const authStore = useAuthStore()
@@ -141,7 +153,8 @@ onMounted(async () => {
     console.log('用户未登录，跳过模板加载')
     return
   }
-  await load(true)
+  // 进入界面时自动触发一次刷新
+  await handleRefresh()
 })
 
 const load = async (init: boolean = false, stat?: string) => {
@@ -269,17 +282,6 @@ async function selectItem(item: any) {
 function setTempId(tempId: number | string) {
   const { id } = route.query
   router.push({ path: '/home', query: { tempid: tempId, id }, replace: true })
-}
-
-const handleRefresh = async () => {
-  if (state.refreshing || state.loading) return
-  state.refreshing = true
-  // 重置列表并重新加载
-  templateStore.templates = []
-  pageOptions.pageNo = 1
-  state.loadDone = false
-  await load(true)
-  state.refreshing = false
 }
 
 defineExpose({

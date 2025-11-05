@@ -2,19 +2,40 @@
  * @Author: AI Assistant
  * @Date: 2024-12-19
  * @Description: Token 刷新管理器 - 统一管理所有 axios 实例的 token 刷新逻辑
+ * 参考文档逻辑：https://www.dashingdog.cn/article/11
  */
 
 import axios from 'axios'
+import { ElMessageBox } from 'element-plus'
 import { LocalStorageKey } from '@/config'
 import { useAuthStore } from '@/store'
 
 // API基础配置
 const API_BASE_URL = 'http://localhost:48080/admin-api'
 
+// 刷新接口白名单（这些接口不需要 token，也不会触发刷新）
+const REFRESH_TOKEN_URL = '/system/auth/refresh-token'
+const LOGIN_URL = '/system/auth/login'
+
+// 请求白名单，无须token的接口
+const whiteList: string[] = [REFRESH_TOKEN_URL, LOGIN_URL]
+
+// 需要忽略的提示。忽略后，自动 Promise.reject('error')
+// 刷新令牌被删除时，不用提示
+// 使用刷新令牌，刷新获取新的访问令牌时，结果因为过期失败，此时需要忽略。否则，会导致继续 401，无法跳转到登出界面
+const ignoreMsgs = [
+  '无效的刷新令牌',
+  '刷新令牌已过期',
+  '刷新令牌无效'
+]
+
 // Token刷新相关状态（全局共享）
+// 请求队列：刷新期间，其他请求会被加入队列，等待刷新完成
+let requestList: Array<() => void> = []
+// 是否正在刷新中
 let isRefreshing = false
-let requests: Array<(token: string) => void> = []
-let refreshPromise: Promise<string> | null = null
+// 是否正在显示重新登录对话框（防止重复弹窗）
+const isRelogin = { show: false }
 
 // 清除token的工具函数
 function clearTokens() {
@@ -23,9 +44,19 @@ function clearTokens() {
   localStorage.removeItem(LocalStorageKey.expiresTimeKey)
 }
 
-// 跳转到登录页
-function redirectToLogin() {
-  window.location.href = '/login'
+// 跳转到登录页（带 redirect 参数）
+function redirectToLogin(redirectPath?: string) {
+  if (redirectPath) {
+    window.location.href = `/login?redirect=${encodeURIComponent(redirectPath)}`
+  } else {
+    // 尝试从当前路径获取 redirect 参数
+    const currentPath = window.location.pathname + window.location.search
+    if (currentPath !== '/login') {
+      window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`
+    } else {
+      window.location.href = '/login'
+    }
+  }
 }
 
 // 保存token的工具函数
@@ -76,26 +107,7 @@ function parseExpiresTime(expiresTime: string): number | null {
   }
 }
 
-// 检查 token 是否即将过期（提前 5 分钟刷新）
-export function isTokenExpiringSoon(): boolean {
-  const expiresTime = localStorage.getItem(LocalStorageKey.expiresTimeKey)
-  if (!expiresTime) {
-    return false
-  }
-
-  const expiresTimestamp = parseExpiresTime(expiresTime)
-  if (expiresTimestamp === null) {
-    return false
-  }
-
-  const now = Date.now()
-  const fiveMinutes = 5 * 60 * 1000 // 5分钟（毫秒）
-  
-  // 如果过期时间减去当前时间小于 5 分钟，则认为即将过期
-  return (expiresTimestamp - now) < fiveMinutes
-}
-
-// 检查 token 是否已过期
+// 检查 token 是否已过期（用于调试或手动检查）
 export function isTokenExpired(): boolean {
   const expiresTime = localStorage.getItem(LocalStorageKey.expiresTimeKey)
   if (!expiresTime) {
@@ -104,144 +116,212 @@ export function isTokenExpired(): boolean {
 
   const expiresTimestamp = parseExpiresTime(expiresTime)
   if (expiresTimestamp === null) {
-    return true
+    // 解析失败时，保守策略：认为已过期，让后端验证
+    return false
   }
 
   const now = Date.now()
   return now >= expiresTimestamp
 }
 
-// 主动刷新 token（在 token 即将过期前）
-export async function refreshTokenIfNeeded(): Promise<string | null> {
-  const accessToken = localStorage.getItem(LocalStorageKey.tokenKey)
-  
-  // 如果没有 token，直接返回 null
-  if (!accessToken) {
-    return null
-  }
+// 获取当前 token（用于请求拦截器）
+export function getCurrentToken(): string | null {
+  return localStorage.getItem(LocalStorageKey.tokenKey)
+}
 
-  // 如果 token 即将过期或已过期，则刷新
-  if (isTokenExpiringSoon() || isTokenExpired()) {
-    console.log('Token is expiring soon or expired, refreshing...')
-    return await refreshToken()
-  }
+// 获取 refreshToken
+function getRefreshToken(): string | null {
+  return localStorage.getItem(LocalStorageKey.refreshTokenKey)
+}
 
-  return accessToken
+// 获取 accessToken
+function getAccessToken(): string | null {
+  return localStorage.getItem(LocalStorageKey.tokenKey)
 }
 
 // 刷新 token（核心逻辑）
-export async function refreshToken(): Promise<string | null> {
-  // 如果正在刷新，返回已有的刷新 Promise
-  if (isRefreshing && refreshPromise) {
-    return refreshPromise
-  }
-
-  // 开始刷新
-  isRefreshing = true
-  const refreshTokenValue = localStorage.getItem(LocalStorageKey.refreshTokenKey)
-
+// 调用后端接口刷新 token
+export async function refreshToken(): Promise<{ accessToken: string; refreshToken: string; expiresTime?: string } | null> {
+  const refreshTokenValue = getRefreshToken()
   if (!refreshTokenValue) {
-    // 没有refreshToken，跳转登录
-    clearTokens()
-    isRefreshing = false
-    refreshPromise = null
-    redirectToLogin()
     return null
   }
 
-  // 创建刷新 Promise
-  refreshPromise = (async () => {
+  try {
+    console.log('Calling refresh token API')
+    // 调用刷新token接口（使用URL参数，匹配后端 @RequestParam）
+    // 注意：刷新接口本身不需要 token，已在白名单中
+    axios.defaults.headers.common['tenant-id'] = '1'
+    const refreshRes = await axios.post(
+      `${API_BASE_URL}${REFRESH_TOKEN_URL}?refreshToken=${refreshTokenValue}`,
+      null,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'tenant-id': '1'
+          // 注意：不设置 Authorization 头，刷新接口不需要 token
+        }
+      }
+    )
+
+    if (refreshRes.data && refreshRes.data.code === 0) {
+      const { accessToken, refreshToken: newRefreshToken, expiresTime } = refreshRes.data.data
+      if (!accessToken) {
+        throw new Error('刷新token返回的accessToken为空')
+      }
+
+      console.log('Token refresh successful')
+      return {
+        accessToken,
+        refreshToken: newRefreshToken || refreshTokenValue,
+        expiresTime
+      }
+    } else {
+      // 刷新token失败（业务错误码）
+      const errorMsg = refreshRes.data?.msg || refreshRes.data?.message || '刷新token失败'
+      throw new Error(errorMsg)
+    }
+  } catch (error: any) {
+    console.error('Token refresh error:', error)
+    throw error
+  }
+}
+
+// 检查是否为刷新 token 接口或登录接口
+function isRefreshOrLoginUrl(url: string): boolean {
+  if (!url) return false
+  return url.includes(REFRESH_TOKEN_URL) || url.includes(LOGIN_URL)
+}
+
+// 处理认证失败（显示确认对话框并跳转登录）
+function handleAuthorized(): Promise<never> {
+  // 如果已经到登录页面则不进行弹窗提示
+  if (window.location.href.includes('/login')) {
+    return Promise.reject('登录状态已过期')
+  }
+  
+  // 防止重复弹窗
+  if (isRelogin.show) {
+    return Promise.reject('登录状态已过期')
+  }
+  
+  isRelogin.show = true
+  
+  // 获取当前路径作为 redirect 参数
+  const currentPath = window.location.pathname + window.location.search
+  const redirectPath = currentPath !== '/login' ? currentPath : '/'
+  
+  ElMessageBox.confirm(
+    '登录状态已过期，请重新登录',
+    '提示',
+    {
+      showCancelButton: false,
+      closeOnClickModal: false,
+      showClose: false,
+      closeOnPressEscape: false,
+      confirmButtonText: '重新登录',
+      type: 'warning'
+    }
+  ).then(() => {
+    // 清除认证状态
     try {
-      // 调用刷新token接口（使用URL参数，匹配后端 @RequestParam）
-      const refreshRes = await axios.post(
-        `${API_BASE_URL}/system/auth/refresh-token`,
-        null, // POST 请求体为空，参数通过 URL 传递
-        {
-          params: {
-            refreshToken: refreshTokenValue
-          },
-          headers: {
-            'Content-Type': 'application/json',
-            'tenant-id': '1'
-          }
-        }
-      )
+      const authStore = useAuthStore()
+      authStore.clearAuth()
+    } catch (error) {
+      console.warn('Failed to clear auth store:', error)
+    }
+    
+    clearTokens()
+    isRelogin.show = false
+    
+    // 刷新页面后走路由守卫，自动跳转到登录页
+    window.location.href = window.location.href
+  }).catch(() => {
+    // 用户取消，但还是要跳转（参考文档行为）
+    isRelogin.show = false
+    clearTokens()
+    redirectToLogin(redirectPath)
+  })
+  
+  return Promise.reject('登录状态已过期')
+}
 
-      if (refreshRes.data && refreshRes.data.code === 0) {
-        // 保存新的token
-        const { accessToken: newAccessToken, refreshToken: newRefreshToken, expiresTime } = refreshRes.data.data
-        if (!newAccessToken) {
-          throw new Error('刷新token返回的accessToken为空')
-        }
+// 处理 401 错误并刷新 token（被动刷新机制）
+// 参考文档逻辑：https://www.dashingdog.cn/article/11
+export async function handle401Error(config: any, service: any): Promise<any> {
+  // 如果是刷新token的接口或登录接口返回401，直接跳转登录（避免循环依赖）
+  if (config?.url && isRefreshOrLoginUrl(config.url)) {
+    console.warn('Refresh token or login endpoint returned 401, redirecting to login')
+    clearTokens()
+    handleAuthorized()
+    return Promise.reject('登录状态已过期')
+  }
 
-        saveTokens(newAccessToken, newRefreshToken || refreshTokenValue, expiresTime)
-
+  // 如果未认证，并且未进行刷新令牌，说明可能是访问令牌过期了
+  if (!isRefreshing) {
+    isRefreshing = true
+    
+    // 1. 如果获取不到刷新令牌，则只能执行登出操作
+    if (!getRefreshToken()) {
+      return handleAuthorized()
+    }
+    
+    // 2. 进行刷新访问令牌
+    try {
+      const refreshTokenRes = await refreshToken()
+      
+      // 2.1 刷新成功，则回放队列的请求 + 当前请求
+      if (refreshTokenRes) {
+        saveTokens(refreshTokenRes.accessToken, refreshTokenRes.refreshToken, refreshTokenRes.expiresTime)
+        
         // 同步更新Store的token状态
         try {
           const authStore = useAuthStore()
-          authStore.token = newAccessToken
+          authStore.token = refreshTokenRes.accessToken
         } catch (storeError) {
-          // Store可能未初始化，忽略错误
           console.warn('Failed to update auth store token:', storeError)
         }
-
-        // 执行队列中的请求
-        requests.forEach(cb => cb(newAccessToken))
-        requests = []
-
-        return newAccessToken
+        
+        // 更新请求头
+        config.headers!.Authorization = 'Bearer ' + getAccessToken()
+        
+        // 回放队列的请求
+        requestList.forEach((cb: any) => {
+          cb()
+        })
+        requestList = []
+        
+        // 重试当前请求
+        return service(config)
       } else {
-        // 刷新token失败（业务错误码）
-        const errorMsg = refreshRes.data?.msg || refreshRes.data?.message || '刷新token失败'
-        console.error('Token refresh failed:', errorMsg, refreshRes.data)
-        throw new Error(errorMsg)
+        // 刷新失败，执行登出
+        return handleAuthorized()
       }
-    } catch (refreshError: any) {
-      // 刷新token失败，跳转登录
-      console.error('Token refresh error:', refreshError)
-      clearTokens()
-
-      // 执行队列中的请求（但会失败）
-      requests.forEach(cb => cb(''))
-      requests = []
-
-      redirectToLogin()
-      return null
+    } catch (e) {
+      // 为什么需要 catch 异常呢？刷新失败时，请求因为 Promise.reject 触发异常。
+      // 2.2 刷新失败，只回放队列的请求（不回放当前请求，避免递归）
+      requestList.forEach((cb: any) => {
+        cb()
+      })
+      requestList = []
+      
+      // 提示是否要登出。即不回放当前请求！不然会形成递归
+      return handleAuthorized()
     } finally {
       isRefreshing = false
-      refreshPromise = null
     }
-  })()
-
-  return refreshPromise
-}
-
-// 处理 401 错误并刷新 token
-export async function handle401Error(config: any): Promise<string | null> {
-  // 如果是刷新token的接口失败，直接跳转登录
-  if (config?.url && (config.url.includes('/refresh-token') || config.url.endsWith('refresh-token'))) {
-    clearTokens()
-    redirectToLogin()
-    return null
-  }
-
-  // 如果正在刷新token，将请求加入队列
-  if (isRefreshing && refreshPromise) {
-    return new Promise((resolve, reject) => {
-      requests.push((token: string) => {
-        if (!token) {
-          reject(new Error('Token refresh failed'))
-          return
-        }
-        resolve(token)
+  } else {
+    // 添加到队列，等待刷新获取到新的令牌
+    return new Promise((resolve) => {
+      requestList.push(() => {
+        config.headers!.Authorization = 'Bearer ' + getAccessToken() // 让每个请求携带自定义token
+        resolve(service(config))
       })
     })
   }
-
-  // 开始刷新token
-  return await refreshToken()
 }
 
-// 导出工具函数
-export { clearTokens, redirectToLogin, saveTokens }
+// 导出工具函数和配置
+export { clearTokens, redirectToLogin, saveTokens, handleAuthorized }
+export { ignoreMsgs, whiteList }
 

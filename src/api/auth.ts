@@ -7,7 +7,7 @@
 import axios, { AxiosRequestConfig } from 'axios'
 import { LocalStorageKey } from '@/config'
 import { 
-  refreshTokenIfNeeded, 
+  getCurrentToken,
   handle401Error, 
   saveTokens,
   clearTokens 
@@ -34,17 +34,12 @@ function setAuthHeader(config: AxiosRequestConfig | any, token?: string) {
   }
 }
 
-// 请求拦截器
+// 请求拦截器（只负责设置 token，不进行主动刷新）
 authAxios.interceptors.request.use(
-  async (config) => {
-    // 在发送请求前，检查 token 是否即将过期，如果是则主动刷新
-    const token = await refreshTokenIfNeeded()
-    if (token) {
-      setAuthHeader(config, token)
-    } else {
-      // 如果刷新失败或没有 token，仍然尝试使用现有的 token
-      setAuthHeader(config)
-    }
+  (config) => {
+    // 只设置当前的 token，不进行主动刷新
+    // 如果 token 过期，后端会返回 401，由响应拦截器处理
+    setAuthHeader(config)
     return config
   },
   (error) => {
@@ -60,8 +55,39 @@ authAxios.interceptors.response.use(
   async (error) => {
     const { response, config } = error
     
-    // 如果是401错误（未授权/Token过期）
-    if (response && response.status === 401) {
+    // 处理业务错误码
+    if (response && response.data) {
+      const code = response.data.code
+      const msg = response.data.msg || response.data.message
+      
+      // 如果是401错误（未授权/Token过期）
+      if (code === 401 || response.status === 401) {
+        // 如果没有config（请求配置丢失），直接拒绝
+        if (!config) {
+          console.error('Token refresh failed: config is missing', error)
+          return Promise.reject(error)
+        }
+        
+        try {
+          // 使用共享的 token 刷新管理器处理 401 错误
+          const { handle401Error } = await import('@/utils/tokenRefreshManager')
+          return await handle401Error(config, authAxios)
+        } catch (refreshError: any) {
+          // 刷新token失败，已跳转登录
+          return Promise.reject(refreshError)
+        }
+      }
+      
+      // 检查是否需要忽略的错误提示
+      const { ignoreMsgs } = await import('@/utils/tokenRefreshManager')
+      if (msg && ignoreMsgs.includes(msg)) {
+        // 忽略的错误，直接 reject，不显示提示
+        return Promise.reject('error')
+      }
+    }
+    
+    // 如果是HTTP 401错误（未授权/Token过期），且未在业务错误码中处理
+    if (response && response.status === 401 && (!response.data || response.data.code !== 401)) {
       // 如果没有config（请求配置丢失），直接拒绝
       if (!config) {
         console.error('Token refresh failed: config is missing', error)
@@ -70,22 +96,8 @@ authAxios.interceptors.response.use(
       
       try {
         // 使用共享的 token 刷新管理器处理 401 错误
-        const newToken = await handle401Error(config)
-        
-        if (newToken) {
-          // 更新请求头并重试原请求
-          const retryConfig = {
-            ...config,
-            headers: {
-              ...config.headers,
-              'Authorization': `Bearer ${newToken}`
-            }
-          }
-          return authAxios(retryConfig)
-        } else {
-          // 刷新失败，已跳转登录，直接拒绝
-          return Promise.reject(error)
-        }
+        const { handle401Error } = await import('@/utils/tokenRefreshManager')
+        return await handle401Error(config, authAxios)
       } catch (refreshError: any) {
         // 刷新token失败，已跳转登录
         return Promise.reject(refreshError)
@@ -111,6 +123,82 @@ interface ApiResponse<T = any> {
   code: number
   data: T
   msg?: string
+}
+
+// ========== 用户信息相关类型定义 ==========
+
+// 角色简单信息
+export interface RoleSimpleRespVO {
+  id: number
+  name: string
+}
+
+// 部门简单信息
+export interface DeptSimpleRespVO {
+  id: number
+  name: string
+  parentId: number
+}
+
+// 岗位简单信息
+export interface PostSimpleRespVO {
+  id: number
+  name: string
+}
+
+// 社交用户信息
+export interface SocialUser {
+  type: number
+  openid: string
+}
+
+// 用户详细信息响应（接口一）
+export interface UserProfileRespVO {
+  id: number
+  username: string
+  nickname: string
+  email?: string
+  mobile?: string
+  sex?: number
+  avatar?: string
+  loginIp: string
+  loginDate: string
+  createTime: string
+  roles?: RoleSimpleRespVO[]
+  dept?: DeptSimpleRespVO
+  posts?: PostSimpleRespVO[]
+  socialUsers?: SocialUser[]
+}
+
+// 用户VO（用于权限信息接口）
+export interface UserVO {
+  id: number
+  nickname: string
+  avatar?: string
+  deptId?: number
+}
+
+// 菜单VO
+export interface MenuVO {
+  id: number
+  parentId: number
+  name: string
+  path?: string
+  component?: string
+  componentName?: string
+  icon?: string
+  visible: boolean
+  keepAlive: boolean
+  alwaysShow: boolean
+  children: MenuVO[]
+}
+
+// 用户权限信息响应（接口二）
+export interface AuthPermissionInfoRespVO {
+  user: UserVO
+  roles: string[]
+  permissions: string[]
+  menus: MenuVO[]
 }
 
 // 登录接口
@@ -186,13 +274,25 @@ export const register = async (username: string, password: string, email?: strin
   }
 }
 
-// 获取用户信息
-export const getUserInfo = async (): Promise<ApiResponse> => {
+// 获取用户信息（接口二：获取用户权限信息，包含用户基本信息、角色、权限标识、菜单树等）
+// 适用于：登录后初始化用户权限和菜单
+export const getUserInfo = async (): Promise<ApiResponse<AuthPermissionInfoRespVO>> => {
   try {
     const response = await authAxios.get('/system/auth/get-permission-info')
-    return response as unknown as ApiResponse
+    return response as unknown as ApiResponse<AuthPermissionInfoRespVO>
   } catch (error: any) {
     throw new Error(error.response?.data?.msg || '获取用户信息失败')
+  }
+}
+
+// 获取用户详细信息（接口一：获取用户详细信息，包含角色、部门、岗位、社交账号等）
+// 适用于：用户个人中心页面展示用户详细信息
+export const getUserProfile = async (): Promise<ApiResponse<UserProfileRespVO>> => {
+  try {
+    const response = await authAxios.get('/system/user/profile/get')
+    return response as unknown as ApiResponse<UserProfileRespVO>
+  } catch (error: any) {
+    throw new Error(error.response?.data?.msg || '获取用户详细信息失败')
   }
 }
 
@@ -212,19 +312,22 @@ export const logout = async (): Promise<ApiResponse> => {
 // 刷新token（手动调用，通常由拦截器自动调用）
 export const refreshToken = async (): Promise<ApiResponse> => {
   const { refreshToken: refreshTokenFromManager } = await import('@/utils/tokenRefreshManager')
-  const newToken = await refreshTokenFromManager()
+  const tokenData = await refreshTokenFromManager()
   
-  if (!newToken) {
+  if (!tokenData) {
     throw new Error('刷新token失败')
   }
+  
+  // 保存token
+  saveTokens(tokenData.accessToken, tokenData.refreshToken, tokenData.expiresTime)
   
   // 返回格式化的响应
   return {
     code: 0,
     data: {
-      accessToken: newToken,
-      refreshToken: localStorage.getItem(LocalStorageKey.refreshTokenKey) || '',
-      expiresTime: localStorage.getItem(LocalStorageKey.expiresTimeKey) || ''
+      accessToken: tokenData.accessToken,
+      refreshToken: tokenData.refreshToken,
+      expiresTime: tokenData.expiresTime || ''
     }
   }
 }
@@ -233,6 +336,7 @@ export default {
   login,
   register,
   getUserInfo,
+  getUserProfile,
   logout,
   refreshToken
 }
