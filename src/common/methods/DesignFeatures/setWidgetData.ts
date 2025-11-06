@@ -29,6 +29,13 @@ export default async function(type: string, item: TCommonItemData, data: Record<
     setting.width = img.width
     setting.height = img.height // parseInt(100 / item.value.ratio, 10)
     setting.imgUrl = item.value.url
+    // 保留图片素材的关联信息（sortId 和 sortIndex），用于后续保存时更新任务记录
+    if (item.value.sortId) {
+      ;(setting as any).sortId = item.value.sortId
+    }
+    if (item.value.sortIndex !== undefined) {
+      ;(setting as any).sortIndex = item.value.sortIndex
+    }
   }
   if (type === 'mask') {
     setting.mask = item.value.url

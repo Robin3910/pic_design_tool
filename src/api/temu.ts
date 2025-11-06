@@ -11,11 +11,13 @@ import { OssApi } from './temu/oss'
  * 使用新后端服务(端口48080)
  * @param file 图片文件
  * @param onUploadProgress 上传进度回调 (可选，后端代理上传无法获取真实进度)
+ * @param fileName 自定义文件名（可选，不包含扩展名）
  * @returns Promise<string> 返回图片访问URL
  */
 export const uploadToOSS = async (
   file: File,
-  onUploadProgress?: (progress: number) => void
+  onUploadProgress?: (progress: number) => void,
+  fileName?: string
 ): Promise<string> => {
   // 使用新的 OSS API
   // 注意：后端代理上传无法获取真实进度，如果提供了 onUploadProgress，可以模拟进度
@@ -27,7 +29,7 @@ export const uploadToOSS = async (
   }
   
   try {
-    const url = await OssApi.uploadFile(file)
+    const url = await OssApi.uploadFile(file, fileName)
     if (onUploadProgress) {
       onUploadProgress(100)
     }

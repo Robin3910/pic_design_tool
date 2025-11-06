@@ -254,6 +254,15 @@ const selectLocalImage = async (image: TLocalImage) => {
   setting.width = img.width
   setting.height = img.height
   setting.imgUrl = image.url
+  
+  // 保存图片素材的关联信息（sortId 和 sortIndex），用于后续保存时更新任务记录
+  if (image.sortId) {
+    ;(setting as any).sortId = image.sortId
+  }
+  if (image.sortIndex !== undefined) {
+    ;(setting as any).sortIndex = image.sortIndex
+  }
+  
   const { width: pW, height: pH } = dPage.value
   setting.left = pW / 2 - img.width / 2
   setting.top = pH / 2 - img.height / 2
@@ -262,10 +271,18 @@ const selectLocalImage = async (image: TLocalImage) => {
 }
 
 const dragStart = (event: MouseEvent, image: TLocalImage) => {
-  const imageData = {
+  const imageData: any = {
     url: image.url,
     thumb: image.thumb || image.url,
     name: image.name
+  }
+  
+  // 保存图片素材的关联信息到临时数据中
+  if (image.sortId) {
+    imageData.sortId = image.sortId
+  }
+  if (image.sortIndex !== undefined) {
+    imageData.sortIndex = image.sortIndex
   }
   
   widgetStore.setSelectItem({ data: { value: imageData }, type: 'image' })

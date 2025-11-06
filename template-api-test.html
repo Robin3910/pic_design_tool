@@ -735,6 +735,14 @@
                 // 创建FormData
                 const formData = new FormData();
                 formData.append('file', file);
+                
+                // 提取文件名（去掉扩展名）作为自定义文件名
+                const originalName = file.name || 'upload';
+                const lastDotIndex = originalName.lastIndexOf('.');
+                const fileName = lastDotIndex > 0 
+                    ? originalName.substring(0, lastDotIndex) 
+                    : originalName || `upload-${Date.now()}`;
+                formData.append('fileName', fileName);
 
                 // 模拟上传进度（后端代理上传无法获取真实进度）
                 let progress = 0;
@@ -746,8 +754,8 @@
                     }
                 }, 200);
 
-                // 发送请求
-                const response = await fetch(`${API_BASE_URL}/temu/oss/upload`, {
+                // 发送请求（使用新接口，支持自定义文件名）
+                const response = await fetch(`${API_BASE_URL}/temu/oss/upload-with-name`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,

@@ -19,13 +19,27 @@ interface ApiResponse<T = any> {
  */
 export const OssApi = {
   /**
-   * 上传文件到OSS
+   * 上传文件到OSS（支持自定义文件名）
    * @param file 要上传的文件对象
+   * @param fileName 自定义文件名（可选，不包含扩展名。如果不提供，将从文件对象中提取文件名并去掉扩展名）
    * @returns 返回文件访问URL字符串
    */
-  uploadFile: async (file: File): Promise<string> => {
+  uploadFile: async (file: File, fileName?: string): Promise<string> => {
     const formData = new FormData()
     formData.append('file', file)
+    
+    // 处理文件名：如果未提供，从文件对象中提取并去掉扩展名
+    let finalFileName = fileName
+    if (!finalFileName) {
+      const originalName = file.name || 'upload'
+      // 去掉扩展名
+      const lastDotIndex = originalName.lastIndexOf('.')
+      finalFileName = lastDotIndex > 0 
+        ? originalName.substring(0, lastDotIndex) 
+        : originalName || `upload-${Date.now()}`
+    }
+    
+    formData.append('fileName', finalFileName)
     
     // 请求配置：使用 multipart/form-data，增加超时时间到 60 秒（文件上传需要更长时间）
     const config: AxiosRequestConfig = {
@@ -36,10 +50,11 @@ export const OssApi = {
     }
     
     try {
-      // 调用接口，templateRequest 会自动处理认证token和tenant-id
+      // 调用新接口，支持自定义文件名
+      // templateRequest 会自动处理认证token和tenant-id
       // 注意：templateRequest.post 返回的是 res.data，而 templateAxios 拦截器已经处理了业务状态码
       // 所以这里 response 应该是 { code: 0, data: string } 格式
-      const response = await templateRequest.post<ApiResponse<string>>('/temu/oss/upload', formData, config)
+      const response = await templateRequest.post<ApiResponse<string>>('/temu/oss/upload-with-name', formData, config)
       
       // 处理响应格式：根据 templateAxios 的响应拦截器，成功时返回的是 response.data
       // 所以这里的 response 实际上是 { code: 0, data: string } 格式
