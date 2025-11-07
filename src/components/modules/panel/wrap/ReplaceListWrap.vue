@@ -55,6 +55,9 @@
               </div>
             </template>
           </el-image>
+          <div class="delete-btn" @click.stop="handleDelete(image, index)" title="删除">
+            <i class="el-icon-delete"></i>
+          </div>
           <div class="image-name">{{ image.name }}</div>
         </div>
       </div>
@@ -218,8 +221,8 @@ const loadImagesFromApi = async (init: boolean = false) => {
       let str = item.newSetImageUrls ?? item.new_set_image_urls
       if (typeof str !== 'string' || str.trim().length === 0) return
 
-      // 解析需重制序号（支持 number、字符串"1,2,3"、数组）
-      const raw = (item as any).need_redraw_index ?? (item as any).needRedrawIndex
+      // 解析已完成序号（支持 number、字符串"1,2,3"、数组）
+      const raw = (item as any).finished_index ?? (item as any).finishedIndex
       let indices: number[] = []
       if (Array.isArray(raw)) {
         indices = raw.map((n) => parseInt(n, 10)).filter((n) => !isNaN(n))
@@ -361,6 +364,83 @@ const handlePreviewClose = () => {
   }, 300)
 }
 
+// 删除图片
+const handleDelete = async (image: TLocalImage, index: number) => {
+  if (!image.sortId || image.sortIndex == null) {
+    ElMessage.warning('无法删除：缺少必要的任务信息')
+    return
+  }
+
+  try {
+    // 查询任务记录详情
+    const taskId = typeof image.sortId === 'string' ? parseInt(image.sortId, 10) : image.sortId
+    if (isNaN(taskId)) {
+      ElMessage.error('任务ID格式错误')
+      return
+    }
+
+    const task = await api.redrawTask.getRedrawTaskById(taskId)
+    if (!task) {
+      ElMessage.error('任务记录不存在')
+      return
+    }
+
+    // 从 newSetImageUrls 中移除对应 URL
+    const rawNewSetImageUrls = task.newSetImageUrls || ''
+    const existingUrls = rawNewSetImageUrls
+      .split(',')
+      .map((s: string) => s.trim())
+      .filter((s: string) => s.length > 0)
+    
+    // 移除匹配的 URL
+    const newUrls = existingUrls.filter((url: string) => url !== image.url)
+    const newSetImageUrls = newUrls.length > 0 ? newUrls.join(',') : ''
+
+    // 从 finishedIndex 中移除对应序号
+    const rawFinished = (task as any).finished_index ?? task.finishedIndex ?? ''
+    const finishedIndices = (typeof rawFinished === 'string' ? rawFinished : '')
+      .split(',')
+      .map((s: string) => parseInt(s.trim(), 10))
+      .filter((n: number) => !isNaN(n) && n !== image.sortIndex)
+    const finishedIndex = finishedIndices.length > 0
+      ? finishedIndices.sort((a: number, b: number) => a - b).join(',')
+      : ''
+
+    // 将删除的序号添加到 needRedrawIndex 中
+    const rawNeedRedraw = (task as any).need_redraw_index ?? task.needRedrawIndex ?? ''
+    const needRedrawIndices = (typeof rawNeedRedraw === 'string' ? rawNeedRedraw : '')
+      .split(',')
+      .map((s: string) => parseInt(s.trim(), 10))
+      .filter((n: number) => !isNaN(n))
+    
+    // 如果删除的序号不在 needRedrawIndex 中，则添加
+    if (image.sortIndex != null && !needRedrawIndices.includes(image.sortIndex)) {
+      needRedrawIndices.push(image.sortIndex)
+    }
+    const needRedrawIndex = needRedrawIndices.length > 0
+      ? needRedrawIndices.sort((a: number, b: number) => a - b).join(',')
+      : ''
+
+    // 调用更新接口
+    await api.redrawTask.updateRedrawTask({
+      id: task.id,
+      orderId: task.orderId,
+      orderNo: task.orderNo,
+      newSetImageUrls,
+      finishedIndex,
+      needRedrawIndex,
+    })
+
+    // 删除成功后，刷新数据以确保显示最新状态
+    await handleRefresh()
+
+    ElMessage.success('删除成功')
+  } catch (error) {
+    console.error('删除图片失败:', error)
+    ElMessage.error('删除失败，请稍后重试')
+  }
+}
+
 defineExpose({
   handleRefresh,
 })
@@ -410,6 +490,7 @@ defineExpose({
   overflow: hidden;
   background: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: relative;
   
   &.readonly {
     cursor: pointer;
@@ -420,11 +501,42 @@ defineExpose({
       opacity: 1;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
       transform: translateY(-2px);
+      
+      .delete-btn {
+        opacity: 1;
+      }
     }
     
     &:active {
       transform: translateY(0);
     }
+  }
+}
+
+.delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.3s ease;
+  z-index: 10;
+  
+  &:hover {
+    background: rgba(255, 77, 79, 0.9);
+    transform: scale(1.1);
+  }
+  
+  i {
+    color: #fff;
+    font-size: 16px;
   }
 }
 

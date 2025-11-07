@@ -447,6 +447,8 @@ async function save() {
         throw new Error('图片生成失败')
       }
       blob = result.blob
+      // 做图完成，立即更新进度条显示完成状态
+      emit('change', { downloadPercent: 75, downloadText: '做图完成' })
     } else {
       // 从服务端生成图片
       const { id, tempid } = route.query
@@ -475,13 +477,19 @@ async function save() {
       }
       clearInterval(animation)
       blob = await response.blob()
+      // 做图完成，立即更新进度条显示完成状态
+      emit('change', { downloadPercent: 75, downloadText: '做图完成' })
     }
+    
+    // 等待进度条更新后再开始上传（使用 setTimeout 确保进度条有时间更新）
+    await new Promise(resolve => setTimeout(resolve, 100))
     
     // 将Blob转换为File对象
     const file = new File([blob], fileName, { type: 'image/png' })
     
     // 上传到OSS（使用自定义文件名，不包含扩展名）
     emit('change', { downloadPercent: 80, downloadText: '正在上传到OSS...' })
+    let uploadProgressReached = false
     const url = await uploadToOSS(file, (progress: number) => {
       // 上传进度：80% + 实际进度 * 15%（留出5%给任务记录更新）
       const totalProgress = 80 + Math.floor(progress * 0.15)
@@ -489,10 +497,15 @@ async function save() {
         downloadPercent: totalProgress, 
         downloadText: `正在上传到OSS... ${progress}%` 
       })
+      if (progress >= 100) {
+        uploadProgressReached = true
+      }
     }, customFileName) // 传递自定义文件名（不包含扩展名）
     
-    // 上传完成，更新进度到95%
+    // 上传完成，立即更新进度到95%（无论回调是否到100%）
+    // 使用 setTimeout 确保进度条有时间更新
     emit('change', { downloadPercent: 95, downloadText: '上传完成，正在处理...' })
+    await new Promise(resolve => setTimeout(resolve, 50))
     
     // 按sortId分组，收集需要更新的任务记录
     const taskUpdateMap = new Map<number, { sortIds: number[], taskId: number }>()
@@ -549,6 +562,23 @@ async function save() {
                 合并后: finishedIndex
               })
               
+              // 从 needRedrawIndex 中移除已保存的序号
+              const rawNeedRedraw = (task as any).need_redraw_index ?? task.needRedrawIndex ?? ''
+              const needRedrawIndices = (typeof rawNeedRedraw === 'string' ? rawNeedRedraw : '')
+                .split(',')
+                .map((s: string) => parseInt(s.trim(), 10))
+                .filter((n: number) => !isNaN(n) && !sortIds.includes(n))
+              const needRedrawIndex = needRedrawIndices.length > 0
+                ? needRedrawIndices.sort((a: number, b: number) => a - b).join(',')
+                : ''
+              
+              // 调试日志：输出 needRedrawIndex 更新前后的值
+              console.log(`任务 ${taskId} needRedrawIndex 更新:`, {
+                原有: rawNeedRedraw || '(空)',
+                移除的序号: sortIds.join(','),
+                更新后: needRedrawIndex || '(空)'
+              })
+              
               // 更新 newSetImageUrls（追加新URL）
               const existingUrls = task.newSetImageUrls 
                 ? task.newSetImageUrls.split(',').map(s => s.trim()).filter(s => s.length > 0)
@@ -564,6 +594,7 @@ async function save() {
                 orderNo: task.orderNo,
                 newSetImageUrls,
                 finishedIndex,
+                needRedrawIndex,
               })
               
               console.log(`任务记录 ${taskId} 更新成功: finishedIndex=${finishedIndex}, newSetImageUrls已追加`)
@@ -611,9 +642,12 @@ async function save() {
       }
     }
     
-    // 上传成功，更新进度到100%
+    // 上传成功，确保更新进度到100%（无论前面的步骤如何）
     console.log('准备更新进度到100%')
-    emit('change', { downloadPercent: 100, downloadText: '上传成功', downloadMsg: url })
+    // 使用 setTimeout 确保进度更新在下一个事件循环中执行，避免被其他代码阻塞
+    setTimeout(() => {
+      emit('change', { downloadPercent: 100, downloadText: '上传成功', downloadMsg: url })
+    }, 0)
     const updateCount = taskUpdateMap.size
     
     // 构建最终消息

@@ -29,12 +29,23 @@ export const uploadToOSS = async (
   }
   
   try {
+    // 等待上传完成
     const url = await OssApi.uploadFile(file, fileName)
+    
+    // 确保上传完成后一定调用100%回调
+    // 使用 Promise 确保回调在上传完成后立即执行
     if (onUploadProgress) {
+      // 先立即调用一次，确保进度更新
       onUploadProgress(100)
+      // 再使用 setTimeout 确保进度条有时间更新（双重保险）
+      setTimeout(() => {
+        onUploadProgress(100)
+      }, 50)
     }
     return url
   } catch (error) {
+    // 即使出错，也确保进度回调被调用（可选）
+    // 这里不调用，让调用方处理错误情况
     throw error
   }
   // const formData = new FormData()
