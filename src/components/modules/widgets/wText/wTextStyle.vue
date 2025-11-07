@@ -185,7 +185,10 @@ function finish(key: string, value: number | Record<string, any> | string) {
     value,
   })
   setTimeout(() => {
-    key === 'fontClass' && (state.fontClassList['当前页面'] = usePageFontsFilter())
+    if (key === 'fontClass') {
+      // 重新加载字体列表以确保显示最新
+      loadFonts()
+    }
   }, 300)
 }
 

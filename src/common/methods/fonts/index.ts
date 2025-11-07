@@ -26,32 +26,59 @@ export const useFontStore = {
       this.list.push(...localFonts)
     }
 
+    // 默认字体列表
+    const defaultFonts = [
+      {
+        id: 0,
+        alias: 'Acardia Regular',
+        preview: '',
+        ttf: null,
+        woff: '',
+        value: 'Acardia Regular',
+        font_family: '',
+        size: 0,
+        lang: 'en',
+        woff_size: 0,
+      },
+      {
+        id: 543,
+        alias: '站酷快乐体',
+        preview: '',
+        ttf: null,
+        woff: 'https://lib.baomitu.com/fonts/zcool-kuaile/zcool-kuaile-regular.woff2',
+        value: 'zcool-kuaile-regular',
+        font_family: '',
+        size: 0,
+        lang: 'zh',
+        woff_size: 0,
+      },
+    ]
+
     if (this.list.length === 0) {
-      // TODO: 模拟
-      const res = {
-        list: [
-          {
-            id: 543,
-            alias: '站酷快乐体',
-            preview: '',
-            ttf: null,
-            woff: 'https://lib.baomitu.com/fonts/zcool-kuaile/zcool-kuaile-regular.woff2',
-            value: 'zcool-kuaile-regular',
-            font_family: '',
-            size: 0,
-            lang: 'zh',
-            woff_size: 0,
-          },
-        ],
-      }
+      // 如果列表为空，添加所有默认字体
       this.list.unshift(
-        ...res.list.map((x) => {
+        ...defaultFonts.map((x) => {
           const { id, alias, value, preview, woff, lang } = x
-          return { id, oid: 0, value, preview, alias, url: woff, lang }
+          return { id, oid: '0', value, preview, alias, url: woff, lang }
         }),
       )
       localStorage.setItem('FONTS', JSON.stringify(this.list))
       localStorage.setItem('FONTS_VERSION', nowVersion)
+    } else {
+      // 如果列表不为空，检查并添加缺失的默认字体
+      let hasNewDefaultFont = false
+      for (const defaultFont of defaultFonts) {
+        const hasFont = this.list.some((f) => f.value === defaultFont.value)
+        if (!hasFont) {
+          const { id, alias, value, preview, woff, lang } = defaultFont
+          this.list.unshift({ id, oid: '0', value, preview, alias, url: woff, lang })
+          hasNewDefaultFont = true
+        }
+      }
+      // 如果有新增的默认字体，更新 localStorage
+      if (hasNewDefaultFont) {
+        localStorage.setItem('FONTS', JSON.stringify(this.list))
+      }
     }
     // store.dispatch('setFonts', this.list)
   },

@@ -160,11 +160,25 @@ export const updateRedrawTask = (data: TemuRedrawTaskSaveReqVO) => {
   return templateRequest.put<ApiResponse<boolean>>('/temu/redraw-task/update', data)
 }
 
+/**
+ * 将重制任务的新套图URL同步到订单
+ * @param ids 重制任务ID列表
+ * @returns Promise<ApiResponse<number>> 返回成功处理的任务数量
+ */
+export const syncNewImagesToOrder = (ids: number[]) => {
+  // 将ID数组转换为JSON数组字符串格式，例如 "[1,2,3]"
+  const idsParam = JSON.stringify(ids)
+  // 直接在URL中拼接参数，与测试文件保持一致
+  const url = `/temu/redraw-task/sync-new-images-to-order?ids=${encodeURIComponent(idsParam)}`
+  return templateRequest.put<ApiResponse<number>>(url, null)
+}
+
 export default {
   getRedrawTaskPage,
   getRedrawTaskPageWithCustomText,
   getRedrawTaskById,
   updateRedrawTask,
+  syncNewImagesToOrder,
 }
 
 

@@ -483,13 +483,16 @@ async function save() {
     // 上传到OSS（使用自定义文件名，不包含扩展名）
     emit('change', { downloadPercent: 80, downloadText: '正在上传到OSS...' })
     const url = await uploadToOSS(file, (progress: number) => {
-      // 上传进度：80% + 实际进度 * 20%
-      const totalProgress = 80 + Math.floor(progress * 0.2)
+      // 上传进度：80% + 实际进度 * 15%（留出5%给任务记录更新）
+      const totalProgress = 80 + Math.floor(progress * 0.15)
       emit('change', { 
         downloadPercent: totalProgress, 
         downloadText: `正在上传到OSS... ${progress}%` 
       })
     }, customFileName) // 传递自定义文件名（不包含扩展名）
+    
+    // 上传完成，更新进度到95%
+    emit('change', { downloadPercent: 95, downloadText: '上传完成，正在处理...' })
     
     // 按sortId分组，收集需要更新的任务记录
     const taskUpdateMap = new Map<number, { sortIds: number[], taskId: number }>()
@@ -508,6 +511,11 @@ async function save() {
       }
     })
     
+    // 同步相关变量（在if块外定义，以便在最终消息中使用）
+    let syncSuccess = false
+    let syncCount = 0
+    let syncError: any = null
+    
     // 更新任务记录
     if (taskUpdateMap.size > 0) {
       emit('change', { downloadPercent: 95, downloadText: '正在更新任务记录...' })
@@ -525,13 +533,21 @@ async function save() {
                 return
               }
               
-              // 计算需要更新的 finishedIndex（合并已完成的序号）
-              const existingFinished = task.finishedIndex 
+              // 计算需要更新的 finishedIndex（合并已完成的序号，追加而不是覆盖）
+              const existingFinished = (task.finishedIndex && task.finishedIndex.trim()) 
                 ? task.finishedIndex.split(',').map((s: string) => parseInt(s.trim(), 10)).filter((n: number) => !isNaN(n))
                 : []
               
+              // 合并已存在的序号和新的序号，去重并排序
               const newFinishedSet = new Set([...existingFinished, ...sortIds])
               const finishedIndex = Array.from(newFinishedSet).sort((a, b) => a - b).join(',')
+              
+              // 调试日志：输出合并前后的值
+              console.log(`任务 ${taskId} finishedIndex 合并:`, {
+                原有: task.finishedIndex || '(空)',
+                新增: sortIds.join(','),
+                合并后: finishedIndex
+              })
               
               // 更新 newSetImageUrls（追加新URL）
               const existingUrls = task.newSetImageUrls 
@@ -561,15 +577,64 @@ async function save() {
       
       // 等待所有更新完成
       await Promise.all(updatePromises)
+      console.log('所有任务记录更新完成')
+      
+      // 收集所有已更新的任务记录ID
+      const taskIds = Array.from(taskUpdateMap.keys())
+      console.log('收集到的任务ID列表:', taskIds, '数量:', taskIds.length)
+      
+      // 调用同步接口，将新套图URL同步到订单
+      if (taskIds.length > 0) {
+        console.log('准备调用同步接口，任务ID列表:', taskIds)
+        emit('change', { downloadPercent: 98, downloadText: '正在同步新套图到订单...' })
+        console.log(`开始同步新套图到订单，任务ID列表:`, taskIds)
+        try {
+          console.log('调用 api.redrawTask.syncNewImagesToOrder，参数:', taskIds)
+          const syncResult = await api.redrawTask.syncNewImagesToOrder(taskIds)
+          console.log('同步接口返回结果:', syncResult)
+          syncCount = syncResult.data || 0
+          syncSuccess = true
+          console.log(`同步完成，成功处理 ${syncCount} 条任务记录`)
+        } catch (error: any) {
+          syncError = error
+          console.error('同步新套图到订单失败:', error)
+          const errorMsg = error?.response?.data?.msg || error?.message || '未知错误'
+          console.error('同步失败详情:', {
+            taskIds,
+            error: errorMsg,
+            response: error?.response?.data
+          })
+          // 不抛出错误，允许保存流程继续完成，但会在最终消息中告知用户
+        }
+      } else {
+        console.warn('任务ID列表为空，跳过同步接口调用')
+      }
     }
     
-    // 上传成功
+    // 上传成功，更新进度到100%
+    console.log('准备更新进度到100%')
     emit('change', { downloadPercent: 100, downloadText: '上传成功', downloadMsg: url })
     const updateCount = taskUpdateMap.size
-    const message = updateCount > 0 
-      ? `图片已上传到OSS，已更新 ${updateCount} 条任务记录`
-      : `图片已上传到OSS，URL已复制到剪贴板`
-    useNotification('上传成功', message, { type: 'success' })
+    
+    // 构建最终消息
+    let message = ''
+    let notificationType: 'success' | 'warning' = 'success'
+    
+    if (updateCount > 0) {
+      message = `图片已上传到OSS，已更新 ${updateCount} 条任务记录`
+      // 检查是否有同步操作
+      if (syncSuccess) {
+        message += `，已同步 ${syncCount} 条任务到订单`
+      } else if (syncError) {
+        const errorMsg = syncError?.response?.data?.msg || syncError?.message || '未知错误'
+        message += `，但同步到订单失败: ${errorMsg}`
+        notificationType = 'warning'
+      }
+    } else {
+      message = `图片已上传到OSS，URL已复制到剪贴板`
+    }
+    
+    useNotification('上传成功', message, { type: notificationType })
     
     // 复制URL到剪贴板
     try {
