@@ -32,19 +32,50 @@
         <p>暂无文字素材</p>
         <p>尝试刷新或检查接口数据</p>
       </div>
-      <div v-else class="texts-grid">
-        <div 
-          v-for="(text, index) in state.textList" 
-        :key="index"
-          class="text-item"
-          @click="selectText(text)"
-          @mousedown="dragStart($event, text)"
-        >
-          <div class="text-content">
-            {{ text.text }}
+      <template v-else-if="groupedTexts && groupedTexts.length > 0">
+        <div class="groups-container">
+          <div 
+            v-for="(group, groupIndex) in groupedTexts" 
+            :key="group.sortId || groupIndex"
+            class="text-group"
+          >
+          <div 
+            class="group-header"
+            @click="toggleGroup(group.sortId)"
+          >
+            <i 
+              :class="['collapse-icon', state.expandedGroups.has(group.sortId) ? 'el-icon-arrow-down' : 'el-icon-arrow-right']"
+            ></i>
+            <span class="group-title">
+              {{ getGroupTitle(group) }}
+            </span>
+            <span class="group-count">({{ group.texts.length }})</span>
           </div>
-          <div class="text-name">{{ text.name }}</div>
+          <div 
+            v-show="state.expandedGroups.has(group.sortId)"
+            class="group-content"
+          >
+            <div class="texts-grid">
+              <div 
+                v-for="(text, index) in group.texts" 
+                :key="index"
+                class="text-item"
+                @click="selectText(text)"
+                @mousedown="dragStart($event, text)"
+              >
+                <div class="text-content">
+                  {{ text.text }}
+                </div>
+                <div class="text-name">{{ text.name }}</div>
+              </div>
+            </div>
+          </div>
         </div>
+        </div>
+      </template>
+      <div v-else-if="!state.loading" class="empty-state">
+        <p>暂无文字素材</p>
+        <p>尝试刷新或检查接口数据</p>
       </div>
       <div v-show="state.loading" class="loading"><i class="el-icon-loading" /> 拼命加载中</div>
       <div v-show="state.loadDone && state.textList.length > 0" class="loading">全部加载完毕</div>
@@ -53,12 +84,13 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, onMounted, ref, nextTick } from 'vue'
+import { reactive, onMounted, onBeforeUnmount, ref, nextTick, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { wTextSetting } from '../../widgets/wText/wTextSetting'
 import RefreshIcon from '@/components/common/Icon/RefreshIcon.vue'
 import { useControlStore, useCanvasStore, useWidgetStore } from '@/store'
 import api from '@/api'
+import eventBus from '@/utils/plugins/eventBus'
 
 type TTextData = {
   name: string
@@ -68,6 +100,16 @@ type TTextData = {
   // 排序字段（不显示）
   sortId?: number | string
   sortIndex?: number
+  // 显示字段
+  orderNo?: string
+  categoryName?: string
+}
+
+type TTextGroup = {
+  sortId: number | string
+  texts: TTextData[]
+  orderNo?: string
+  categoryName?: string
 }
 
 type TState = {
@@ -75,6 +117,7 @@ type TState = {
   refreshing: boolean
   loading: boolean
   loadDone: boolean
+  expandedGroups: Set<number | string>
 }
 
 const controlStore = useControlStore()
@@ -87,14 +130,76 @@ const state = reactive<TState>({
   refreshing: false,
   loading: false,
   loadDone: false,
+  expandedGroups: new Set<number | string>(),
 })
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
 
 const pageOptions = { pageNo: 1, pageSize: 40 }
 
+// 按 sortId 分组文字
+const groupedTexts = computed<TTextGroup[]>(() => {
+  try {
+    if (!state.textList || state.textList.length === 0) {
+      return []
+    }
+    
+    const groupsMap = new Map<number | string, TTextGroup>()
+    
+    state.textList.forEach((text) => {
+      const sortId = text.sortId ?? 'unknown'
+      if (!groupsMap.has(sortId)) {
+        groupsMap.set(sortId, {
+          sortId,
+          texts: [],
+          orderNo: text.orderNo,
+          categoryName: text.categoryName,
+        })
+      }
+      groupsMap.get(sortId)!.texts.push(text)
+    })
+    
+    // 转换为数组，保持原始顺序（按第一个文字的顺序）
+    return Array.from(groupsMap.values())
+  } catch (error) {
+    console.error('groupedTexts computed error:', error)
+    return []
+  }
+})
+
+// 获取分组标题
+const getGroupTitle = (group: TTextGroup): string => {
+  const parts: string[] = []
+  if (group.orderNo) {
+    parts.push(`订单: ${group.orderNo}`)
+  }
+  if (group.categoryName) {
+    parts.push(`类目: ${group.categoryName}`)
+  }
+  if (parts.length === 0) {
+    parts.push(`任务ID: ${group.sortId}`)
+  }
+  return parts.join(' | ')
+}
+
+// 切换分组展开/折叠
+const toggleGroup = (sortId: number | string) => {
+  if (state.expandedGroups.has(sortId)) {
+    state.expandedGroups.delete(sortId)
+  } else {
+    state.expandedGroups.add(sortId)
+  }
+}
+
 onMounted(() => {
   loadTextsFromApi(true)
+  // 监听刷新事件
+  eventBus.on('refreshTextList', handleRefresh)
+})
+
+onBeforeUnmount(() => {
+  // 清理事件监听
+  eventBus.off('refreshTextList', handleRefresh)
 })
 
 const loadTextsFromApi = async (init: boolean = false) => {
@@ -113,6 +218,13 @@ const loadTextsFromApi = async (init: boolean = false) => {
       pageSize: pageOptions.pageSize 
     })
     console.log('文字素材API响应:', res)
+    console.log('API响应结构:', {
+      code: res.code,
+      hasData: !!res.data,
+      dataType: typeof res.data,
+      dataKeys: res.data ? Object.keys(res.data) : [],
+      dataValue: res.data
+    })
     
     // 根据API文档，返回格式为: {code: 0, data: {list: [...], total: ...}, msg: ...}
     // templateRequest.get 返回 res.data，所以 res = {code: 0, data: {list: [...], total: ...}, msg: ...}
@@ -238,6 +350,8 @@ const loadTextsFromApi = async (init: boolean = false) => {
               fontWeight: 'normal',
               sortId: item.id ?? '',
               sortIndex: idx,
+              orderNo: item.orderNo || item.order_no || '',
+              categoryName: item.categoryName || item.category_name || '',
             })
             addedCount++
             console.log(`添加文字素材: ${name}, 文本: ${text}, 索引: ${idx}`)
@@ -254,6 +368,13 @@ const loadTextsFromApi = async (init: boolean = false) => {
     
     if (init) {
       state.textList = results
+      // 初始化时，默认展开所有分组
+      state.expandedGroups.clear()
+      results.forEach(item => {
+        if (item.sortId) {
+          state.expandedGroups.add(item.sortId)
+        }
+      })
       // 初始加载完成后，重置滚动位置到顶部
       await nextTick()
       if (scrollContainerRef.value) {
@@ -264,6 +385,10 @@ const loadTextsFromApi = async (init: boolean = false) => {
       results.forEach(newItem => {
         if (!state.textList.find(existing => existing.name === newItem.name && existing.text === newItem.text)) {
           state.textList.push(newItem)
+          // 新数据的分组默认展开
+          if (newItem.sortId && !state.expandedGroups.has(newItem.sortId)) {
+            state.expandedGroups.add(newItem.sortId)
+          }
         }
       })
       // 不排序，保持接口输出的原始顺序
@@ -367,6 +492,73 @@ defineExpose({
   p {
     margin: 0.5rem 0;
     font-size: 0.9rem;
+  }
+}
+
+.groups-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.text-group {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  }
+}
+
+.group-header {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #2d9f5f 0%, #2ba89a 100%);
+  color: #fff;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: linear-gradient(135deg, #2ba89a 0%, #2d9f5f 100%);
+  }
+  
+  .collapse-icon {
+    margin-right: 0.5rem;
+    font-size: 14px;
+    transition: transform 0.3s ease;
+  }
+  
+  .group-title {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  
+  .group-count {
+    font-size: 12px;
+    opacity: 0.9;
+    margin-left: 0.5rem;
+  }
+}
+
+.group-content {
+  padding: 0.75rem;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 2000px;
   }
 }
 

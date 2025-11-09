@@ -29,6 +29,8 @@ type TControlState = {
   dSpaceDown: boolean
   /** 正在编辑or裁剪的组件id */
   dCropUuid: string
+  /** 合成预览图 URL */
+  previewImageUrl: string | null
 }
 
 type TControlAction = {
@@ -46,6 +48,8 @@ type TControlAction = {
   /** 设置正在裁剪or编辑的组件 */
   setCropUuid: (uuid: string) => void
   setSpaceDown: (uuid: boolean) => void // 设置是否按下空格键
+  /** 设置预览图 URL */
+  setPreviewImageUrl: (url: string | null) => void
 }
 
 /** 全局控制配置 */
@@ -60,6 +64,7 @@ const ControlStore =  defineStore<"controlStore", TControlState, {}, TControlAct
     dAltDown: false, // 记录是否按下alt键 / 或ctrl
     dCropUuid: '-1', // 正在编辑or裁剪的组件id
     dSpaceDown: false, // 记录是否按下空格键
+    previewImageUrl: null, // 合成预览图 URL
   }),
   getters: {},
   actions: {
@@ -112,6 +117,10 @@ const ControlStore =  defineStore<"controlStore", TControlState, {}, TControlAct
     },
     setSpaceDown(val: boolean) {
       this.dSpaceDown = val
+    },
+    /** 设置预览图 URL */
+    setPreviewImageUrl(url: string | null) {
+      this.previewImageUrl = url
     }
   }
 })

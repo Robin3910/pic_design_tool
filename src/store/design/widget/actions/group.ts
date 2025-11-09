@@ -23,6 +23,10 @@ export function addGroup(store: TWidgetStore, group: TdWidgetData[]) {
   group.forEach((item) => {
     !item.isContainer && parent && (item.parent = parent.uuid) // 重设父id
     item.text && (item.text = decodeURIComponent(item.text))
+    // 从模板添加的图片命名为"模板图片"
+    if (item.type === 'w-image') {
+      item.name = '模板图片'
+    }
     store.dWidgets.push(item)
   })
   // 选中组件

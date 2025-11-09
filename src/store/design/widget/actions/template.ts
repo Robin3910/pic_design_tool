@@ -20,6 +20,10 @@ export function setTemplate(store: TWidgetStore, allWidgets: TdWidgetData[]) {
   allWidgets.forEach((item) => {
     Number(item.uuid) < 0 && (item.uuid = nanoid()) // 重设id
     item.text && (item.text = decodeURIComponent(item.text))
+    // 从模板加载的图片命名为"模板图片"
+    if (item.type === 'w-image') {
+      item.name = '模板图片'
+    }
     store.dWidgets.push(item)
   })
   widgetStore.updateDWidgets()

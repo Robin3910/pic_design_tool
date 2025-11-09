@@ -61,7 +61,8 @@ authAxios.interceptors.response.use(
       const msg = response.data.msg || response.data.message
       
       // 如果是401错误（未授权/Token过期）
-      if (code === 401 || response.status === 401) {
+      // 但是，如果是重试请求，不应该再次触发刷新（避免无限循环）
+      if ((code === 401 || response.status === 401) && !config?._isRetryRequest) {
         // 如果没有config（请求配置丢失），直接拒绝
         if (!config) {
           console.error('Token refresh failed: config is missing', error)
@@ -87,7 +88,8 @@ authAxios.interceptors.response.use(
     }
     
     // 如果是HTTP 401错误（未授权/Token过期），且未在业务错误码中处理
-    if (response && response.status === 401 && (!response.data || response.data.code !== 401)) {
+    // 但是，如果是重试请求，不应该再次触发刷新（避免无限循环）
+    if (response && response.status === 401 && (!response.data || response.data.code !== 401) && !config?._isRetryRequest) {
       // 如果没有config（请求配置丢失），直接拒绝
       if (!config) {
         console.error('Token refresh failed: config is missing', error)

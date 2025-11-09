@@ -229,17 +229,24 @@
         
         async function refreshToken() {
             const token = localStorage.getItem('xp_token');
-            if (!token) {
+            const refreshToken = localStorage.getItem('xp_refresh_token');
+            
+            if (!token && !refreshToken) {
                 showResult('userResult', '没有找到Token，请先登录', 'error');
                 return;
             }
             
+            // 后端接口使用 @RequestParam 接收参数，期望查询参数或表单数据
+            // 优先使用查询参数方式
+            const refreshTokenValue = refreshToken || token; // 如果没有refreshToken，使用accessToken
+            
             try {
-                const response = await fetch(`${API_BASE_URL}/system/auth/refresh-token`, {
+                // 方式1: 使用查询参数（推荐）
+                const url = `${API_BASE_URL}/system/auth/refresh-token?refreshToken=${encodeURIComponent(refreshTokenValue)}`;
+                const response = await fetch(url, {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
                         'tenant-id': '1'
                     }
                 });

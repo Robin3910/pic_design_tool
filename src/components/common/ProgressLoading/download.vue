@@ -15,7 +15,18 @@
       <div class="text">{{ text }}</div>
       <el-progress style="width: 100%" :text-inside="true" :percentage="percent" />
       <div v-show="percent < 100" class="text btn" @click="cancel">{{ cancelText }}</div>
-      <div class="text info">{{ msg }}</div>
+      <div v-if="msg" class="text info url-container">
+        <span class="url-text">{{ msg }}</span>
+        <el-button 
+          v-if="percent >= 100 && isUrl(msg)" 
+          type="primary" 
+          size="small" 
+          class="copy-btn"
+          @click="copyUrl"
+        >
+          复制URL
+        </el-button>
+      </div>
       <div v-show="percent >= 100" class="success">
         <!-- 使用本地成功图标替代外部图片 -->
         <div class="success-icon">✅</div>
@@ -27,8 +38,9 @@
 
 <script lang="ts" setup>
 import { watch, ref } from 'vue'
-import { ElProgress } from 'element-plus'
+import { ElProgress, ElButton } from 'element-plus'
 import { Close as iconClose } from '@element-plus/icons-vue'
+import useNotification from '@/common/methods/notification'
 // import toolTip from '@/components/common/PopoverTip.vue'
 
 type TProps = {
@@ -73,6 +85,43 @@ const cancel = () => {
 
 const close = () => {
   hide.value = true
+}
+
+// 判断是否为URL
+const isUrl = (str: string): boolean => {
+  if (!str) return false
+  try {
+    const url = new URL(str)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+// 复制URL到剪贴板
+const copyUrl = async () => {
+  if (!props.msg) return
+  
+  try {
+    await navigator.clipboard.writeText(props.msg)
+    useNotification('复制成功', '成品URL已复制到剪贴板', { type: 'success' })
+  } catch (error) {
+    // 降级方案：使用传统方法
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = props.msg || ''
+      textArea.style.position = 'fixed'
+      textArea.style.opacity = '0'
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      useNotification('复制成功', '成品URL已复制到剪贴板', { type: 'success' })
+    } catch (err) {
+      console.error('复制失败:', err)
+      useNotification('复制失败', '请手动复制URL', { type: 'error' })
+    }
+  }
 }
 
 defineExpose({
@@ -121,6 +170,24 @@ defineExpose({
   font-weight: 400;
   font-size: 16px;
   color: #777777;
+}
+.url-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  
+  .url-text {
+    word-break: break-all;
+    max-width: 100%;
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .copy-btn {
+    flex-shrink: 0;
+  }
 }
 .tool {
   text-align: right;

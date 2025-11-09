@@ -22,6 +22,16 @@
     <slot />
     <!-- <el-button :loading="state.loading" size="large" class="primary-btn" :disabled="tempEditing" plain type="primary" @click="download">下载作品</el-button> -->
     <!-- </copyRight> -->
+    <!-- 清除素材按钮 -->
+    <el-button 
+      v-if="!tempEditing"
+      plain 
+      type="warning" 
+      @click="handleClearMaterials"
+      style="margin-right: 10px"
+    >
+      清除素材
+    </el-button>
     <!-- 登出按钮 -->
     <el-button 
       v-if="authStore.isLoggedIn"
@@ -38,6 +48,7 @@
 <script lang="ts" setup>
 import api from '@/api'
 import { reactive, toRefs, ref, computed } from 'vue'
+import { taskRecordCache } from '@/utils/taskRecordCache'
 import { useRoute, useRouter } from 'vue-router'
 import _dl from '@/common/methods/download'
 import useNotification from '@/common/methods/notification'
@@ -50,6 +61,7 @@ import { useControlStore, useHistoryStore, useCanvasStore, useUserStore, useWidg
 import { useAuthStore } from '@/store/auth'
 import { storeToRefs } from 'pinia'
 import { uploadToOSS } from '@/api/temu'
+import eventBus from '@/utils/plugins/eventBus'
 
 type TProps = {
   modelValue?: boolean
@@ -341,6 +353,50 @@ function jump2Edit() {
   userStore.managerEdit(true)
 }
 
+// 清除素材（保留模板）
+function handleClearMaterials() {
+  try {
+    const currentPage = pageStore.dCurrentPage
+    const currentLayout = dLayouts.value[currentPage]
+    
+    if (!currentLayout || !currentLayout.layers) {
+      useNotification('提示', '当前画版没有素材', { type: 'info' })
+      return
+    }
+    
+    // 过滤出模板图片（name === '模板图片'）
+    const templateImages = currentLayout.layers.filter((widget: any) => 
+      widget.name === '模板图片' && widget.type === 'w-image'
+    )
+    
+    // 统计要清除的素材数量
+    const clearCount = currentLayout.layers.length - templateImages.length
+    
+    if (clearCount === 0) {
+      useNotification('提示', '没有需要清除的素材', { type: 'info' })
+      return
+    }
+    
+    // 更新当前页面的图层，只保留模板图片
+    currentLayout.layers = templateImages
+    
+    // 更新 dWidgets（同步到 dWidgets）
+    widgetStore.setDWidgets(widgetStore.getWidgets())
+    
+    // 清除选中状态
+    controlStore.setShowMoveable(false)
+    widgetStore.selectWidget({ uuid: '-1' })
+    
+    // 更新画版
+    pageStore.reChangeCanvas()
+    
+    useNotification('成功', `已清除 ${clearCount} 个素材，保留了 ${templateImages.length} 个模板图片`, { type: 'success' })
+  } catch (error: any) {
+    console.error('清除素材失败:', error)
+    useNotification('错误', error.message || '清除素材失败，请重试', { type: 'error' })
+  }
+}
+
 function checkDownloadPoster({ layers }: any) {
   let backEndCapture = false
   for (let i = 0; i < layers.length; i++) {
@@ -373,22 +429,40 @@ async function save() {
       widget.type === 'w-image' && widget.sortId
     ) || []
     
-    // 生成文件名：原图片素材的名称 + "_template_result_" + need_redraw_index
+    // 生成文件名：{素材图片url}_template_result_re_{数字}
     let customFileName: string | undefined = undefined
     if (imageWidgets.length > 0) {
-      // 使用第一个图片素材的信息来生成文件名
+      // 使用第一张素材图片的sortId和sortIndex
       const firstWidget = imageWidgets[0] as any
       const sortId = Number(firstWidget.sortId)
       const sortIndex = firstWidget.sortIndex
       
       if (sortId && sortIndex !== undefined) {
         try {
-          // 查询任务记录详情，获取原图片素材的URL
-          const task = await api.redrawTask.getRedrawTaskById(sortId)
-          if (task && task.setImageUrls) {
-            // 从setImageUrls中找到对应sortIndex的图片URL
-            const imageUrls = task.setImageUrls.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+          // 从任务记录中获取图片URL
+          let task = taskRecordCache.get(sortId) || null
+          
+          // 如果缓存中没有，尝试查询（但这里不阻塞，如果查询失败就使用默认文件名）
+          if (!task) {
+            console.log(`任务记录 ${sortId} 不在缓存中，尝试查询以获取图片URL`)
+            try {
+              task = await api.redrawTask.getRedrawTaskById(sortId)
+              if (task) {
+                taskRecordCache.set(sortId, task)
+              }
+            } catch (e) {
+              console.warn(`查询任务记录 ${sortId} 失败，使用默认文件名:`, e)
+            }
+          }
+          
+          if (task) {
+            // 优先使用 hdImages，如果为空则使用 customImageUrls
+            let imageUrlsStr = task.hdImages
+            if (typeof imageUrlsStr !== 'string' || imageUrlsStr.trim().length === 0) {
+              imageUrlsStr = task.customImageUrls ?? (task as any).custom_image_urls
+            }
             
+            if (typeof imageUrlsStr === 'string' && imageUrlsStr.trim().length > 0) {
             // 提取URL文件名结尾的数字作为序号（如 xxx_12.jpg => 12）
             const extractIndexFromUrl = (u: string): number | null => {
               try {
@@ -403,9 +477,14 @@ async function save() {
               }
             }
             
-            // 找到对应sortIndex的图片URL
+              // 从图片URL列表中查找对应序号的URL
+              const imageList: string[] = imageUrlsStr
+                .split(',')
+                .map((s: string) => s.trim())
+                .filter((s: string) => s.length > 0)
+              
             let targetUrl: string | null = null
-            for (const url of imageUrls) {
+              for (const url of imageList) {
               const idx = extractIndexFromUrl(url)
               if (idx === sortIndex) {
                 targetUrl = url
@@ -413,22 +492,56 @@ async function save() {
               }
             }
             
-            if (targetUrl) {
-              // 从URL中提取文件名（去掉扩展名）
-              const withoutQuery = targetUrl.split('?')[0]
-              const lastSlash = withoutQuery.lastIndexOf('/')
-              const fileName = lastSlash >= 0 ? withoutQuery.slice(lastSlash + 1) : withoutQuery
-              const lastDotIndex = fileName.lastIndexOf('.')
-              const originalName = lastDotIndex > 0 
-                ? fileName.substring(0, lastDotIndex) 
-                : fileName
-              
-              // 生成文件名：原图片素材的名称 + "_template_result_" + need_redraw_index
-              customFileName = `${originalName}_template_result_${sortIndex}`
+              if (targetUrl) {
+                // 提取URL最后的数字
+                const extractLastNumberFromUrl = (url: string): string | null => {
+              try {
+                const withoutQuery = url.split('?')[0]
+                const lastSlash = withoutQuery.lastIndexOf('/')
+                const fileName = lastSlash >= 0 ? withoutQuery.slice(lastSlash + 1) : withoutQuery
+                    const nameOnly = fileName.replace(/\.[^.]*$/, '')
+                    const match = nameOnly.match(/(\d+)$/)
+                    return match ? match[1] : null
+              } catch (e) {
+                    return null
+                  }
+                }
+                
+                // 从URL中提取文件名部分（避免重复段）
+                const extractFileNameFromUrl = (url: string): string | null => {
+                  try {
+                    const withoutQuery = url.split('?')[0]
+                    const lastSlash = withoutQuery.lastIndexOf('/')
+                    const fileName = lastSlash >= 0 ? withoutQuery.slice(lastSlash + 1) : withoutQuery
+                    return fileName || null
+                  } catch (e) {
+                    return null
+                  }
+                }
+                
+                // 提取URL最后的数字
+                const lastNumber = extractLastNumberFromUrl(targetUrl)
+                
+                if (lastNumber) {
+                  // 只提取文件名部分，避免重复的URL路径
+                  const fileName = extractFileNameFromUrl(targetUrl)
+                  
+                  if (fileName) {
+                    // 移除文件扩展名
+                    const nameWithoutExt = fileName.replace(/\.[^.]*$/, '')
+                    // 将文件名中的特殊字符替换为下划线，使其文件名安全
+                    const safeFileName = nameWithoutExt.replace(/[^a-zA-Z0-9._-]/g, '_')
+                    // 生成文件名：{素材图片文件名}_template_result_re_{数字}（无后缀）
+                    customFileName = `${safeFileName}_template_result_re_${lastNumber}`
+                  }
+                }
+              } else {
+                console.warn(`未找到序号 ${sortIndex} 对应的图片URL`)
+              }
             }
           }
         } catch (error) {
-          console.warn('获取原图片素材名称失败，使用默认文件名:', error)
+          console.warn('从任务记录获取图片URL失败，使用默认文件名:', error)
         }
       }
     }
@@ -529,26 +642,58 @@ async function save() {
     let syncCount = 0
     let syncError: any = null
     
+    // 更新任务记录相关变量（在if块外定义，以便在最终消息中使用）
+    let updateSuccessCount = 0
+    let updateFailCount = 0
+    
     // 更新任务记录
     if (taskUpdateMap.size > 0) {
       emit('change', { downloadPercent: 95, downloadText: '正在更新任务记录...' })
       
-      const updatePromises: Promise<void>[] = []
+      const updatePromises: Promise<{ success: boolean; taskId: number }>[] = []
       
       for (const [taskId, { sortIds }] of taskUpdateMap.entries()) {
         updatePromises.push(
-          (async () => {
+          (async (): Promise<{ success: boolean; taskId: number }> => {
             try {
-              // 查询任务记录详情
-              const task = await api.redrawTask.getRedrawTaskById(taskId)
+              // 优先使用缓存的任务记录数据，避免查询
+              let task = taskRecordCache.get(taskId) || null
+              
+              // 如果缓存中没有，再查询（兼容场景：图片素材列表未加载或已刷新）
               if (!task) {
-                console.warn(`任务记录 ${taskId} 不存在，跳过更新`)
-                return
+                console.log(`任务记录 ${taskId} 不在缓存中，从接口查询`)
+                task = await api.redrawTask.getRedrawTaskById(taskId)
+              } else {
+                console.log(`任务记录 ${taskId} 使用缓存数据`)
+                
+                // 检查缓存数据是否完整（必须有 orderId 和 orderNo）
+                const cachedOrderId = (task as any).order_id ?? task.orderId
+                const cachedOrderNo = (task as any).order_no ?? task.orderNo
+                
+                // 如果缓存数据缺少必要字段，从接口重新查询
+                if (!cachedOrderId || !cachedOrderNo || 
+                    (typeof cachedOrderNo === 'string' && cachedOrderNo.trim().length === 0)) {
+                  console.warn(`任务记录 ${taskId} 缓存数据不完整（缺少 orderId 或 orderNo），从接口重新查询`)
+                  task = await api.redrawTask.getRedrawTaskById(taskId)
+                  
+                  // 如果查询成功，更新缓存
+                  if (task) {
+                    taskRecordCache.set(taskId, task)
+                  }
+                }
               }
               
+              if (!task) {
+                console.warn(`任务记录 ${taskId} 不存在，跳过更新`)
+                return { success: false, taskId }
+              }
+              
+              // 处理字段名兼容（后端可能返回蛇形命名）
+              const rawFinishedIndex = (task as any).finished_index ?? task.finishedIndex ?? ''
+              
               // 计算需要更新的 finishedIndex（合并已完成的序号，追加而不是覆盖）
-              const existingFinished = (task.finishedIndex && task.finishedIndex.trim()) 
-                ? task.finishedIndex.split(',').map((s: string) => parseInt(s.trim(), 10)).filter((n: number) => !isNaN(n))
+              const existingFinished = (rawFinishedIndex && typeof rawFinishedIndex === 'string' && rawFinishedIndex.trim()) 
+                ? rawFinishedIndex.split(',').map((s: string) => parseInt(s.trim(), 10)).filter((n: number) => !isNaN(n))
                 : []
               
               // 合并已存在的序号和新的序号，去重并排序
@@ -557,7 +702,7 @@ async function save() {
               
               // 调试日志：输出合并前后的值
               console.log(`任务 ${taskId} finishedIndex 合并:`, {
-                原有: task.finishedIndex || '(空)',
+                原有: rawFinishedIndex || '(空)',
                 新增: sortIds.join(','),
                 合并后: finishedIndex
               })
@@ -580,35 +725,86 @@ async function save() {
               })
               
               // 更新 newSetImageUrls（追加新URL）
-              const existingUrls = task.newSetImageUrls 
-                ? task.newSetImageUrls.split(',').map(s => s.trim()).filter(s => s.length > 0)
+              // 处理字段名兼容（后端可能返回蛇形命名）
+              const rawNewSetImageUrls = (task as any).new_set_image_urls ?? task.newSetImageUrls ?? ''
+              const existingUrls = (rawNewSetImageUrls && typeof rawNewSetImageUrls === 'string' && rawNewSetImageUrls.trim())
+                ? rawNewSetImageUrls.split(',').map(s => s.trim()).filter(s => s.length > 0)
                 : []
               
               const newUrls = existingUrls.includes(url) ? existingUrls : [...existingUrls, url]
               const newSetImageUrls = newUrls.join(',')
               
               // 调用更新接口
-              await api.redrawTask.updateRedrawTask({
-                id: task.id,
-                orderId: task.orderId,
-                orderNo: task.orderNo,
-                newSetImageUrls,
-                finishedIndex,
-                needRedrawIndex,
-              })
+              // 处理字段名兼容（后端可能返回蛇形命名）
+              const orderId = (task as any).order_id ?? task.orderId
+              const orderNo = (task as any).order_no ?? task.orderNo
               
-              console.log(`任务记录 ${taskId} 更新成功: finishedIndex=${finishedIndex}, newSetImageUrls已追加`)
-            } catch (error) {
+              // 严格检查：orderId 必须是有效数字，orderNo 必须是非空字符串
+              if (!orderId || (typeof orderId !== 'number' && isNaN(Number(orderId)))) {
+                console.error(`任务 ${taskId} 缺少有效的 orderId:`, orderId, '任务数据:', task)
+                return { success: false, taskId }
+              }
+              
+              if (!orderNo || typeof orderNo !== 'string' || orderNo.trim().length === 0) {
+                console.error(`任务 ${taskId} 缺少有效的 orderNo:`, orderNo, '任务数据:', task)
+                return { success: false, taskId }
+              }
+              
+              // 使用驼峰命名发送请求（与类型定义一致）
+              const updateData = {
+                id: task.id,
+                orderId: orderId,
+                orderNo: orderNo,
+                newSetImageUrls: newSetImageUrls,
+                finishedIndex: finishedIndex,
+                needRedrawIndex: needRedrawIndex,
+              }
+              
+              console.log(`任务 ${taskId} 准备更新，数据:`, updateData)
+              const updateResult = await api.redrawTask.updateRedrawTask(updateData)
+              console.log(`任务 ${taskId} 更新接口返回:`, updateResult)
+              
+              // 验证接口返回结果
+              if (!updateResult || updateResult.code !== 0) {
+                const errorMsg = updateResult?.msg || '更新失败，接口返回异常'
+                throw new Error(`更新任务记录失败: ${errorMsg} (code: ${updateResult?.code || 'unknown'})`)
+              }
+              
+              // 验证返回的data是否为true（表示更新成功）
+              if (updateResult.data !== true && updateResult.data !== undefined) {
+                console.warn(`任务 ${taskId} 更新接口返回的data不是预期的true:`, updateResult.data)
+              }
+              
+              console.log(`任务记录 ${taskId} 更新成功: finishedIndex=${finishedIndex}, needRedrawIndex=${needRedrawIndex || '(空)'}, newSetImageUrls已追加`)
+              return { success: true, taskId }
+            } catch (error: any) {
               console.error(`更新任务记录 ${taskId} 失败:`, error)
-              // 不抛出错误，允许其他任务继续更新
+              console.error(`错误详情:`, {
+                message: error?.message,
+                response: error?.response?.data,
+                status: error?.response?.status,
+                code: error?.response?.data?.code,
+                msg: error?.response?.data?.msg,
+              })
+              // 不抛出错误，允许其他任务继续更新，但记录失败信息
+              console.warn(`任务 ${taskId} 更新失败，但继续处理其他任务`)
+              return { success: false, taskId }
             }
           })()
         )
       }
       
-      // 等待所有更新完成
-      await Promise.all(updatePromises)
-      console.log('所有任务记录更新完成')
+      // 等待所有更新完成，并统计成功/失败数量
+      const updateResults = await Promise.all(updatePromises)
+      updateSuccessCount = updateResults.filter(r => r.success).length
+      updateFailCount = updateResults.filter(r => !r.success).length
+      console.log(`所有任务记录更新完成: 成功 ${updateSuccessCount} 个，失败 ${updateFailCount} 个`)
+      
+      // 如果有失败的任务，输出详细信息
+      if (updateFailCount > 0) {
+        const failedTaskIds = updateResults.filter(r => !r.success).map(r => r.taskId)
+        console.warn(`更新失败的任务ID:`, failedTaskIds)
+      }
       
       // 收集所有已更新的任务记录ID
       const taskIds = Array.from(taskUpdateMap.keys())
@@ -644,10 +840,8 @@ async function save() {
     
     // 上传成功，确保更新进度到100%（无论前面的步骤如何）
     console.log('准备更新进度到100%')
-    // 使用 setTimeout 确保进度更新在下一个事件循环中执行，避免被其他代码阻塞
-    setTimeout(() => {
+    // 立即更新进度到100%，不使用setTimeout避免延迟
       emit('change', { downloadPercent: 100, downloadText: '上传成功', downloadMsg: url })
-    }, 0)
     const updateCount = taskUpdateMap.size
     
     // 构建最终消息
@@ -655,7 +849,17 @@ async function save() {
     let notificationType: 'success' | 'warning' = 'success'
     
     if (updateCount > 0) {
-      message = `图片已上传到OSS，已更新 ${updateCount} 条任务记录`
+      message = `图片已上传到OSS`
+      
+      // 添加更新任务记录的统计信息
+      if (updateSuccessCount > 0) {
+        message += `，成功更新 ${updateSuccessCount} 条任务记录`
+      }
+      if (updateFailCount > 0) {
+        message += `，${updateFailCount} 条任务记录更新失败`
+        notificationType = 'warning'
+      }
+      
       // 检查是否有同步操作
       if (syncSuccess) {
         message += `，已同步 ${syncCount} 条任务到订单`
@@ -665,17 +869,21 @@ async function save() {
         notificationType = 'warning'
       }
     } else {
-      message = `图片已上传到OSS，URL已复制到剪贴板`
+      message = `图片已上传到OSS`
     }
     
     useNotification('上传成功', message, { type: notificationType })
     
-    // 复制URL到剪贴板
-    try {
-      await navigator.clipboard.writeText(url)
-    } catch (err) {
-      console.warn('复制到剪贴板失败:', err)
-    }
+    // 保存成功后自动触发清除素材功能
+    // 使用 setTimeout 确保通知显示后再执行清除操作
+    setTimeout(() => {
+      handleClearMaterials()
+    }, 500)
+    
+    // 保存成功后触发图片素材刷新
+    eventBus.emit('refreshPhotoList')
+    // 保存成功后触发文字素材刷新
+    eventBus.emit('refreshTextList')
     
     state.loading = false
   } catch (error: any) {

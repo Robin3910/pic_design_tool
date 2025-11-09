@@ -24,7 +24,7 @@ export type TemuRedrawTaskPageQuery = {
   shopId?: number
   categoryId?: string
   categoryName?: string
-  reworkStatus?: number
+  reworkStatus?: number | number[] // 支持单个状态或多个状态数组
   operator?: string
   sku?: string
   createTime?: [string, string] // 格式：["2024-01-01 00:00:00", "2024-12-31 23:59:59"]
@@ -75,9 +75,11 @@ export type TemuRedrawTaskRespVO = {
   finishedIndex?: string // 已完成制图的序号（逗号分隔，如1,2,4表示第1、2、4张已完成）
   createTime?: string // 创建时间
   updateTime?: string // 更新时间
+  effectiveImgUrl?: string // 合成预览图
   // 兼容旧版字段名（蛇形命名）
   custom_text_list?: string | string[]
   need_redraw_index?: string
+  effective_img_url?: string // 合成预览图（蛇形命名兼容）
 }
 
 export type PageResp<T> = {
@@ -118,6 +120,7 @@ export type TemuRedrawTaskSaveReqVO = {
   remark?: string // 可选：备注
   needRedrawIndex?: string // 可选：需重制图片的序号（逗号分隔，如1,3,5表示第1、3、5张）
   finishedIndex?: string // 可选：已完成制图的序号（逗号分隔，如1,2,4表示第1、2、4张已完成）
+  effectiveImgUrl?: string // 可选：合成预览图
 }
 
 // 旧版分页接口
@@ -130,23 +133,55 @@ export const getRedrawTaskPageWithCustomText = (params: TemuRedrawTaskPageQuery)
   return templateRequest.get<PageResp<TemuRedrawTaskRespVO>>('/temu/redraw-task/page-with-custom-text', { params })
 }
 
+// 套图不合格重制任务分页接口（仅包含need_redraw_index有数据的记录）
+export const getRedrawTaskPageWithNeedRedrawIndex = (params: TemuRedrawTaskPageQuery) => {
+  return templateRequest.get<PageResp<TemuRedrawTaskRespVO>>('/temu/redraw-task/page-with-need-redraw-index', { params })
+}
+
 /**
  * 根据ID查询单个任务记录
  * @param id 任务记录ID
- * @returns Promise<ApiResponse<TemuRedrawTaskRespVO>> 任务记录详情
+ * @returns Promise<TemuRedrawTaskRespVO | null> 任务记录详情
  */
 export const getRedrawTaskById = async (id: number): Promise<TemuRedrawTaskRespVO | null> => {
   try {
-    // 使用分页接口查询，设置pageSize为1，理论上应该能找到
-    const res = await templateRequest.get<PageResp<TemuRedrawTaskRespVO>>('/temu/redraw-task/page-with-custom-text', {
-      params: { pageNo: 1, pageSize: 100 }
-    })
-    const list = res.data?.list || []
-    // 从列表中查找匹配的ID
-    const task = list.find((item: TemuRedrawTaskRespVO) => item.id === id)
-    return task || null
+    // 使用分页接口查询，增加pageSize以确保能找到目标记录
+    // 如果数据量很大，可以考虑使用ID作为查询条件（如果后端支持）
+    let pageNo = 1
+    const pageSize = 100
+    let found = false
+    let task: TemuRedrawTaskRespVO | null = null
+    
+    // 最多查询10页，避免无限循环
+    while (!found && pageNo <= 10) {
+      const res = await templateRequest.get<PageResp<TemuRedrawTaskRespVO>>('/temu/redraw-task/page-with-custom-text', {
+        params: { pageNo, pageSize }
+      })
+      const list = res.data?.list || []
+      
+      // 从列表中查找匹配的ID
+      task = list.find((item: TemuRedrawTaskRespVO) => item.id === id) || null
+      
+      if (task) {
+        found = true
+        break
+      }
+      
+      // 如果当前页数据少于pageSize，说明已经到最后一页了
+      if (list.length < pageSize) {
+        break
+      }
+      
+      pageNo++
+    }
+    
+    if (!task) {
+      console.warn(`未找到ID为 ${id} 的任务记录`)
+    }
+    
+    return task
   } catch (error) {
-    console.error('查询任务记录失败:', error)
+    console.error(`查询任务记录失败 (ID: ${id}):`, error)
     return null
   }
 }
@@ -176,6 +211,7 @@ export const syncNewImagesToOrder = (ids: number[]) => {
 export default {
   getRedrawTaskPage,
   getRedrawTaskPageWithCustomText,
+  getRedrawTaskPageWithNeedRedrawIndex,
   getRedrawTaskById,
   updateRedrawTask,
   syncNewImagesToOrder,

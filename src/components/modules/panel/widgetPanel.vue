@@ -19,7 +19,10 @@
     </div>
     <div v-show="state.active" class="widget-wrap">
       <keep-alive>
-        <component :is="state.widgetClassifyList[state.activeWidgetClassify].component" />
+        <component 
+          ref="currentComponentRef"
+          :is="state.widgetClassifyList[state.activeWidgetClassify].component" 
+        />
       </keep-alive>
     </div>
     <!-- <div v-show="active" class="side-wrap"><div class="pack__up" @click="active = false">&lt;</div></div> -->
@@ -35,7 +38,7 @@
 // 组件面板
 // const NAME = 'widget-panel'
 import widgetClassifyListData from '@/assets/data/WidgetClassifyList'
-import { reactive, onMounted, watch, nextTick, markRaw } from 'vue'
+import { reactive, onMounted, watch, nextTick, markRaw, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { UploadIcon } from '@/components/common/Icon'
 
@@ -54,22 +57,49 @@ const state = reactive({
   activeWidgetClassify: 0,
   active: true,
 })
+
+// 动态组件的 ref
+const currentComponentRef = ref<any>(null)
+
+// 需要自动刷新的页面索引：模板(0)、图片(1)、文字(2)、替换(3)
+const AUTO_REFRESH_INDEXES = [0, 1, 2, 3]
+
 const clickClassify = (index: number) => {
   state.activeWidgetClassify = index
   state.active = true
+  // 刷新逻辑在 watch 中统一处理，避免重复调用
+}
+
+// 触发当前页面的刷新
+const triggerRefresh = async () => {
+  await nextTick()
+  if (currentComponentRef.value?.handleRefresh) {
+    currentComponentRef.value.handleRefresh()
+  }
 }
 
 onMounted(async () => {
   await nextTick()
   const { koutu } = route.query
-  koutu && (state.activeWidgetClassify = 4)
+  if (koutu) {
+    state.activeWidgetClassify = 4
+  } else {
+    // 如果默认显示的是需要自动刷新的页面，触发刷新
+    if (AUTO_REFRESH_INDEXES.includes(state.activeWidgetClassify)) {
+      await triggerRefresh()
+    }
+  }
 })
 
 watch(
   () => state.activeWidgetClassify,
-  (index) => {
+  async (index) => {
     if (index >= 0 && index < state.widgetClassifyList.length) {
       state.widgetClassifyList[index].show = true
+      // 如果切换到需要自动刷新的页面，触发刷新
+      if (AUTO_REFRESH_INDEXES.includes(index)) {
+        await triggerRefresh()
+      }
     }
   },
 )

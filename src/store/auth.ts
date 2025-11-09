@@ -8,6 +8,7 @@ import { defineStore } from 'pinia'
 import { login, logout, getUserInfo, getUserProfile, refreshToken } from '@/api/auth'
 import type { UserVO, AuthPermissionInfoRespVO, UserProfileRespVO } from '@/api/auth'
 import { LocalStorageKey } from '@/config'
+import { startAutoRefresh, stopAutoRefresh } from '@/utils/tokenRefreshManager'
 
 export interface User {
   id: number | string
@@ -67,6 +68,9 @@ export const useAuthStore = defineStore('auth', {
           // 获取用户详细信息（包含头像）
           await this.fetchUserProfile()
           
+          // 启动Token主动刷新机制
+          startAutoRefresh()
+          
           return { success: true }
         } else {
           throw new Error(response.msg || '登录失败')
@@ -82,6 +86,8 @@ export const useAuthStore = defineStore('auth', {
     async logoutAction() {
       this.loading = true
       try {
+        // 停止Token主动刷新机制
+        stopAutoRefresh()
         await logout()
       } catch (error) {
         console.error('Logout error:', error)
@@ -193,10 +199,16 @@ export const useAuthStore = defineStore('auth', {
         await this.fetchUserInfo()
         // 获取用户详细信息（包含头像）
         await this.fetchUserProfile()
+        // 如果已登录，启动Token主动刷新机制
+        if (this.isAuthenticated) {
+          startAutoRefresh()
+        }
       }
     },
     
     clearAuth() {
+      // 停止Token主动刷新机制
+      stopAutoRefresh()
       this.isAuthenticated = false
       this.user = null
       this.token = null
