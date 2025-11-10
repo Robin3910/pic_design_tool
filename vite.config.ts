@@ -15,7 +15,7 @@ const resolve = (...data: string[]) => path.resolve(__dirname, ...data)
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  // base: '/web',
+  base: '/design/',
   plugins: [
     vue(),
     viteCompression({

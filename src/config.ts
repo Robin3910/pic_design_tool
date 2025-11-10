@@ -13,7 +13,7 @@ import { version } from '../package.json'
 
 export default {
   isDev,
-  BASE_URL: isDev ? '/' : './',
+  BASE_URL: isDev ? '/' : '/design/',
   VERSION: version,
   APP_NAME: '禹链设计器',
   COPYRIGHT: 'ShawnPhang - Design.pPalxp.cn',
