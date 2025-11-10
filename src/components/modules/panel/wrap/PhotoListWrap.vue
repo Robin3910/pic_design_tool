@@ -57,31 +57,31 @@
             <div class="images-grid">
               <div 
                 v-for="(image, index) in group.images" 
-                :key="index"
-                class="image-item"
-                @click="selectLocalImage(image)"
-                @mousedown="dragStart($event, image)"
+          :key="index"
+          class="image-item"
+          @click="selectLocalImage(image)"
+          @mousedown="dragStart($event, image)"
                 @contextmenu.prevent="showContextMenu($event, image)"
-              >
-                <el-image 
-                  :src="image.url" 
-                  fit="cover" 
-                  lazy 
-                  loading="lazy"
-                  class="image-thumb"
-                >
-                  <template #placeholder>
-                    <div class="image-placeholder">
-                      <i class="el-icon-picture"></i>
-                    </div>
-                  </template>
-                  <template #error>
-                    <div class="image-error">
-                      <i class="el-icon-warning"></i>
-                    </div>
-                  </template>
-                </el-image>
-                <div class="image-name">{{ image.name }}</div>
+        >
+          <el-image 
+            :src="image.url" 
+            fit="cover" 
+            lazy 
+            loading="lazy"
+            class="image-thumb"
+          >
+            <template #placeholder>
+              <div class="image-placeholder">
+                <i class="el-icon-picture"></i>
+              </div>
+            </template>
+            <template #error>
+              <div class="image-error">
+                <i class="el-icon-warning"></i>
+              </div>
+            </template>
+          </el-image>
+          <div class="image-name">{{ image.name }}</div>
               </div>
             </div>
           </div>

@@ -29,6 +29,15 @@ const ignoreMsgs = [
   '刷新令牌无效'
 ]
 
+// 为刷新接口单独创建 axios 实例，避免全局拦截器篡改请求体或响应结构
+const refreshAxios = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+  headers: {
+    'tenant-id': '1'
+  }
+})
+
 // Token刷新相关状态（全局共享）
 // 请求队列：刷新期间，其他请求会被加入队列，等待刷新完成
 let requestList: Array<() => void> = []
@@ -37,7 +46,7 @@ let isRefreshing = false
 // 是否正在显示重新登录对话框（防止重复弹窗）
 const isRelogin = { show: false }
 // 主动刷新定时器
-let autoRefreshTimer: NodeJS.Timeout | null = null
+let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
 
 // 停止主动刷新定时器（提前声明，供clearTokens使用）
 function stopAutoRefreshInternal(): void {
@@ -155,8 +164,16 @@ function getAccessToken(): string | null {
 // 刷新 token（核心逻辑）
 // 调用后端接口刷新 token
 export async function refreshToken(): Promise<{ accessToken: string; refreshToken: string; expiresTime?: string } | null> {
+  console.log('refreshToken函数被调用')
   const refreshTokenValue = getRefreshToken()
+  console.log('获取refreshToken值:', {
+    hasValue: !!refreshTokenValue,
+    valueLength: refreshTokenValue?.length,
+    valuePreview: refreshTokenValue ? refreshTokenValue.substring(0, 20) + '...' : 'null'
+  })
+  
   if (!refreshTokenValue) {
+    console.warn('refreshToken值为空，返回null')
     return null
   }
 
@@ -166,118 +183,55 @@ export async function refreshToken(): Promise<{ accessToken: string; refreshToke
     // 获取当前的access token（即使过期，后端可能也需要它来识别用户）
     const currentAccessToken = getAccessToken()
     
-    // 后端接口使用 @RequestParam 接收参数，期望查询参数或表单数据，而不是JSON请求体
-    // 方案1（推荐）: 使用查询参数（URL params）
-    // 方案2（备选）: 使用表单数据（application/x-www-form-urlencoded）
-    let refreshRes: any = null
-    let lastError: any = null
-    
-    // 方式1: 使用查询参数（推荐）- 使用 axios 的 params 配置
-    try {
-      console.log('尝试方式1: 使用查询参数（URL params）')
-      refreshRes = await axios.post(
-        `${API_BASE_URL}${REFRESH_TOKEN_URL}`,
-        null, // POST请求体为空
-        {
-          params: {
-            refreshToken: refreshTokenValue
-          },
-          headers: {
-            // 如果后端需要，可以添加 Authorization 头（Bearer accessToken）
-            ...(currentAccessToken ? { 'Authorization': `Bearer ${currentAccessToken}` } : {}),
-            'tenant-id': '1'
-            // 注意：使用查询参数时，不需要设置 Content-Type，axios 会自动处理
-          }
-        }
-      )
-      // 检查响应是否成功
-      if (refreshRes?.data?.code === 0 && refreshRes?.data?.data) {
-        console.log('方式1成功: 使用查询参数刷新Token成功')
-      } else {
-        throw new Error(refreshRes?.data?.msg || '方式1返回数据格式错误')
-      }
-    } catch (error1: any) {
-      const error1Info = {
-        status: error1?.response?.status,
-        code: error1?.response?.data?.code,
-        msg: error1?.response?.data?.msg || error1?.message,
-        data: error1?.response?.data
-      }
-      console.warn('方式1失败（查询参数），尝试方式2（表单数据）:', error1Info)
-      lastError = error1
-      refreshRes = null
-      
-      // 方式2: 使用表单数据（application/x-www-form-urlencoded）
-      try {
-        console.log('尝试方式2: 使用表单数据（application/x-www-form-urlencoded）')
-        // 使用 URLSearchParams 构建表单数据
-        const formData = new URLSearchParams()
-        formData.append('refreshToken', refreshTokenValue)
-        
-        refreshRes = await axios.post(
-          `${API_BASE_URL}${REFRESH_TOKEN_URL}`,
-          formData, // 表单数据
-          {
-            headers: {
-              // 如果后端需要，可以添加 Authorization 头（Bearer accessToken）
-              ...(currentAccessToken ? { 'Authorization': `Bearer ${currentAccessToken}` } : {}),
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'tenant-id': '1'
-            }
-          }
-        )
-        // 检查响应是否成功
-        if (refreshRes?.data?.code === 0 && refreshRes?.data?.data) {
-          console.log('方式2成功: 使用表单数据刷新Token成功')
-        } else {
-          throw new Error(refreshRes?.data?.msg || '方式2返回数据格式错误')
-        }
-      } catch (error2: any) {
-        const error2Info = {
-          status: error2?.response?.status,
-          code: error2?.response?.data?.code,
-          msg: error2?.response?.data?.msg || error2?.message,
-          data: error2?.response?.data
-        }
-        console.error('所有方式都失败，最后错误:', error2Info)
-        lastError = error2
-        throw error2
-      }
-    }
-    
-    // 如果所有方式都失败，抛出最后一个错误
-    if (!refreshRes && lastError) {
-      throw lastError
-    }
+    // 使用 application/x-www-form-urlencoded 形式提交 refreshToken
+    const formData = new URLSearchParams()
+    formData.set('refreshToken', refreshTokenValue)
 
-    // 安全检查：确保 refreshRes 存在且是有效的响应对象
-    if (!refreshRes) {
-      console.error('刷新Token接口返回的响应为空')
-      throw new Error('刷新Token接口返回的响应为空')
-    }
+    console.log('使用表单数据刷新Token:', {
+      url: REFRESH_TOKEN_URL,
+      payload: formData.toString()
+    })
 
-    // 安全检查：确保 refreshRes.data 存在
-    if (!refreshRes.data || typeof refreshRes.data !== 'object') {
-      console.error('刷新Token接口返回的data为空或格式错误:', refreshRes)
+    const refreshRes = await refreshAxios.post(
+      REFRESH_TOKEN_URL,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          ...(currentAccessToken ? { Authorization: `Bearer ${currentAccessToken}` } : {})
+        },
+        params: undefined
+      }
+    )
+
+    // 兼容存在全局响应拦截器时直接返回数据体的情况
+    const responseData = (refreshRes && typeof refreshRes === 'object' && 'data' in refreshRes)
+      ? (refreshRes as any).data
+      : refreshRes
+
+    if (!responseData || typeof responseData !== 'object') {
+      console.error('刷新Token接口返回的数据格式错误:', refreshRes)
       throw new Error('刷新Token接口返回的数据格式错误')
     }
 
+    const resultCode = (responseData as any).code
+    const resultMsg = (responseData as any).msg || (responseData as any).message
+    const resultData = (responseData as any).data
+
     console.log('刷新Token接口响应:', {
-      status: refreshRes.status,
-      code: refreshRes.data?.code,
-      hasData: !!refreshRes.data?.data,
-      msg: refreshRes.data?.msg
+      resultCode,
+      hasData: !!resultData,
+      resultMsg
     })
 
-    if (refreshRes.data.code === 0) {
-      // 检查 data.data 是否存在，避免解构 undefined 或 null
-      if (!refreshRes.data.data || typeof refreshRes.data.data !== 'object') {
-        console.error('刷新token返回的data格式错误:', refreshRes.data)
+    if (resultCode === 0) {
+      if (!resultData || typeof resultData !== 'object') {
+        console.error('刷新token返回的data格式错误:', responseData)
         throw new Error('刷新token返回的数据格式错误')
       }
       
       // 安全解构：确保解构的对象存在
-      const tokenData = refreshRes.data.data
+      const tokenData = resultData
       const accessToken = tokenData?.accessToken
       const newRefreshToken = tokenData?.refreshToken
       const expiresTime = tokenData?.expiresTime
@@ -299,8 +253,12 @@ export async function refreshToken(): Promise<{ accessToken: string; refreshToke
       }
     } else {
       // 刷新token失败（业务错误码）
-      const errorMsg = refreshRes.data?.msg || refreshRes.data?.message || '刷新token失败'
-      console.error('刷新Token失败（业务错误）:', errorMsg)
+      const errorMsg = resultMsg || '刷新token失败'
+      console.error('刷新Token失败（业务错误）:', {
+        resultCode,
+        errorMsg,
+        responseData
+      })
       throw new Error(errorMsg)
     }
   } catch (error: any) {
@@ -355,7 +313,7 @@ export async function refreshToken(): Promise<{ accessToken: string; refreshToke
     
     // 如果 error 本身是一个 Error 对象，直接抛出；否则包装成 Error
     if (error instanceof Error) {
-      throw error
+    throw error
     } else {
       throw new Error(errorMessage)
     }
@@ -424,11 +382,23 @@ function handleAuthorized(): Promise<never> {
 // 处理 401 错误并刷新 token（被动刷新机制）
 // 参考文档逻辑：https://www.dashingdog.cn/article/11
 export async function handle401Error(config: any, service: any): Promise<any> {
+  // 详细检查 localStorage 中的 token 状态
+  const accessToken = getAccessToken()
+  const refreshTokenValue = getRefreshToken()
+  const expiresTime = localStorage.getItem(LocalStorageKey.expiresTimeKey)
+  
   console.log('handle401Error被调用:', {
     url: config?.url,
     method: config?.method,
     isRefreshing,
-    hasRefreshToken: !!getRefreshToken()
+    hasAccessToken: !!accessToken,
+    hasRefreshToken: !!refreshTokenValue,
+    accessTokenLength: accessToken?.length,
+    refreshTokenLength: refreshTokenValue?.length,
+    expiresTime,
+    localStorageKeys: Object.keys(localStorage).filter(key => 
+      key.includes('token') || key.includes('Token') || key.includes('auth') || key.includes('Auth')
+    )
   })
 
   // 如果是刷新token的接口或登录接口返回401，直接跳转登录（避免循环依赖）
@@ -445,13 +415,26 @@ export async function handle401Error(config: any, service: any): Promise<any> {
     isRefreshing = true
     
     // 1. 如果获取不到刷新令牌，则只能执行登出操作
-    if (!getRefreshToken()) {
+    if (!refreshTokenValue) {
+      console.error('无法获取refreshToken，可能的原因:', {
+        refreshTokenExists: !!refreshTokenValue,
+        localStorageHasToken: !!localStorage.getItem(LocalStorageKey.tokenKey),
+        localStorageHasRefreshToken: !!localStorage.getItem(LocalStorageKey.refreshTokenKey),
+        allLocalStorageKeys: Object.keys(localStorage)
+      })
       return handleAuthorized()
     }
     
     // 2. 进行刷新访问令牌
     try {
+      console.log('准备调用 refreshToken() 函数...')
       const refreshTokenRes = await refreshToken()
+      console.log('refreshToken() 调用完成，结果:', {
+        hasResult: !!refreshTokenRes,
+        hasAccessToken: !!refreshTokenRes?.accessToken,
+        hasRefreshToken: !!refreshTokenRes?.refreshToken,
+        result: refreshTokenRes
+      })
       
       // 2.1 刷新成功，则回放队列的请求 + 当前请求
       if (refreshTokenRes) {
@@ -523,6 +506,7 @@ export async function handle401Error(config: any, service: any): Promise<any> {
         }
       } else {
         // 刷新失败，执行登出
+        console.error('refreshToken() 返回 null，刷新失败，执行登出')
         return handleAuthorized()
       }
     } catch (e: any) {
@@ -530,8 +514,12 @@ export async function handle401Error(config: any, service: any): Promise<any> {
       // 2.2 刷新失败，只回放队列的请求（不回放当前请求，避免递归）
       console.error('Token刷新流程异常:', {
         error: e?.message,
+        errorType: e?.constructor?.name,
         response: e?.response?.data,
-        status: e?.response?.status
+        status: e?.response?.status,
+        code: e?.code,
+        fullError: e,
+        stack: e?.stack
       })
       
       requestList.forEach((cb: any) => {

@@ -20,20 +20,16 @@ const baseUrl = ''
 axios.interceptors.request.use(
   (config: AxiosRequestConfig) => {
     const url = config.url ?? ""
-    const values = {}
+    const values: Record<string, any> = {}
     // 主后端服务已移除，只处理绝对URL
     // if (!url.startsWith('http://') && !url.startsWith('https://')) {
     //   config.url = url.startsWith('/') ? baseUrl + url : config.url = baseUrl + '/' + url
     // }
 
     if (config.method === 'get') {
-      //  config.params = utils.extend(config.params, values)
-      config.params = Object.assign(config.params, values)
-      // config.params = qs.stringify(config.params);
+      config.params = Object.assign({}, values, config.params ?? {})
     } else {
-      config.data = Object.assign(config.data, values)
-      //  config.data = utils.extend(config.data, values)
-      // config.data = qs.stringify(config.data);
+      config.data = Object.assign({}, values, config.data ?? {})
     }
     return config
   },
