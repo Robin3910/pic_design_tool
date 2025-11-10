@@ -5,14 +5,14 @@
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
-import { LocalStorageKey } from '@/config'
+import app_config, { LocalStorageKey } from '@/config'
 import { 
   getCurrentToken,
   handle401Error 
 } from '@/utils/tokenRefreshManager'
 
-// API基础配置
-const API_BASE_URL = 'http://localhost:48080/admin-api'
+// API基础配置（从统一配置中获取）
+const API_BASE_URL = app_config.API_BASE_URL
 
 // 创建axios实例
 const templateAxios: AxiosInstance = axios.create({
