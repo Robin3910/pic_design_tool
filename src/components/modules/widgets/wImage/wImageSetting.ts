@@ -14,7 +14,7 @@ export type TImageSetting = {
   imgUrl: string
   mask: string
   setting: [],
-  rotate: number
+  rotate: string
   record: {
     width: number
     height: number
@@ -48,7 +48,7 @@ const setting: TImageSetting = {
   imgUrl: '',
   mask: '',
   setting: [],
-  rotate: 0,
+  rotate: '0deg',
   record: {
     width: 0,
     height: 0,

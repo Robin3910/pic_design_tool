@@ -23,7 +23,7 @@ import {
 } from './rcMenuData'
 import { getTarget } from '@/common/methods/target'
 import { storeToRefs } from 'pinia';
-import { useControlStore, useWidgetStore } from '@/store';
+import { useControlStore, useWidgetStore, useForceStore } from '@/store';
 
 const menuListData = ref<TMenuItemData>({...menu})
 const showMenuBg = ref<boolean>(false)
@@ -31,6 +31,7 @@ const widgetMenu = ref<TWidgetItemData[]>([...widget])
 const pageMenu = ref<TWidgetItemData[]>([...page])
 
 const widgetStore = useWidgetStore()
+const forceStore = useForceStore()
 
 const {dActiveElement, dWidgets, dCopyElement} = storeToRefs(widgetStore)
 const { dAltDown } = storeToRefs(useControlStore())
@@ -108,6 +109,33 @@ function closeMenu() {
   showMenuBg.value = false
 }
 
+function rotateWidget(step: number) {
+  const active = dActiveElement.value
+  if (!active || active.uuid === '-1') {
+    return
+  }
+  const currentRotate = active.rotate ? Number(String(active.rotate).replace('deg', '')) : 0
+  const nextRotate = (currentRotate + step + 360) % 360
+  const rotateValue = `${nextRotate}deg`
+
+  const targetEl = document.getElementById(active.uuid)
+  if (targetEl) {
+    const originalTransform = targetEl.style.transform || ''
+    const hasRotate = /rotate\([^)]*\)/.test(originalTransform)
+    targetEl.style.transform = hasRotate
+      ? originalTransform.replace(/rotate\([^)]*\)/, `rotate(${rotateValue})`)
+      : `${originalTransform} rotate(${rotateValue})`.trim()
+  }
+
+  widgetStore.updateWidgetData({
+    uuid: active.uuid,
+    key: 'rotate',
+    value: rotateValue,
+  })
+
+  forceStore.setUpdateRect()
+}
+
 /** 点击菜单触发事件 */
 function selectMenu(type: TWidgetItemData['type']) {
   switch (type) {
@@ -119,6 +147,12 @@ function selectMenu(type: TWidgetItemData['type']) {
         return
       }
       widgetStore.pasteWidget()
+      break
+    case 'rotate-left':
+      rotateWidget(-90)
+      break
+    case 'rotate-right':
+      rotateWidget(90)
       break
     case 'index-up':
       widgetStore.updateLayerIndex({

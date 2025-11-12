@@ -90,7 +90,7 @@ const forceStore = useForceStore()
 const widgetRef = ref<HTMLElement | null>(null)
 const targetRef = ref<HTMLImageElement | null>(null)
 
-let rotateTemp: number | null = null
+let rotateTemp: string | null = null
 let flipTemp: string | null = null
 
 // const {
@@ -223,9 +223,9 @@ function move(payload?: MouseEvent) {
 }
 
 function updateRecord() {
-  if (dActiveElement.value?.uuid === props.params.uuid) {
-    let record = dActiveElement.value?.record
-    if (widgetRef.value) {
+  if (dActiveElement.value?.uuid === props.params.uuid && dActiveElement.value && 'record' in dActiveElement.value) {
+    const record = dActiveElement.value.record as { width: number; height: number }
+    if (record && widgetRef.value) {
       record.width = widgetRef.value.offsetWidth
       record.height = widgetRef.value.offsetHeight
     }
@@ -305,7 +305,7 @@ function fixRotate() {
   }, 100)
 }
 
-function lockOthers(isCrop) {
+function lockOthers(isCrop: boolean) {
   // 裁剪时锁定其他图层
   widgetStore.lockWidgets()
   if (!isCrop) return
@@ -334,6 +334,8 @@ function lockOthers(isCrop) {
 //   // outline: none;
 // }
 .mask {
+  mask-size: 100% 100%;
+  mask-position: center;
   -webkit-mask-size: 100% 100%;
   -webkit-mask-position: center;
 }

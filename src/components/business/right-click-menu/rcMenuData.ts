@@ -19,7 +19,15 @@ export const menuList: TMenuItemData = {
 }
 
 export type TWidgetItemData = {
-  type: 'copy' | 'paste' | 'index-up' | 'index-down' | 'del' | 'ungroup'
+  type:
+    | 'copy'
+    | 'paste'
+    | 'rotate-left'
+    | 'rotate-right'
+    | 'index-up'
+    | 'index-down'
+    | 'del'
+    | 'ungroup'
   text: string
 }
 
@@ -31,6 +39,14 @@ export const widgetMenu: TWidgetItemData[] = [
   {
     type: 'paste',
     text: '粘贴',
+  },
+  {
+    type: 'rotate-left',
+    text: '向左旋转90度',
+  },
+  {
+    type: 'rotate-right',
+    text: '向右旋转90度',
   },
   {
     type: 'index-up',

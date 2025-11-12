@@ -22,6 +22,7 @@
         <div class="options">
           <el-button v-if="state.innerElement.cropEdit" plain type="primary" @click="imgCrop(false)">完成</el-button>
           <el-button v-else plain type="primary" @click="imgCrop(true)"><i class="icon sd-caijian" /> 裁剪</el-button>
+          <el-button v-if="!state.innerElement.cropEdit" plain type="primary" class="rotate-btn" @click="rotateImage">旋转90°</el-button>
           <!-- <el-button plain @click="openImageCutout"><i class="icon sd-AIkoutu" /> 抠图</el-button> -->
           <!-- <uploader class="options__upload" @done="uploadImgDone">
             <el-button size="small" plain>替换图片</el-button>
@@ -309,6 +310,33 @@ function cropHandle() {
   // store.commit('setCropUuid', state.innerElement.cropEdit ? state.innerElement.uuid : -1)
 }
 
+function rotateImage() {
+  if (!dActiveElement.value || !dActiveElement.value.uuid || dActiveElement.value.uuid === '-1') {
+    return
+  }
+  const currentRotate = dActiveElement.value.rotate || '0deg'
+  const currentDegree = typeof currentRotate === 'string' ? parseFloat(currentRotate) : Number(currentRotate) || 0
+  const nextDegree = (currentDegree + 90) % 360
+  const rotateValue = `${nextDegree}deg`
+  const targetEl = document.getElementById(dActiveElement.value.uuid)
+  if (targetEl) {
+    const originalTransform = targetEl.style.transform || ''
+    const hasRotate = /rotate\([^)]*\)/.test(originalTransform)
+    targetEl.style.transform = hasRotate
+      ? originalTransform.replace(/rotate\([^)]*\)/, `rotate(${rotateValue})`)
+      : `${originalTransform} rotate(${rotateValue})`.trim()
+  }
+
+  state.innerElement.rotate = rotateValue
+  widgetStore.updateWidgetData({
+    uuid: dActiveElement.value.uuid,
+    key: 'rotate',
+    value: rotateValue,
+  })
+
+  forceStore.setUpdateRect()
+}
+
 // 图库选择器
 function openPicBox() {
   if (picBoxRef.value) {
@@ -371,6 +399,10 @@ async function cutImageDone(url: string) {
   .icon {
     margin-right: 0.3em;
   }
+}
+
+.rotate-btn {
+  margin-left: 8px;
 }
 
 .slide-wrap {
