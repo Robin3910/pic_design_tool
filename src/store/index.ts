@@ -16,6 +16,7 @@ import useGroupStore from './design/group'
 import useForceStore from './design/force'
 import useAuthStore from './auth'
 import { useTemplateStore } from './template'
+import useUiStore from './base/ui'
 
 export {
   useBaseStore,
@@ -28,4 +29,5 @@ export {
   useForceStore,
   useAuthStore,
   useTemplateStore,
+  useUiStore,
 }

@@ -8,7 +8,7 @@
 -->
 <template>
   <div id="page-design-index" ref="pageDesignIndex" class="page-design-bg-color">
-    <div :style="state.style" class="top-nav">
+    <div :style="[state.style, uiZoomStyle]" class="top-nav">
       <div class="top-nav-wrap">
         <div class="top-left">
           <div class="name">{{ state.APP_NAME }}</div>
@@ -23,6 +23,12 @@
             <i style="font-size: 20px" class="icon sd-biaochi operation-item" @click="changeLineGuides" />
           </el-tooltip> -->
           <el-divider direction="vertical" />
+          <!-- 全局界面缩放（模拟浏览器缩放） -->
+          <div class="operation">
+            <div class="operation-item" @click="uiStore.zoomOut()"><i class="iconfont icon-sub" /></div>
+            <div class="operation-item" @click="uiStore.resetZoom()"><span class="text">{{ uiStore.uiZoom }}%</span></div>
+            <div class="operation-item" @click="uiStore.zoomIn()"><i class="iconfont icon-add" /></div>
+          </div>
         </div>
         <HeaderOptions ref="optionsRef" v-model="state.isContinue" @change="optionsChange">
           <el-button size="large" class="primary-btn" style="background-color: #67C23A; border-color: #67C23A; color: #fff;" @click="handleSave">保存</el-button>
@@ -31,7 +37,9 @@
       </div>
     </div>
     <div class="page-design-index-wrap">
-      <widget-panel ref="ref2"></widget-panel>
+      <div :style="uiZoomStyle">
+        <widget-panel ref="ref2"></widget-panel>
+      </div>
       <design-board class="page-design-wrap" pageDesignCanvasId="page-design-canvas">
         <!-- 用于挡住画布溢出部分，因为使用overflow有bug -->
         <div class="shelter" :style="{ width: Math.floor((dPage.width * dZoom) / 100) + 'px', height: Math.floor((dPage.height * dZoom) / 100) + 'px' }"></div>
@@ -40,7 +48,9 @@
         <!-- 多画板操作组件 -->
         <template #bottom> <multipleBoards /> </template>
       </design-board>
-      <style-panel ref="ref3"></style-panel>
+      <div :style="uiZoomStyle">
+        <style-panel ref="ref3"></style-panel>
+      </div>
     </div>
     <!-- 标尺 -->
     <line-guides :show="state.showLineGuides" />
@@ -84,7 +94,7 @@ import Helper from './components/Helper.vue'
 import ProgressLoading from '@/components/common/ProgressLoading/download.vue'
 import { wGroupSetting } from '@/components/modules/widgets/wGroup/groupSetting'
 import { storeToRefs } from 'pinia'
-import { useCanvasStore, useControlStore, useHistoryStore, useWidgetStore, useGroupStore } from '@/store'
+import { useCanvasStore, useControlStore, useHistoryStore, useWidgetStore, useGroupStore, useUiStore } from '@/store'
 import type { ButtonInstance } from 'element-plus'
 import Tour from './components/Tour.vue'
 import createDesign from '@/components/business/create-design'
@@ -133,6 +143,7 @@ const optionsRef = ref<typeof HeaderOptions | null>(null)
 const zoomControlRef = ref<typeof zoomControl | null>(null)
 const controlStore = useControlStore()
 const createDesignRef: Ref<typeof createDesign | null> = ref(null)
+const uiStore = useUiStore()
 
 // 移除不再使用的 beforeUnload 函数，改用现代浏览器兼容的事件
 
@@ -210,6 +221,17 @@ onMounted(() => {
   document.addEventListener('keydown', handleKeydowm(controlStore, checkCtrl, instanceFn, dealCtrl), false)
   document.addEventListener('keyup', handleKeyup(controlStore, checkCtrl), false)
   loadData()
+  // 恢复 UI 缩放
+  try {
+    const saved = Number(localStorage.getItem('ui_zoom_percent') || '')
+    if (!Number.isNaN(saved) && saved) {
+      uiStore.setUiZoom(saved)
+    }
+  } catch {}
+  // 绑定浏览器式快捷键：Ctrl + +/-/0
+  window.addEventListener('keydown', handleUiZoomKeydown, { passive: false })
+  // 绑定 Ctrl + 滚轮
+  window.addEventListener('wheel', handleUiZoomWheel, { passive: false })
 })
 
 onBeforeUnmount(() => {
@@ -218,6 +240,8 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleKeydowm(controlStore, checkCtrl, instanceFn, dealCtrl), false)
   document.removeEventListener('keyup', handleKeyup(controlStore, checkCtrl), false)
   document.oncontextmenu = null
+  window.removeEventListener('keydown', handleUiZoomKeydown)
+  window.removeEventListener('wheel', handleUiZoomWheel)
 })
 
 function handleHistory(data: "undo" | "redo") {
@@ -280,6 +304,52 @@ const dealWith = (fnName: string, params?: any) => {
 
 defineExpose({
 })
+
+const uiZoomStyle = computed(() => {
+  const scale = uiStore.uiZoom / 100
+  const supportsZoom = typeof document !== 'undefined' && 'zoom' in (document.body?.style || ({} as any))
+  if (supportsZoom) {
+    return { zoom: scale } as any
+  }
+  // 兜底方案：transform 缩放
+  const widthPercent = `${100 / scale}%`
+  return {
+    transform: `scale(${scale})`,
+    transformOrigin: 'top left',
+    width: widthPercent,
+  } as any
+})
+
+function handleUiZoomKeydown(e: KeyboardEvent) {
+  if (!e.ctrlKey && !e.metaKey) return
+  // 避免输入框/文本域内拦截
+  const target = e.target as HTMLElement | null
+  const tag = (target?.tagName || '').toLowerCase()
+  const isTyping = tag === 'input' || tag === 'textarea' || (target as any)?.isContentEditable
+  if (isTyping) return
+  const key = e.key
+  if (key === '+' || key === '=' ) {
+    e.preventDefault()
+    uiStore.zoomIn()
+  } else if (key === '-' || key === '_') {
+    e.preventDefault()
+    uiStore.zoomOut()
+  } else if (key === '0') {
+    e.preventDefault()
+    uiStore.resetZoom()
+  }
+}
+
+function handleUiZoomWheel(e: WheelEvent) {
+  if (!e.ctrlKey && !e.metaKey) return
+  e.preventDefault()
+  const delta = e.deltaY
+  if (delta > 0) {
+    uiStore.zoomOut()
+  } else if (delta < 0) {
+    uiStore.zoomIn()
+  }
+}
 </script>
 
 <style lang="less" scoped>
