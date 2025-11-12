@@ -30,7 +30,7 @@ const UiStore = defineStore<'uiStore', TUiState, {}, Record<TUiActions, (v?: num
       this.setUiZoom(this.uiZoom - step)
     },
     resetZoom() {
-      this.setUiZoom(150)
+      this.setUiZoom(100)
     },
   },
 })
