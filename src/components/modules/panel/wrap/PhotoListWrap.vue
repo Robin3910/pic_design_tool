@@ -113,13 +113,14 @@ import wImageSetting from '../../widgets/wImage/wImageSetting'
 import setItem2Data from '@/common/methods/DesignFeatures/setImage'
 import RefreshIcon from '@/components/common/Icon/RefreshIcon.vue'
 import { storeToRefs } from 'pinia'
-import { useControlStore, useCanvasStore, useWidgetStore } from '@/store'
+import { useControlStore, useCanvasStore, useWidgetStore, useUiStore } from '@/store'
 import api from '@/api'
 import { taskRecordCache } from '@/utils/taskRecordCache'
 import eventBus from '@/utils/plugins/eventBus'
 import { ElMessage } from 'element-plus'
 
 const controlStore = useControlStore()
+const uiStore = useUiStore()
 
 type TProps = {
   active?: boolean
@@ -486,8 +487,12 @@ const showContextMenu = (event: MouseEvent, image: TLocalImage) => {
   event.preventDefault()
   event.stopPropagation()
   contextMenu.visible = true
-  contextMenu.x = event.clientX
-  contextMenu.y = event.clientY
+  // 获取缩放比例，调整坐标以适配缩放
+  const scale = uiStore.uiZoom / 100
+  // 由于菜单在应用了 transform: scale() 的容器内，position: fixed 会相对于该容器定位
+  // 需要将坐标除以缩放比例
+  contextMenu.x = event.clientX / scale
+  contextMenu.y = event.clientY / scale
   contextMenu.image = image
 }
 

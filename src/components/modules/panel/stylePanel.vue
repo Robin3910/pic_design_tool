@@ -1,10 +1,18 @@
 <template>
   <div id="style-panel">
-    <div class="style-tab">
-      <span :class="['tab', { 'active-tab': activeTab === 0 }]" @click="activeTab = 0">设置</span>
-      <span :class="['tab', { 'active-tab': activeTab === 1 }]" @click="activeTab = 1">图层</span>
+    <!-- 图层区域 - 上方 -->
+    <div class="layer-wrap">
+      <div class="layer-header">
+        <span class="layer-title">图层</span>
+      </div>
+      <div class="layer-content">
+        <layer-list :data="dWidgets" @change="layerChange" />
+      </div>
     </div>
-    <div v-show="activeTab === 0" class="style-wrap">
+    <!-- 分割线 -->
+    <div class="divider"></div>
+    <!-- 设置区域 - 下方 -->
+    <div class="style-wrap">
       <div class="style-content">
         <div v-show="showGroupCombined" style="padding: 2rem 0">
           <el-button plain type="primary" class="gounp__btn" @click="handleCombine">成组</el-button>
@@ -28,9 +36,6 @@
         </div>
       </div>
     </div>
-    <div v-show="activeTab === 1" class="layer-wrap">
-      <layer-list :data="dWidgets" @change="layerChange" />
-    </div>
   </div>
 </template>
 
@@ -39,6 +44,7 @@
 // const NAME = 'style-panel'
 import alignIconList, { AlignListData } from '@/assets/data/AlignListData'
 import iconItemSelect, { TIconItemSelectData } from '../settings/iconItemSelect.vue'
+import layerList from './components/layerList.vue'
 import { ref, watch, computed } from 'vue';
 // import { useSetupMapGetters } from '@/common/hooks/mapGetters';
 import { useControlStore, useGroupStore, useHistoryStore, useWidgetStore } from '@/store';
@@ -60,7 +66,6 @@ const handleImageError = (event: Event) => {
   img.style.display = 'none'
 }
 
-const activeTab = ref(0)
 const iconList = ref<AlignListData[]>(alignIconList)
 const showGroupCombined = ref(false)
 
@@ -120,29 +125,46 @@ function layerChange(newLayer: TdWidgetData[]) {
   height: 100%;
   position: relative;
   width: 280px;
-  .style-tab {
-    box-shadow: 0px 2px 0px 0px rgba(0, 0, 0, 0.1);
+  
+  // 图层区域 - 上方
+  .layer-wrap {
+    flex: 0 0 40%; // 固定高度比例，可根据需要调整
+    min-height: 200px; // 最小高度
+    max-height: 50%; // 最大高度
     display: flex;
-    flex-direction: row;
-    text-align: center;
-    width: 100%;
-    z-index: 10;
-    .tab {
-      user-select: none;
+    flex-direction: column;
+    overflow: hidden;
+    border-bottom: 1px solid @background-color-transparent;
+    
+    .layer-header {
+      flex-shrink: 0;
+      padding: 14px 20px;
+      border-bottom: 1px solid @background-color-transparent;
       background-color: @color0;
-      font-size: 14px;
-      color: @color1;
-      cursor: pointer;
-      flex: 1;
-      padding: 14px 10px;
+      
+      .layer-title {
+        font-size: 15px;
+        color: #444444;
+        font-weight: 600;
+        user-select: none;
+      }
     }
-    .tab.active-tab {
-      // background-color: #3e4651;
-      font-size: 15px;
-      color: #444444;
-      font-weight: 600;
+    
+    .layer-content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
   }
+  
+  // 分割线
+  .divider {
+    flex-shrink: 0;
+    height: 1px;
+    background-color: @background-color-transparent;
+  }
+  
+  // 设置区域 - 下方
   .style-wrap {
     flex: 1;
     width: 100%;
@@ -150,24 +172,29 @@ function layerChange(newLayer: TdWidgetData[]) {
     display: flex;
     flex-direction: column;
     overflow: hidden; // 防止整体滚动
+    min-height: 0; // 允许 flex 子元素缩小
+    
     .style-content {
       flex: 1;
       overflow-y: auto;
       overflow-x: hidden;
       padding-bottom: 10px; // 给内容一些底部间距
+      min-height: 0; // 允许 flex 子元素缩小
     }
+    
     .image-preview-area {
       flex-shrink: 0; // 防止被压缩
       padding: 20px 0;
       border-top: 1px solid @background-color-transparent;
       background-color: @color0; // 确保背景色一致
-      margin-top: auto; // 确保在底部
+      
       .preview-label {
         font-size: 14px;
         color: @color1;
         margin-bottom: 10px;
         font-weight: 500;
       }
+      
       .preview-image {
         width: 100%;
         background-color: #f5f5f5;
@@ -177,11 +204,13 @@ function layerChange(newLayer: TdWidgetData[]) {
         display: flex;
         align-items: center;
         justify-content: center;
+        
         img {
           width: 100%;
           height: auto;
           display: block;
         }
+        
         .preview-placeholder {
           display: flex;
           flex-direction: column;
@@ -189,10 +218,12 @@ function layerChange(newLayer: TdWidgetData[]) {
           justify-content: center;
           color: #999;
           padding: 2rem;
+          
           i {
             font-size: 3rem;
             margin-bottom: 0.5rem;
           }
+          
           p {
             margin: 0;
             font-size: 0.9rem;
@@ -200,11 +231,6 @@ function layerChange(newLayer: TdWidgetData[]) {
         }
       }
     }
-  }
-  .layer-wrap {
-    flex: 1;
-    overflow: auto;
-    width: 100%;
   }
 }
 

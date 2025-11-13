@@ -186,6 +186,7 @@ import PrevIcon from '@/components/common/Icon/PrevIcon.vue'
 import NextIcon from '@/components/common/Icon/NextIcon.vue'
 import api from '@/api'
 import { ElMessage } from 'element-plus'
+import { useUiStore } from '@/store'
 
 type TProps = {
   active?: boolean
@@ -241,6 +242,7 @@ const state = reactive<TState>({
 })
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
+const uiStore = useUiStore()
 
 const pageOptions = { pageNo: 1, pageSize: 20 }
 
@@ -324,8 +326,12 @@ const showContextMenu = (event: MouseEvent, image: TLocalImage) => {
   event.preventDefault()
   event.stopPropagation()
   contextMenu.visible = true
-  contextMenu.x = event.clientX
-  contextMenu.y = event.clientY
+  // 获取缩放比例，调整坐标以适配缩放
+  const scale = uiStore.uiZoom / 100
+  // 由于菜单在应用了 transform: scale() 的容器内，position: fixed 会相对于该容器定位
+  // 需要将坐标除以缩放比例
+  contextMenu.x = event.clientX / scale
+  contextMenu.y = event.clientY / scale
   contextMenu.image = image
 }
 

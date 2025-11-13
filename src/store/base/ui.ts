@@ -13,10 +13,10 @@ type TUiActions =
 
 const UiStore = defineStore<'uiStore', TUiState, {}, Record<TUiActions, (v?: number) => void>>('uiStore', {
   state: () => ({
-    uiZoom: 100,
+    uiZoom: 150,
   }),
   actions: {
-    setUiZoom(v: number = 100) {
+    setUiZoom(v: number = 150) {
       const nv = Math.min(300, Math.max(50, Math.round(v)))
       this.uiZoom = nv
       try {

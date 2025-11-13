@@ -226,8 +226,14 @@ onMounted(() => {
     const saved = Number(localStorage.getItem('ui_zoom_percent') || '')
     if (!Number.isNaN(saved) && saved) {
       uiStore.setUiZoom(saved)
+    } else {
+      // 如果没有保存的值，默认设置为 150%
+      uiStore.setUiZoom(150)
     }
-  } catch {}
+  } catch {
+    // 如果出错，默认设置为 150%
+    uiStore.setUiZoom(150)
+  }
   // 绑定浏览器式快捷键：Ctrl + +/-/0
   window.addEventListener('keydown', handleUiZoomKeydown, { passive: false })
   // 绑定 Ctrl + 滚轮
