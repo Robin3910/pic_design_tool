@@ -290,7 +290,7 @@ defineExpose({
 #zoom-control {
   bottom: 10px;
   position: absolute;
-  right: 292px;
+  right: 16px;
   z-index: 1000;
   .zoom-control-wrap {
     display: flex;

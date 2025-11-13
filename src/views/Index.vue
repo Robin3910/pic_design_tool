@@ -45,8 +45,11 @@
         <div class="shelter" :style="{ width: Math.floor((dPage.width * dZoom) / 100) + 'px', height: Math.floor((dPage.height * dZoom) / 100) + 'px' }"></div>
         <!-- 提供一个背景图层 -->
         <div class="shelter-bg transparent-bg" :style="{ width: Math.floor((dPage.width * dZoom) / 100) + 'px', height: Math.floor((dPage.height * dZoom) / 100) + 'px' }"></div>
-        <!-- 多画板操作组件 -->
-        <template #bottom> <multipleBoards /> </template>
+        <!-- 多画板操作组件与缩放控制（跟随画布容器） -->
+        <template #bottom>
+          <zoom-control ref="zoomControlRef" />
+          <multipleBoards />
+        </template>
       </design-board>
       <div :style="uiZoomStyle">
         <style-panel ref="ref3"></style-panel>
@@ -54,8 +57,6 @@
     </div>
     <!-- 标尺 -->
     <line-guides :show="state.showLineGuides" />
-    <!-- 缩放控制 -->
-    <zoom-control ref="zoomControlRef" />
     <!-- 右键菜单 -->
     <right-click-menu />
     <!-- 旋转缩放组件 -->
