@@ -23,12 +23,12 @@
     <!-- <el-button :loading="state.loading" size="large" class="primary-btn" :disabled="tempEditing" plain type="primary" @click="download">下载作品</el-button> -->
     <!-- </copyRight> -->
     <!-- 清除素材按钮 -->
-    <el-button 
+    <el-button
+      ref="clearButtonRef"
       v-if="!tempEditing"
-      plain 
-      type="warning" 
+      size="large"
+      class="primary-btn primary-btn--clear"
       @click="handleClearMaterials"
-      style="margin-right: 10px"
     >
       清除素材
     </el-button>
@@ -88,6 +88,7 @@ const widgetStore = useWidgetStore()
 const authStore = useAuthStore()
 
 const canvasImage = ref<typeof SaveImage | null>(null)
+const clearButtonRef = ref<HTMLElement | null>(null)
 
 // 获取用户头像 - 使用 computed 使其响应式
 const userAvatar = computed(() => authStore.user?.avatar)
@@ -899,6 +900,7 @@ defineExpose({
   // saveTemp, // 已注释，依赖后端服务
   // stateChange, // 已注释，依赖后端服务
   load,
+  clearButtonRef,
 })
 </script>
 

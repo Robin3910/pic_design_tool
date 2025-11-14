@@ -7,12 +7,16 @@
 -->
 <template>
   <el-tour v-model="isShow">
-    <el-tour-step :target="steps[0]?.$el" title="文件管理">
-      <div>点击文件菜单，管理你的设计，设置页面视图等操作。</div>
+    <el-tour-step placement="bottom" :target="steps[0]?.$el || steps[0]" title="撤销按钮" description="误操作了？点击这里或使用 Ctrl+Z 快速回退一步。"/>
+    <el-tour-step placement="bottom" :target="steps[1]?.$el || steps[1]" title="前进按钮" description="想恢复撤销的内容，点这里或使用 Ctrl+Shift+Z / Ctrl+Y。"/>
+    <el-tour-step placement="bottom" :target="steps[2]?.$el || steps[2]" title="保存按钮" description="创作到一半也别担心，点击保存将当前作品上传备份。"/>
+    <el-tour-step placement="bottom" :target="steps[3]?.$el || steps[3]" title="清除素材按钮" description="需要重头开始？这里可一键清空画布上的素材（保留锁定元素）。"/>
+    <el-tour-step placement="bottom" :target="steps[4]?.$el || steps[4]" title="页面缩放" description="用这组按钮放大/缩小或重置视图，方便检查细节。"/>
+    <el-tour-step placement="right" :target="steps[5]?.$el || steps[5]" title="素材与模板面板">
+      <div>在这里挑选模板、文字、形状与图片素材，拖拽到画布即可开始创作。</div>
     </el-tour-step>
-    <el-tour-step placement="right" :target="steps[1]?.$el" title="左侧工具栏" description="在这里可以选择模板开始设计，或是挑选文字、图片等素材拖拽至画布中。" />
-    <el-tour-step placement="left" :target="steps[2]?.$el" title="右侧属性栏" description="当选中画布中的元素时，在此处会显示相应的编辑界面；同时也可以切换到“图层”管理。" />
-    <el-tour-step :target="steps[3]?.$el" title="下载作品" description="点击此处即可导出当前作品，赶紧试试吧。" />
+    <el-tour-step placement="left" :target="steps[6]?.$el || steps[6]" title="属性与图层面板" description="选中画布元素后，可在此调整样式、位置与图层顺序，精细控制每个细节。" />
+    <el-tour-step :target="steps[7]?.$el || steps[7]" title="下载图片" description="完成后点击这里导出设计稿，支持图片快速下载与分享。" />
   </el-tour>
 </template>
 

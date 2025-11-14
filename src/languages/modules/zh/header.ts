@@ -8,5 +8,5 @@
 export default {
   logout: '退出登录',
   save: '保存',
-  download: '下载模版',
+  download: '下载图片',
 }

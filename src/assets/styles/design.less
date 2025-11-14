@@ -159,8 +159,39 @@
       }
       .primary-btn {
         font-weight: 600;
-        transform: scale(0.95);
-        margin-left: 10px;
+        border-radius: 8px;
+        padding: 0 22px;
+        height: 40px;
+        margin-left: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+        &:first-child {
+          margin-left: 0;
+        }
+        &:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+        }
+        &--save {
+          background-color: #67c23a !important;
+          border-color: #67c23a !important;
+          color: #fff !important;
+        }
+        &--download {
+          background-color: #409eff !important;
+          border-color: #409eff !important;
+          color: #fff !important;
+        }
+        &--clear {
+          background-color: #f56c6c !important;
+          border-color: #f56c6c !important;
+          color: #fff !important;
+        }
+        &--clear:hover {
+          opacity: 0.95;
+        }
       }
     }
   }

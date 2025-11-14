@@ -13,26 +13,25 @@
         <div class="top-left">
           <div class="name">{{ state.APP_NAME }}</div>
           <div class="operation">
-            <div :class="['operation-item', { disable: !undoable }]" @click="undoable ? handleHistory('undo') : ''"><i class="iconfont icon-undo" /></div>
-            <div :class="['operation-item', { disable: !redoable }]" @click="redoable ? handleHistory('redo') : ''"><i class="iconfont icon-redo" /></div>
+            <div ref="undoRef" :class="['operation-item', { disable: !undoable }]" @click="undoable ? handleHistory('undo') : ''"><i class="iconfont icon-undo" /></div>
+            <div ref="redoRef" :class="['operation-item', { disable: !redoable }]" @click="redoable ? handleHistory('redo') : ''"><i class="iconfont icon-redo" /></div>
           </div>
           <el-divider direction="vertical" />
-          <Folder @select="dealWith" ref="ref1"> <div class="operation-item"><i class="icon sd-wenjian" /> <span class="text" >文件</span></div> </Folder>
           <Helper @select="dealWith"> <div class="operation-item"><i class="icon sd-bangzhu" /> <span class="text" >帮助</span></div> </Helper>
           <!-- <el-tooltip effect="dark" :show-after="300" :offset="0" content="标尺" placement="bottom">
             <i style="font-size: 20px" class="icon sd-biaochi operation-item" @click="changeLineGuides" />
           </el-tooltip> -->
           <el-divider direction="vertical" />
           <!-- 全局界面缩放（模拟浏览器缩放） -->
-          <div class="operation">
+          <div ref="zoomToolbarRef" class="operation">
             <div class="operation-item" @click="uiStore.zoomOut()"><i class="iconfont icon-sub" /></div>
             <div class="operation-item" @click="uiStore.resetZoom()"><span class="text">{{ uiStore.uiZoom }}%</span></div>
             <div class="operation-item" @click="uiStore.zoomIn()"><i class="iconfont icon-add" /></div>
           </div>
         </div>
         <HeaderOptions ref="optionsRef" v-model="state.isContinue" @change="optionsChange">
-          <el-button size="large" class="primary-btn" style="background-color: #67C23A; border-color: #67C23A; color: #fff;" @click="handleSave">保存</el-button>
-          <el-button ref="ref4" size="large" class="primary-btn" type="primary" @click="dealWith('download')">{{ $t('header.download') }}</el-button>
+          <el-button ref="saveButtonRef" size="large" class="primary-btn primary-btn--save" @click="handleSave">保存</el-button>
+          <el-button ref="ref4" size="large" class="primary-btn primary-btn--download" @click="dealWith('download')">{{ $t('header.download') }}</el-button>
         </HeaderOptions>
       </div>
     </div>
@@ -71,7 +70,7 @@
       @done="state.downloadPercent = 0"
     />
     <!-- 漫游导航 -->
-    <Tour ref="tourRef" :steps="[ref1, ref2, ref3, ref4]" />
+    <Tour ref="tourRef" :steps="[undoRef, redoRef, saveButtonRef, clearButtonEl, zoomToolbarRef, ref2, ref3, ref4]" />
     <!-- 创建设计 -->
     <createDesign ref="createDesignRef" />
   </div>
@@ -81,7 +80,7 @@
 import _config from '../config'
 import {
   CSSProperties, computed, nextTick,
-  onBeforeUnmount, onMounted, reactive, ref, Ref
+  onBeforeUnmount, onMounted, reactive, ref, Ref, watchEffect, isRef
 } from 'vue'
 import RightClickMenu from '@/components/business/right-click-menu/RcMenu.vue'
 import Moveable from '@/components/business/moveable/Moveable.vue'
@@ -90,7 +89,6 @@ import zoomControl from '@/components/modules/layout/zoomControl/index.vue'
 import lineGuides from '@/components/modules/layout/lineGuides.vue'
 import shortcuts from '@/mixins/shortcuts'
 import HeaderOptions from './components/HeaderOptions.vue'
-import Folder from './components/Folder.vue'
 import Helper from './components/Helper.vue'
 import ProgressLoading from '@/components/common/ProgressLoading/download.vue'
 import { wGroupSetting } from '@/components/modules/widgets/wGroup/groupSetting'
@@ -103,7 +101,11 @@ import multipleBoards from '@/components/modules/layout/multipleBoards'
 import useHistory from '@/common/hooks/history'
 useHistory()
 
-const ref1 = ref<ButtonInstance>()
+const undoRef = ref<HTMLDivElement | null>(null)
+const redoRef = ref<HTMLDivElement | null>(null)
+const saveButtonRef = ref<ButtonInstance | null>(null)
+const clearButtonEl = ref<HTMLElement | null>(null)
+const zoomToolbarRef = ref<HTMLDivElement | null>(null)
 const ref2 = ref<ButtonInstance>()
 const ref3 = ref<ButtonInstance>()
 const ref4 = ref<ButtonInstance>()
@@ -140,11 +142,26 @@ const state = reactive<TState>({
   APP_NAME: _config.APP_NAME,
   showLineGuides: false,
 })
-const optionsRef = ref<typeof HeaderOptions | null>(null)
+type HeaderOptionsExpose = {
+  save: () => void
+  download: () => void
+  load: (cb: () => void) => void
+  clearButtonRef?: Ref<HTMLElement | null> | HTMLElement | null
+}
+const optionsRef = ref<HeaderOptionsExpose | null>(null)
 const zoomControlRef = ref<typeof zoomControl | null>(null)
 const controlStore = useControlStore()
 const createDesignRef: Ref<typeof createDesign | null> = ref(null)
 const uiStore = useUiStore()
+
+watchEffect(() => {
+  const exposed: Ref<HTMLElement | null> | HTMLElement | null | undefined = optionsRef.value?.clearButtonRef
+  if (exposed && isRef(exposed)) {
+    clearButtonEl.value = (exposed.value as HTMLElement | null)
+    return
+  }
+  clearButtonEl.value = (exposed as HTMLElement | null | undefined) ?? null
+})
 
 // 移除不再使用的 beforeUnload 函数，改用现代浏览器兼容的事件
 

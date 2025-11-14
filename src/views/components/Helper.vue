@@ -24,7 +24,6 @@
       <el-dropdown-menu v-show="type === 'menu'">
         <el-dropdown-item @click="type = 'shortkey'">快捷键</el-dropdown-item>
         <el-dropdown-item @click="openTour">新手引导</el-dropdown-item>
-        <el-dropdown-item @click="openIssues"><div class="menu-item">反馈或建议</div></el-dropdown-item>
       </el-dropdown-menu>
     </template>
   </el-dropdown>
@@ -44,9 +43,6 @@ const openTour = () => {
   dropdownRef.value?.handleClose()
 }
 
-const openIssues = () => {
-  window.open('https://github.com/palxiao/poster-design/issues', '_blank')
-}
 </script>
 
 <style lang="less" scoped>
