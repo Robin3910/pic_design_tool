@@ -20,9 +20,19 @@
         <!-- <el-button size="mini" style="width: 100%; margin-top: 0.5rem" plain @click="openCropper">替换图片</el-button> -->
         <!-- <el-button style="width: 100%; margin-bottom: 12px" plain @click="openPicBox">替换图片</el-button> -->
         <div class="options">
-          <el-button v-if="state.innerElement.cropEdit" plain type="primary" @click="imgCrop(false)">完成</el-button>
-          <el-button v-else plain type="primary" @click="imgCrop(true)"><i class="icon sd-caijian" /> 裁剪</el-button>
-          <el-button v-if="!state.innerElement.cropEdit" plain type="primary" class="rotate-btn" @click="rotateImage">旋转90°</el-button>
+          <div class="primary-actions">
+            <el-button v-if="state.innerElement.cropEdit" plain type="primary" class="transform-btn" @click="imgCrop(false)">完成</el-button>
+            <template v-else>
+              <el-button plain type="primary" class="transform-btn" @click="imgCrop(true)"><i class="icon sd-caijian" /> 裁剪</el-button>
+              <el-button plain type="primary" class="transform-btn" @click="rotateImage">旋转90°</el-button>
+            </template>
+          </div>
+          <div v-if="!state.innerElement.cropEdit" class="transform-actions">
+            <div class="scale-row">
+              <el-button plain type="primary" class="transform-btn" @click="scaleImage('in')">放大</el-button>
+              <el-button plain type="primary" class="transform-btn" @click="scaleImage('out')">缩小</el-button>
+            </div>
+          </div>
           <!-- <el-button plain @click="openImageCutout"><i class="icon sd-AIkoutu" /> 抠图</el-button> -->
           <!-- <uploader class="options__upload" @done="uploadImgDone">
             <el-button size="small" plain>替换图片</el-button>
@@ -337,6 +347,27 @@ function rotateImage() {
   forceStore.setUpdateRect()
 }
 
+const SCALE_RATIO = 0.1
+const MIN_SIZE = 10
+function scaleImage(direction: 'in' | 'out') {
+  if (!dActiveElement.value) {
+    return
+  }
+  const multiplier = direction === 'in' ? 1 + SCALE_RATIO : 1 - SCALE_RATIO
+  const currentWidth = Number(state.innerElement.width) || 0
+  const currentHeight = Number(state.innerElement.height) || 0
+  if (!currentWidth || !currentHeight) {
+    return
+  }
+  const nextWidth = Math.max(MIN_SIZE, Math.round(currentWidth * multiplier))
+  const nextHeight = Math.max(MIN_SIZE, Math.round(currentHeight * multiplier))
+  state.innerElement.width = nextWidth
+  state.innerElement.height = nextHeight
+  finish('width', nextWidth)
+  finish('height', nextHeight)
+  forceStore.setUpdateRect()
+}
+
 // 图库选择器
 function openPicBox() {
   if (picBoxRef.value) {
@@ -401,8 +432,27 @@ async function cutImageDone(url: string) {
   }
 }
 
-.rotate-btn {
-  margin-left: 8px;
+.primary-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.transform-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.scale-row {
+  display: flex;
+  gap: 8px;
+}
+
+.transform-btn {
+  flex: 1;
+  min-width: 90px;
 }
 
 .slide-wrap {

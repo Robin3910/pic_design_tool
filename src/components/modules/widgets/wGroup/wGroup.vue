@@ -8,7 +8,7 @@
 <template>
   <div
     ref="widget"
-    :class="['w-group', { 'layer-lock': props.params?.lock }]"
+    :class="['w-group', { 'layer-lock': props.params?.lock, 'layer-top': props.params?.isTop }]"
     :style="{
       position: 'absolute',
       left: (props.params.left || 0) - (props.parent?.left || 0) + 'px',

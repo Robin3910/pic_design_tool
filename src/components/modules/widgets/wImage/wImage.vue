@@ -2,7 +2,7 @@
   <div
     :id="params.uuid"
     ref="widgetRef"
-    :class="['w-image', { 'layer-lock': params.lock }]"
+    :class="['w-image', { 'layer-lock': params.lock, 'layer-top': params.isTop }]"
     :style="{
       position: state.position,
       left: params.left - parent.left + 'px',

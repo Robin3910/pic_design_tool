@@ -9,7 +9,7 @@
   <div
     :id="`${params.uuid}`"
     ref="widgetRef"
-    :class="['w-qrcode', { 'layer-lock': params.lock }]"
+    :class="['w-qrcode', { 'layer-lock': params.lock, 'layer-top': params.isTop }]"
     :style="{
       position: 'absolute',
       left: params.left - parent.left + 'px',

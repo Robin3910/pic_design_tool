@@ -24,6 +24,7 @@
           <span v-else :class="['widget-type icon', `sd-${element.type}`, element.type]"></span>
           <span :class="['widget-name', 'line-clamp-1', `${element.type}`]">{{ element.text || element.name }} {{ element.mask ? '(容器)' : '' }}</span>
           <div class="widget-out" :data-type="element.type" :data-uuid="element.uuid">
+            <img src="/置顶.svg" :class="['top-icon', { 'top-icon-active': element.isTop }]" @click.stop="topLayer(element)" :title="element.isTop ? '取消置顶' : '置顶'" />
             <i :class="['icon', element.lock ? 'sd-suoding' : 'sd-jiesuo']" @click.stop="lockLayer(element)" />
           </div>
         </li>
@@ -151,8 +152,16 @@ export default defineComponent({
       // })
       // item.lock = typeof item.lock === 'undefined' ? true : !item.lock
     }
+    // 置顶图层
+    const topLayer = (item: any) => {
+      widgetStore.updateLayerIndex({
+        uuid: item.uuid,
+        value: 999,
+        isGroup: item.isContainer
+      })
+    }
 
-    return { lockLayer, onDone, onMove, selectLayer, hoverLayer, widgets, getWidgets, getIsActive, ...toRefs(state), dragOptions, showItem }
+    return { lockLayer, topLayer, onDone, onMove, selectLayer, hoverLayer, widgets, getWidgets, getIsActive, ...toRefs(state), dragOptions, showItem }
   },
   watch: {
     data: {
@@ -215,7 +224,8 @@ export default defineComponent({
       display: flex;
       align-items: center;
     }
-    .widget-out:hover > .sd-jiesuo {
+    .widget-out:hover > .sd-jiesuo,
+    .widget-out:hover > .top-icon {
       opacity: 1;
     }
   }
@@ -238,13 +248,29 @@ export default defineComponent({
 .sd-jiesuo,
 .sd-suoding {
   position: absolute;
-  right: 12px;
   font-size: 18px;
   cursor: default;
   color: #444444;
+  right: 12px;
 }
 .sd-jiesuo {
   opacity: 0;
+}
+.sd-suoding {
+  color: #70BC59;
+}
+.top-icon {
+  position: absolute;
+  right: 40px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  &.top-icon-active {
+    opacity: 1;
+    filter: brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(2476%) hue-rotate(86deg) brightness(118%) contrast(119%);
+  }
 }
 .sd-xiaji {
   margin: 0 -4px 0 32px !important;

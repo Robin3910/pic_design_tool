@@ -23,6 +23,116 @@ export function updateLayerIndex(store: TWidgetStore, { uuid, value, isGroup }: 
 
   if (!widget) return
 
+  // 置顶功能：value === 999 表示置顶
+  if (value === 999) {
+    // 如果已经置顶，则取消置顶（将图层移动到同层级的第一个位置）
+    if (widget.isTop) {
+      widget.isTop = false
+      
+      if (isGroup) {
+        // 组合组件移动
+        group = widgets.filter((item) => item.parent === uuid)
+        for (let i = 0; i < group.length; ++i) {
+          const pos = widgets.findIndex((item) => item.uuid === group[i].uuid)
+          widgets.splice(pos, 1)
+        }
+      }
+      
+      // 找到同层级（相同 parent）的第一个位置
+      let targetIndex = 0
+      if (widget.parent !== '-1') {
+        // 在容器内，找到容器内第一个元素的位置
+        for (let i = 0; i < widgets.length; i++) {
+          if (widgets[i].parent === widget.parent) {
+            targetIndex = i
+            break
+          }
+        }
+      } else {
+        // 在顶层，找到顶层第一个元素的位置（跳过容器内的子元素）
+        for (let i = 0; i < widgets.length; i++) {
+          if (widgets[i].parent === '-1') {
+            targetIndex = i
+            break
+          }
+        }
+      }
+      
+      // 移除原位置
+      const currentIndex = widgets.findIndex((item) => item.uuid === uuid)
+      widgets.splice(currentIndex, 1)
+      // 插入到目标位置
+      widgets.splice(targetIndex, 0, widget)
+      
+      // 如果是组合，要把里面的组件添加回去
+      if (isGroup) {
+        const pos = widgets.findIndex((item) => item.uuid === uuid)
+        for (let i = group.length - 1; i >= 0; --i) {
+          widgets.splice(pos + 1, 0, group[i])
+        }
+      }
+      return
+    }
+
+    if (isGroup) {
+      // 组合组件移动
+      group = widgets.filter((item) => item.parent === uuid)
+      for (let i = 0; i < group.length; ++i) {
+        const pos = widgets.findIndex((item) => item.uuid === group[i].uuid)
+        widgets.splice(pos, 1)
+      }
+    }
+
+    // 找到同层级（相同 parent）的最后一个位置
+    let targetIndex = widgets.length
+    if (widget.parent !== '-1') {
+      // 在容器内，找到容器内最后一个元素的位置
+      for (let i = widgets.length - 1; i >= 0; i--) {
+        if (widgets[i].parent === widget.parent) {
+          targetIndex = i + 1
+          break
+        }
+      }
+    } else {
+      // 在顶层，找到顶层最后一个元素的位置（跳过容器内的子元素）
+      for (let i = widgets.length - 1; i >= 0; i--) {
+        if (widgets[i].parent === '-1') {
+          if (widgets[i].isContainer) {
+            // 如果是容器，找到容器及其所有子元素后的位置
+            let containerEnd = i
+            for (let j = i + 1; j < widgets.length; j++) {
+              if (widgets[j].parent === widgets[i].uuid) {
+                containerEnd = j
+              } else {
+                break
+              }
+            }
+            targetIndex = containerEnd + 1
+          } else {
+            targetIndex = i + 1
+          }
+          break
+        }
+      }
+    }
+
+    // 移除原位置
+    widgets.splice(index, 1)
+    // 插入到目标位置
+    widgets.splice(targetIndex, 0, widget)
+    // 设置置顶标记
+    widget.isTop = true
+
+    // 如果是组合，要把里面的组件添加回去
+    if (isGroup) {
+      const pos = widgets.findIndex((item) => item.uuid === uuid)
+      for (let i = group.length - 1; i >= 0; --i) {
+        widgets.splice(pos + 1, 0, group[i])
+      }
+    }
+    return
+  }
+
   if (isGroup) {
     // 组合组件移动
     group = widgets.filter((item) => item.parent === uuid)

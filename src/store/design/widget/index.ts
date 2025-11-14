@@ -28,6 +28,7 @@ export type TdWidgetData = TPageState & Partial<TCommonItemData> & {
   text?: string
   editable?: boolean
   lock?: boolean
+  isTop?: boolean
   imgUrl?: string
   rotate?: string
   transform?: string

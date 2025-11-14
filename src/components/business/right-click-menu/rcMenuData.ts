@@ -26,6 +26,7 @@ export type TWidgetItemData = {
     | 'rotate-right'
     | 'index-up'
     | 'index-down'
+    | 'index-top'
     | 'del'
     | 'ungroup'
   text: string
@@ -55,6 +56,10 @@ export const widgetMenu: TWidgetItemData[] = [
   {
     type: 'index-down',
     text: '下移一层',
+  },
+  {
+    type: 'index-top',
+    text: '置顶',
   },
   {
     type: 'del',

@@ -107,12 +107,62 @@ export function addWidget(store: TWidgetStore, setting: TdWidgetData) {
   const historyStore = useHistoryStore()
   const canvasStore = useCanvasStore()
   setting.uuid = nanoid()
-  store.dWidgets.push(setting)
-  const len = store.dWidgets.length
+  
+  const widgets = store.dWidgets
+  const parent = setting.parent || '-1'
+  
+  // 找到同层级（相同 parent）中最后一个图层的位置
+  // 新图层应该插入到这个位置之前，以保持已置顶的图层在最上层
+  let insertIndex = widgets.length
+  
+  if (parent !== '-1') {
+    // 在容器内，找到容器内最后一个元素的位置
+    for (let i = widgets.length - 1; i >= 0; i--) {
+      if (widgets[i].parent === parent) {
+        // 新图层应该插入到最后一个同层级图层之前
+        insertIndex = i
+        break
+      }
+    }
+  } else {
+    // 在顶层，找到顶层最后一个元素的位置（跳过容器内的子元素）
+    for (let i = widgets.length - 1; i >= 0; i--) {
+      if (widgets[i].parent === '-1') {
+        if (widgets[i].isContainer) {
+          // 如果是容器，找到容器及其所有子元素后的位置
+          let containerEnd = i
+          for (let j = i + 1; j < widgets.length; j++) {
+            if (widgets[j].parent === widgets[i].uuid) {
+              containerEnd = j
+            } else {
+              break
+            }
+          }
+          // 新图层应该插入到容器之前（保持容器置顶）
+          insertIndex = i
+        } else {
+          // 新图层应该插入到最后一个同层级图层之前
+          insertIndex = i
+        }
+        break
+      }
+    }
+  }
+  
+  // 新图层应该插入到 insertIndex 位置，以保持已置顶的图层在最上层
+  // 如果 insertIndex 等于 widgets.length，说明没有找到同层级的图层，直接 push 到末尾
+  if (insertIndex === widgets.length) {
+    widgets.push(setting)
+  } else {
+    // 插入到 insertIndex 位置（即插入到最后一个同层级图层之前）
+    widgets.splice(insertIndex, 0, setting)
+  }
+  
+  const len = widgets.length
   // store.state.dActiveElement = store.state.dWidgets[len - 1]
 
   store.selectWidget({
-    uuid: store.dWidgets[len - 1].uuid,
+    uuid: setting.uuid,
   })
   canvasStore.reChangeCanvas()
 }

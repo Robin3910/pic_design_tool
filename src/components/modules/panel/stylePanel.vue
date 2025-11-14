@@ -22,19 +22,44 @@
       </div>
       <div class="image-preview-area">
         <div class="preview-label">预览</div>
-        <div class="preview-image">
+        <div class="preview-image" @click="showPreviewDialog = true">
           <img 
             v-if="previewImageUrl" 
             :src="previewImageUrl" 
             alt="预览图"
             @error="handleImageError"
+            class="preview-img"
           />
           <div v-else class="preview-placeholder">
             <i class="el-icon-picture"></i>
             <p>暂无预览图</p>
           </div>
+          <div v-if="previewImageUrl" class="preview-hint">
+            <i class="el-icon-zoom-in"></i>
+            <span>点击放大</span>
+          </div>
         </div>
       </div>
+      
+      <!-- 放大预览对话框 -->
+      <el-dialog
+        v-model="showPreviewDialog"
+        title="预览图"
+        width="80%"
+        :before-close="() => showPreviewDialog = false"
+        center
+        class="preview-dialog"
+      >
+        <div class="preview-dialog-content">
+          <img 
+            v-if="previewImageUrl" 
+            :src="previewImageUrl" 
+            alt="预览图"
+            class="preview-dialog-img"
+            @error="handleImageError"
+          />
+        </div>
+      </el-dialog>
     </div>
   </div>
 </template>
@@ -68,6 +93,7 @@ const handleImageError = (event: Event) => {
 
 const iconList = ref<AlignListData[]>(alignIconList)
 const showGroupCombined = ref(false)
+const showPreviewDialog = ref(false)
 
 // const { dActiveElement, dWidgets, dSelectWidgets } = useSetupMapGetters(['dActiveElement', 'dWidgets', 'dSelectWidgets'])
 const { dActiveElement, dWidgets, dSelectWidgets } = storeToRefs(widgetStore)
@@ -128,9 +154,9 @@ function layerChange(newLayer: TdWidgetData[]) {
   
   // 图层区域 - 上方
   .layer-wrap {
-    flex: 0 0 40%; // 固定高度比例，可根据需要调整
-    min-height: 200px; // 最小高度
-    max-height: 50%; // 最大高度
+    flex: 0 0 30%; // 固定高度比例，可根据需要调整
+    min-height: 150px; // 最小高度
+    max-height: 35%; // 最大高度
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -200,15 +226,52 @@ function layerChange(newLayer: TdWidgetData[]) {
         background-color: #f5f5f5;
         border-radius: 4px;
         overflow: hidden;
-        min-height: 120px;
+        min-height: 200px;
         display: flex;
         align-items: center;
         justify-content: center;
+        position: relative;
+        cursor: pointer;
+        transition: all 0.3s ease;
         
-        img {
+        &:hover {
+          background-color: #eeeeee;
+          
+          .preview-hint {
+            opacity: 1;
+          }
+          
+          .preview-img {
+            transform: scale(1.02);
+          }
+        }
+        
+        .preview-img {
           width: 100%;
           height: auto;
           display: block;
+          transition: transform 0.3s ease;
+        }
+        
+        .preview-hint {
+          position: absolute;
+          bottom: 10px;
+          right: 10px;
+          background-color: rgba(0, 0, 0, 0.6);
+          color: #fff;
+          padding: 6px 12px;
+          border-radius: 4px;
+          font-size: 12px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          opacity: 0;
+          transition: opacity 0.3s ease;
+          pointer-events: none;
+          
+          i {
+            font-size: 14px;
+          }
         }
         
         .preview-placeholder {
@@ -230,6 +293,29 @@ function layerChange(newLayer: TdWidgetData[]) {
           }
         }
       }
+    }
+  }
+  
+}
+
+// 预览对话框样式
+:deep(.preview-dialog) {
+  .preview-dialog-content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    padding: 20px;
+    
+    .preview-dialog-img {
+      max-width: 100%;
+      max-height: 70vh;
+      height: auto;
+      display: block;
+      border-radius: 4px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
     }
   }
 }

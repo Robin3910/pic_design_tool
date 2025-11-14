@@ -353,7 +353,7 @@ function jump2Edit() {
   userStore.managerEdit(true)
 }
 
-// 清除素材（保留模板）
+// 清除素材（仅保留锁定图层）
 function handleClearMaterials() {
   try {
     const currentPage = pageStore.dCurrentPage
@@ -364,21 +364,19 @@ function handleClearMaterials() {
       return
     }
     
-    // 过滤出模板图片（name === '模板图片'）
-    const templateImages = currentLayout.layers.filter((widget: any) => 
-      widget.name === '模板图片' && widget.type === 'w-image'
-    )
+    // 过滤出需要保留的图层：仅锁定图层
+    const preservedLayers = currentLayout.layers.filter((widget: any) => widget.lock === true)
     
     // 统计要清除的素材数量
-    const clearCount = currentLayout.layers.length - templateImages.length
+    const clearCount = currentLayout.layers.length - preservedLayers.length
     
     if (clearCount === 0) {
       useNotification('提示', '没有需要清除的素材', { type: 'info' })
       return
     }
     
-    // 更新当前页面的图层，只保留模板图片
-    currentLayout.layers = templateImages
+    // 更新当前页面的图层，只保留已锁定图层
+    currentLayout.layers = preservedLayers
     
     // 更新 dWidgets（同步到 dWidgets）
     widgetStore.setDWidgets(widgetStore.getWidgets())
@@ -390,7 +388,8 @@ function handleClearMaterials() {
     // 更新画版
     pageStore.reChangeCanvas()
     
-    useNotification('成功', `已清除 ${clearCount} 个素材，保留了 ${templateImages.length} 个模板图片`, { type: 'success' })
+    const lockedCount = preservedLayers.length
+    useNotification('成功', `已清除 ${clearCount} 个素材，仅保留 ${lockedCount} 个锁定图层`, { type: 'success' })
   } catch (error: any) {
     console.error('清除素材失败:', error)
     useNotification('错误', error.message || '清除素材失败，请重试', { type: 'error' })

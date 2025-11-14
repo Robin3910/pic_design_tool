@@ -3,7 +3,7 @@
     :id="`${params.uuid}`"
     ref="widget"
     v-loading="state.loading"
-    :class="['w-text', { editing: state.editable, 'layer-lock': params.lock }, params.uuid]"
+    :class="['w-text', { editing: state.editable, 'layer-lock': params.lock, 'layer-top': params.isTop }, params.uuid]"
     :style="{
       position: 'absolute',
       left: params.left - parent.left + 'px',

@@ -168,6 +168,13 @@ function selectMenu(type: TWidgetItemData['type']) {
         isGroup: dActiveElement.value?.isContainer,
       })
       break
+    case 'index-top':
+      widgetStore.updateLayerIndex({
+        uuid: dActiveElement.value?.uuid || "",
+        value: 999,
+        isGroup: dActiveElement.value?.isContainer,
+      })
+      break
     case 'del':
       widgetStore.deleteWidget()
       break

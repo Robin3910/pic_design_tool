@@ -21,4 +21,10 @@ export default [
     tip: '下一层',
     value: -1,
   },
+  {
+    key: 'zIndex',
+    icon: 'icon-layer-top',
+    tip: '置顶',
+    value: 999,
+  },
 ] as TIconItemSelectData[]
