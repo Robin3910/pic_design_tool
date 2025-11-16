@@ -33,7 +33,7 @@ import { OtherList, TZoomData, ZoomList } from './data';
 // import { useSetupMapGetters } from '@/common/hooks/mapGetters';
 import { useRoute } from 'vue-router';
 import { storeToRefs } from 'pinia';
-import { useCanvasStore, useForceStore } from '@/store';
+import { useCanvasStore, useForceStore, useWidgetStore } from '@/store';
 import { findClosestNumber } from '@/utils/utils';
 
 const route = useRoute()
@@ -56,9 +56,12 @@ const curAction = ref('')
 
 // const { zoomScreenChange } = useSetupMapGetters(['zoomScreenChange'])
 const canvasStore = useCanvasStore()
+const widgetStore = useWidgetStore()
+const forceStore = useForceStore()
 const { dPage } = storeToRefs(useCanvasStore())
 const { zoomScreenChange } = storeToRefs(useForceStore())
 const { dZoom, dScreen } = storeToRefs(canvasStore)
+const { dActiveElement } = storeToRefs(widgetStore)
 const presetPadding = canvasStore.dPresetPadding
 
 watch(
@@ -126,10 +129,19 @@ onMounted(async () => {
   } else {
     activezoomIndex.value = zoomList.value.length - 1
   }
-  // 添加滚轮监听
-  addMouseWheel('page-design', (isDown: boolean) => {
-    mousewheelZoom(isDown)
-  })
+  // Alt+滚轮缩放元素（图片或文字）
+  // addMouseWheel 的第三个参数 altLimit=true 表示只有在 Alt 键按下时才会触发回调
+  addMouseWheel('page-design', (isDown: boolean, e?: Event) => {
+    // 检查是否有图片或文字被选中
+    const isImageSelected = dActiveElement.value && dActiveElement.value.type === 'w-image'
+    const isTextSelected = dActiveElement.value && dActiveElement.value.type === 'w-text'
+    
+    // 只有 Alt 键按下且有图片或文字被选中时，才缩放元素
+    // 其他情况（包括普通滚轮）不执行任何操作，画布缩放只能通过头顶栏按钮
+    if (isImageSelected || isTextSelected) {
+      mousewheelZoomElement(isDown, !!isImageSelected, !!isTextSelected)
+    }
+  }, true)
   // 添加窗口大小监听
   window.addEventListener('resize', (event) => {
     changeScreen()
@@ -230,6 +242,73 @@ function mousewheelZoom(down: boolean) {
   autoFixTop()
   const closest = findClosestNumber(value, zoomList.value.map(x => x.value))
   activezoomIndex.value = zoomList.value.findIndex(x => x.value === closest)
+}
+
+const SCALE_RATIO = 0.05 // 每次滚轮缩放的比率
+const MIN_SIZE = 10 // 最小尺寸
+
+function mousewheelZoomElement(down: boolean, isImage: boolean, isText: boolean) {
+  if (!dActiveElement.value) return
+  
+  if (isImage) {
+    // 缩放图片
+    const multiplier = down ? 1 - SCALE_RATIO : 1 + SCALE_RATIO
+    const currentWidth = Number(dActiveElement.value.width) || 0
+    const currentHeight = Number(dActiveElement.value.height) || 0
+    
+    if (!currentWidth || !currentHeight) return
+    
+    const nextWidth = Math.max(MIN_SIZE, Math.round(currentWidth * multiplier))
+    const nextHeight = Math.max(MIN_SIZE, Math.round(currentHeight * multiplier))
+    
+    widgetStore.updateWidgetData({
+      uuid: dActiveElement.value.uuid || '',
+      key: 'width',
+      value: nextWidth,
+    })
+    widgetStore.updateWidgetData({
+      uuid: dActiveElement.value.uuid || '',
+      key: 'height',
+      value: nextHeight,
+    })
+    forceStore.setUpdateRect()
+  } else if (isText) {
+    // 缩放文字
+    const multiplier = down ? 1 - SCALE_RATIO : 1 + SCALE_RATIO
+    const currentFontSize = Number(dActiveElement.value.fontSize) || 0
+    const currentWidth = Number(dActiveElement.value.width) || 0
+    const currentHeight = Number(dActiveElement.value.height) || 0
+    
+    if (!currentFontSize) return
+    
+    const nextFontSize = Math.max(MIN_SIZE, Math.round(currentFontSize * multiplier))
+    const nextWidth = currentWidth ? Math.max(MIN_SIZE, Math.round(currentWidth * multiplier)) : currentWidth
+    const nextHeight = currentHeight ? Math.max(MIN_SIZE, Math.round(currentHeight * multiplier)) : currentHeight
+    
+    widgetStore.updateWidgetData({
+      uuid: dActiveElement.value.uuid || '',
+      key: 'fontSize',
+      value: nextFontSize,
+    })
+    
+    if (nextWidth) {
+      widgetStore.updateWidgetData({
+        uuid: dActiveElement.value.uuid || '',
+        key: 'width',
+        value: nextWidth,
+      })
+    }
+    
+    if (nextHeight) {
+      widgetStore.updateWidgetData({
+        uuid: dActiveElement.value.uuid || '',
+        key: 'height',
+        value: nextHeight,
+      })
+    }
+    
+    forceStore.setUpdateRect()
+  }
 }
 
 function nearZoom(add?: boolean) {

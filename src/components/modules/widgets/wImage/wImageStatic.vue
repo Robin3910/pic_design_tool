@@ -18,14 +18,14 @@
     }"
   >
     <div :style="{ transform: params.flip ? `rotate${params.flip}(180deg)` : undefined, borderRadius: params.radius + 'px', '-webkit-mask-image': `${params.mask ? `url('${params.mask}')` : 'initial'}` }" :class="['img__box', { mask: params.mask }]">
-      <div v-if="params.isNinePatch" ref="targetRef" class="target" :style="{ border: `${(params.height * params.sliceData.ratio) / 2}px solid transparent`, borderImage: `url('${params.imgUrl}') ${params.sliceData.left} round` }"></div>
-      <img v-else ref="targetRef" class="target" style="transform-origin: center" :src="params.imgUrl" />
+      <div v-if="params.isNinePatch" ref="targetRef" class="target" :style="{ border: `${(params.height * params.sliceData.ratio) / 2}px solid transparent`, borderImage: `url('${params.imgUrl}') ${params.sliceData.left} round`, filter: brightnessFilter }"></div>
+      <img v-else ref="targetRef" class="target" :style="{ transformOrigin: 'center', filter: brightnessFilter }" :src="params.imgUrl" />
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { CSSProperties, reactive, ref } from 'vue'
+import { CSSProperties, computed, reactive, ref } from 'vue'
 import setting from "./wImageSetting"
 
 type TProps = {
@@ -68,6 +68,11 @@ const state = reactive<TState>({
 
 const widgetRef = ref<HTMLElement | null>(null)
 const targetRef = ref<HTMLImageElement | null>(null)
+
+const brightnessFilter = computed(() => {
+  const brightness = props.params.brightness ?? 1
+  return brightness !== 1 ? `brightness(${brightness})` : undefined
+})
 
 </script>
 

@@ -22,8 +22,8 @@
       <img class="edit__model" :src="params.imgUrl" />
     </div>
     <div :style="{ transform: params.flip ? `rotate${params.flip}(180deg)` : undefined, borderRadius: params.radius + 'px', '-webkit-mask-image': `${params.mask ? `url('${params.mask}')` : 'initial'}` }" :class="['img__box', { mask: params.mask }]">
-      <div v-if="params.isNinePatch" ref="targetRef" class="target" :style="{ border: `${(params.height * params.sliceData.ratio) / 2}px solid transparent`, borderImage: `url('${params.imgUrl}') ${params.sliceData.left} round` }"></div>
-      <img v-else ref="targetRef" class="target" style="transform-origin: center" :src="params.imgUrl" />
+      <div v-if="params.isNinePatch" ref="targetRef" class="target" :style="{ border: `${(params.height * params.sliceData.ratio) / 2}px solid transparent`, borderImage: `url('${params.imgUrl}') ${params.sliceData.left} round`, filter: brightnessFilter }"></div>
+      <img v-else ref="targetRef" class="target" :style="{ transformOrigin: 'center', filter: brightnessFilter }" :src="params.imgUrl" />
     </div>
     <div v-if="isMask" class="drop__mask">
       <div putIn="true" :style="{ fontSize: params.width / 12 + 'px' }" class="drop__btn">拖入</div>
@@ -114,6 +114,11 @@ const isMask = computed(() => {
 })
 const isDraw = computed(() => {
   return route.name === 'Draw'
+})
+
+const brightnessFilter = computed(() => {
+  const brightness = props.params.brightness ?? 1
+  return brightness !== 1 ? `brightness(${brightness})` : undefined
 })
 
 watch(

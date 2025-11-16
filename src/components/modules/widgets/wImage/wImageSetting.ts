@@ -30,6 +30,7 @@ export type TImageSetting = {
     left: number
   }
   cropEdit?: boolean
+  brightness?: number
 }
 
 const setting: TImageSetting = {
@@ -62,7 +63,8 @@ const setting: TImageSetting = {
   sliceData: {
     ratio: 0,
     left: 0,
-  }
+  },
+  brightness: 1
 }
 
 export default setting

@@ -70,10 +70,10 @@ watch(
   () => props.percent,
   (num) => {
     if (num >= 100) {
-      // setTimeout(() => {
-      //   emit('done')
-      // }, 1000)
-      hide.value = false
+      // 完成之后自动消失，延迟2秒后触发done事件
+      setTimeout(() => {
+        emit('done')
+      }, 2000)
     }
   },
 )
@@ -137,24 +137,28 @@ defineExpose({
   user-select: none;
   display: flex;
   justify-content: center;
-  flex-direction: column;
-  padding: 0 24%;
+  align-items: flex-start;
+  padding-top: 20px;
   width: 100%;
-  height: 100%;
   position: fixed;
   z-index: 9999;
   top: 0;
   left: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: transparent;
+  pointer-events: none;
 }
 .content {
   background: #ffffff;
   border-radius: 8px;
-  padding: 2rem 4rem;
+  padding: 1rem 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: auto;
+  min-width: 300px;
+  max-width: 500px;
 }
 .text {
-  margin: 2rem 0;
-  font-size: 20px;
+  margin: 0.5rem 0;
+  font-size: 14px;
   font-weight: bold;
   width: 100%;
   text-align: center;
@@ -162,13 +166,13 @@ defineExpose({
 }
 .btn {
   font-weight: 400;
-  font-size: 16px;
+  font-size: 12px;
   cursor: pointer;
   color: #3771e5;
 }
 .info {
   font-weight: 400;
-  font-size: 16px;
+  font-size: 12px;
   color: #777777;
 }
 .url-container {
@@ -191,11 +195,12 @@ defineExpose({
 }
 .tool {
   text-align: right;
+  margin-bottom: 0.25rem;
   .backstage {
     display: inline-flex;
     align-items: center;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 12px;
   }
 }
 .success {
@@ -203,15 +208,15 @@ defineExpose({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin-top: 1rem;
+  margin-top: 0.5rem;
   
   .success-icon {
-    font-size: 48px;
-    margin-bottom: 0.5rem;
+    font-size: 24px;
+    margin-bottom: 0.25rem;
   }
   
   .success-text {
-    font-size: 18px;
+    font-size: 14px;
     color: #67c23a;
     font-weight: 600;
   }

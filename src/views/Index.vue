@@ -254,8 +254,8 @@ onMounted(() => {
   }
   // 绑定浏览器式快捷键：Ctrl + +/-/0
   window.addEventListener('keydown', handleUiZoomKeydown, { passive: false })
-  // 绑定 Ctrl + 滚轮
-  window.addEventListener('wheel', handleUiZoomWheel, { passive: false })
+  // 绑定 Ctrl + 滚轮（已禁用，只能通过头顶栏按钮缩放）
+  // window.addEventListener('wheel', handleUiZoomWheel, { passive: false })
 })
 
 onBeforeUnmount(() => {
@@ -265,7 +265,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('keyup', handleKeyup(controlStore, checkCtrl), false)
   document.oncontextmenu = null
   window.removeEventListener('keydown', handleUiZoomKeydown)
-  window.removeEventListener('wheel', handleUiZoomWheel)
+  // window.removeEventListener('wheel', handleUiZoomWheel)
 })
 
 function handleHistory(data: "undo" | "redo") {
@@ -365,7 +365,7 @@ function handleUiZoomKeydown(e: KeyboardEvent) {
 }
 
 function handleUiZoomWheel(e: WheelEvent) {
-  if (!e.ctrlKey && !e.metaKey) return
+  if (!e.altKey) return
   e.preventDefault()
   const delta = e.deltaY
   if (delta > 0) {

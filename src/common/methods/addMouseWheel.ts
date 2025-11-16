@@ -27,7 +27,7 @@ export default function(el: HTMLElement | string, cb: Function, altLimit: boolea
     // }
     if ((altLimit && controlStore.dAltDown) || !altLimit) {
       ev.preventDefault()
-      cb(down)
+      cb(down, ev)
     }
     return false
   }, { passive: false })

@@ -43,6 +43,7 @@
         <div class="slide-wrap">
           <number-slider v-model="state.innerElement.opacity" style="font-size: 14px" label="不透明" :step="0.05" :maxValue="1" @finish="(value) => finish('opacity', value)" />
           <number-slider v-model="state.innerElement.radius" style="font-size: 14px" label="圆角" :maxValue="Math.min(Number(state.innerElement.record?.width), Number(state.innerElement.record?.height))" @finish="(value) => finish('radius', value)" />
+          <number-slider v-model="state.innerElement.brightness" style="font-size: 14px" label="亮度" :step="0.1" :minValue="0" :maxValue="2" @finish="(value) => finish('brightness', value)" />
           <!-- <number-slider v-model="innerElement.letterSpacing" style="font-size: 14px" label="字距" labelWidth="40px" :step="0.05" :minValue="-50" :maxValue="innerElement.fontSize" @finish="(value) => finish('letterSpacing', value)" />
         <number-slider v-model="innerElement.lineHeight" style="font-size: 14px" label="行距" labelWidth="40px" :step="0.05" :minValue="0" :maxValue="2.5" @finish="(value) => finish('lineHeight', value)" /> -->
         </div>
@@ -185,7 +186,12 @@ created()
 
 function change() {
   tag = true
-  state.innerElement = JSON.parse(JSON.stringify({ ...state.innerElement, ...dActiveElement.value }))
+  const elementData = { ...state.innerElement, ...dActiveElement.value }
+  // 确保 brightness 有默认值
+  if (elementData.brightness === undefined || elementData.brightness === null) {
+    elementData.brightness = 1
+  }
+  state.innerElement = JSON.parse(JSON.stringify(elementData))
 }
 
 function changeValue() {
