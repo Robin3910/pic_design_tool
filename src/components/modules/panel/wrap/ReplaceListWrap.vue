@@ -6,7 +6,7 @@
 <template>
   <div class="wrap">
     <div class="header-with-refresh">
-      <span class="header-title">替换</span>
+      <span class="header-title">历史</span>
       <el-button 
         text
         size="small"

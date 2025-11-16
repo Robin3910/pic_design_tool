@@ -40,13 +40,14 @@
 import widgetClassifyListData from '@/assets/data/WidgetClassifyList'
 import { reactive, onMounted, watch, nextTick, markRaw, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { UploadIcon } from '@/components/common/Icon'
+import { UploadIcon, HistoryIcon } from '@/components/common/Icon'
 
 const route = useRoute()
 
 // 图标组件映射
 const iconComponents: Record<string, any> = {
   UploadIcon: markRaw(UploadIcon),
+  HistoryIcon: markRaw(HistoryIcon),
 }
 
 const state = reactive({

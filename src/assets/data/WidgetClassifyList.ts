@@ -38,11 +38,11 @@ export default [
     component: 'text-list-wrap',
   },
   {
-    name: '替换',
+    name: '历史',
     icon: 'icon-refresh',
     show: false,
     component: 'replace-list-wrap',
-    iconComponent: 'UploadIcon',
+    iconComponent: 'HistoryIcon',
   },
   // 注释掉素材管理相关功能 - 依赖后端服务
   // {
