@@ -99,7 +99,7 @@
     >
       <div class="context-menu-item" @click.stop="handleDelete(contextMenu.image)">
         <i class="el-icon-delete"></i>
-        <span>删除</span>
+        <span>撤销</span>
       </div>
     </div>
     

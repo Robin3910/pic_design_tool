@@ -100,7 +100,7 @@
     >
       <div class="context-menu-item" @click.stop="handleDelete(contextMenu.image)">
         <i class="el-icon-delete"></i>
-        <span>删除</span>
+        <span>撤销</span>
       </div>
     </div>
   </div>
@@ -279,6 +279,24 @@ const loadImagesFromApi = async (init: boolean = false) => {
       }
     }
 
+    const buildIndexMap = (source?: string | null) => {
+      const map = new Map<number, string>()
+      if (typeof source !== 'string' || source.trim().length === 0) {
+        return map
+      }
+      source
+        .split(',')
+        .map((s: string) => s.trim())
+        .filter((s: string) => s.length > 0)
+        .forEach((u: string) => {
+          const idx = extractIndexFromUrl(u)
+          if (idx != null && !map.has(idx)) {
+            map.set(idx, u)
+          }
+        })
+      return map
+    }
+
     // 收集过滤后展示出来的图片素材对应的 effectiveImgUrl，用于更新预览图
     const previewUrls: string[] = []
     // 记录哪些 item 的图片被添加到了 results 中
@@ -289,59 +307,46 @@ const loadImagesFromApi = async (init: boolean = false) => {
       if (item.id != null) {
         taskRecordCache.set(item.id, item)
       }
-      // 优先使用 hdImages，如果为空则使用 customImageUrls
-      let str = item.hdImages
-      if (typeof str !== 'string' || str.trim().length === 0) {
-        str = item.customImageUrls ?? item.custom_image_urls
+      const hdIndexMap = buildIndexMap(item.hdImages ?? item.setImageUrls ?? item.set_image_urls)
+      const customIndexMap = buildIndexMap(item.customImageUrls ?? item.custom_image_urls)
+
+      // 处理普通图片（hdImages 优先，缺失时回退 customImageUrls）
+      // 解析需重制序号（支持 number、字符串"1,2,3"、数组）
+      const raw = (item as any).need_redraw_index ?? (item as any).needRedrawIndex
+      let indices: number[] = []
+      if (Array.isArray(raw)) {
+        indices = raw.map((n) => parseInt(n, 10)).filter((n) => !isNaN(n))
+      } else if (typeof raw === 'string') {
+        indices = raw
+          .split(',')
+          .map((s) => parseInt(s.trim(), 10))
+          .filter((n) => !isNaN(n))
+      } else if (typeof raw === 'number') {
+        indices = [raw]
       }
-      
-      // 处理普通图片（hdImages 或 customImageUrls）
-      if (typeof str === 'string' && str.trim().length > 0) {
-        // 解析需重制序号（支持 number、字符串"1,2,3"、数组）
-        const raw = (item as any).need_redraw_index ?? (item as any).needRedrawIndex
-        let indices: number[] = []
-        if (Array.isArray(raw)) {
-          indices = raw.map((n) => parseInt(n, 10)).filter((n) => !isNaN(n))
-        } else if (typeof raw === 'string') {
-          indices = raw
-            .split(',')
-            .map((s) => parseInt(s.trim(), 10))
-            .filter((n) => !isNaN(n))
-        } else if (typeof raw === 'number') {
-          indices = [raw]
-        }
 
-        if (indices.length > 0) {
-          const indexSet = new Set(indices)
-
-          const imageList: string[] = str
-            .split(',')
-            .map((s: string) => s.trim())
-            .filter((s: string) => s.length > 0)
-
-          imageList.forEach((u) => {
-            const idx = extractIndexFromUrl(u)
-            if (idx != null && indexSet.has(idx)) {
-              const name = `${item.id ?? ''}_${idx}`
-              // 去重：如果该 URL 已添加则跳过
-              if (!results.find((r) => r.url === u)) {
-                results.push({ 
-                  name, 
-                  url: u, 
-                  thumb: u,
-                  sortId: item.id ?? '',
-                  sortIndex: idx,
-                  orderNo: item.orderNo || item.order_no || '',
-                  categoryName: item.categoryName || item.category_name || '',
-                })
-                // 标记该 item 有图片被添加到 results 中
-                if (item.id != null) {
-                  itemsWithFilteredImages.add(item.id)
-                }
-              }
+      if (indices.length > 0) {
+        indices.forEach((idx) => {
+          const url = hdIndexMap.get(idx) ?? customIndexMap.get(idx)
+          if (!url) {
+            return
+          }
+          const name = `${item.id ?? ''}_${idx}`
+          if (!results.find((r) => r.url === url)) {
+            results.push({
+              name,
+              url,
+              thumb: url,
+              sortId: item.id ?? '',
+              sortIndex: idx,
+              orderNo: item.orderNo || item.order_no || '',
+              categoryName: item.categoryName || item.category_name || '',
+            })
+            if (item.id != null) {
+              itemsWithFilteredImages.add(item.id)
             }
-          })
-        }
+          }
+        })
       }
     })
 
