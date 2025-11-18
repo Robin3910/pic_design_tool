@@ -423,46 +423,55 @@ async function save() {
     const currentRecord = pageStore.dCurrentPage
     const backEndCapture: boolean = checkDownloadPoster(dLayouts.value[currentRecord])
     
-    // 收集画板上所有图片素材的widget（包含sortId的）
+    // 收集画板上所有图片素材的widget（包含sortId的，排除模板素材）
+    // 成品只会有两张图片：模板图片和目标图片，过滤后只剩目标图片
+    console.log('[命名过程] 开始生成文件名...')
     const currentLayout = dLayouts.value[currentRecord]
     const imageWidgets = currentLayout?.layers?.filter((widget: any) => 
-      widget.type === 'w-image' && widget.sortId
+      widget.type === 'w-image' && widget.sortId && widget.name !== '模板图片'
     ) || []
+    console.log('[命名过程] 过滤后的图片widgets数量:', imageWidgets.length, imageWidgets)
     
     // 生成文件名：{素材图片url}_template_result_re_{数字}
     let customFileName: string | undefined = undefined
+    if (imageWidgets.length === 0) {
+      console.log('[命名过程] 未找到符合条件的图片widget，使用默认文件名')
+    }
+    
     if (imageWidgets.length > 0) {
-      // 使用第一张素材图片的sortId和sortIndex
-      const firstWidget = imageWidgets[0] as any
-      const sortId = Number(firstWidget.sortId)
-      const sortIndex = firstWidget.sortIndex
+      // 过滤后只剩一张目标图片，直接使用
+      const targetWidget = imageWidgets[0] as any
+      const sortId = Number(targetWidget.sortId)
+      const sortIndex = targetWidget.sortIndex
+      console.log('[命名过程] 目标图片信息:', { sortId, sortIndex, widgetName: targetWidget.name })
       
       if (sortId && sortIndex !== undefined) {
         try {
           // 从任务记录中获取图片URL
           let task = taskRecordCache.get(sortId) || null
+          console.log('[命名过程] 从缓存获取任务记录:', sortId, task ? '命中' : '未命中')
           
           // 如果缓存中没有，尝试查询（但这里不阻塞，如果查询失败就使用默认文件名）
           if (!task) {
-            console.log(`任务记录 ${sortId} 不在缓存中，尝试查询以获取图片URL`)
+            console.log(`[命名过程] 任务记录 ${sortId} 不在缓存中，尝试查询以获取图片URL`)
             try {
               task = await api.redrawTask.getRedrawTaskById(sortId)
               if (task) {
                 taskRecordCache.set(sortId, task)
+                console.log('[命名过程] 查询任务记录成功:', sortId)
               }
             } catch (e) {
-              console.warn(`查询任务记录 ${sortId} 失败，使用默认文件名:`, e)
+              console.warn(`[命名过程] 查询任务记录 ${sortId} 失败，使用默认文件名:`, e)
             }
           }
           
           if (task) {
-            // 优先使用 hdImages，如果为空则使用 customImageUrls
-            let imageUrlsStr = task.hdImages
-            if (typeof imageUrlsStr !== 'string' || imageUrlsStr.trim().length === 0) {
-              imageUrlsStr = task.customImageUrls ?? (task as any).custom_image_urls
-            }
+            // 只使用 customImageUrls
+            const imageUrlsStr = task.customImageUrls ?? (task as any).custom_image_urls
+            console.log('[命名过程] 使用customImageUrls字段')
             
             if (typeof imageUrlsStr === 'string' && imageUrlsStr.trim().length > 0) {
+              console.log('[命名过程] 图片URL字符串长度:', imageUrlsStr.length)
             // 提取URL文件名结尾的数字作为序号（如 xxx_12.jpg => 12）
             const extractIndexFromUrl = (u: string): number | null => {
               try {
@@ -482,12 +491,14 @@ async function save() {
                 .split(',')
                 .map((s: string) => s.trim())
                 .filter((s: string) => s.length > 0)
+              console.log('[命名过程] 解析后的图片URL列表数量:', imageList.length)
               
             let targetUrl: string | null = null
               for (const url of imageList) {
               const idx = extractIndexFromUrl(url)
               if (idx === sortIndex) {
                 targetUrl = url
+                console.log('[命名过程] 找到匹配的URL (sortIndex=' + sortIndex + '):', url)
                 break
               }
             }
@@ -521,10 +532,12 @@ async function save() {
                 
                 // 提取URL最后的数字
                 const lastNumber = extractLastNumberFromUrl(targetUrl)
+                console.log('[命名过程] 从URL提取的最后数字:', lastNumber)
                 
                 if (lastNumber) {
                   // 只提取文件名部分，避免重复的URL路径
                   const fileName = extractFileNameFromUrl(targetUrl)
+                  console.log('[命名过程] 提取的文件名:', fileName)
                   
                   if (fileName) {
                     // 移除文件扩展名
@@ -533,14 +546,24 @@ async function save() {
                     const safeFileName = nameWithoutExt.replace(/[^a-zA-Z0-9._-]/g, '_')
                     // 生成文件名：{素材图片文件名}_template_result_re_{数字}（无后缀）
                     customFileName = `${safeFileName}_template_result_re_${lastNumber}`
+                    console.log('[命名过程] 最终生成的文件名:', customFileName)
+                  } else {
+                    console.warn('[命名过程] 无法从URL提取文件名')
                   }
+                } else {
+                  console.warn('[命名过程] 无法从URL提取最后数字')
                 }
               } else {
-                console.warn(`未找到序号 ${sortIndex} 对应的图片URL`)
+                console.warn(`[命名过程] 未找到序号 ${sortIndex} 对应的图片URL`)
               }
+            } else {
+              console.warn('[命名过程] 图片URL字符串为空或无效')
             }
+          } else {
+            console.warn('[命名过程] 未找到任务记录，无法生成自定义文件名')
           }
         } catch (error) {
+          console.error('[命名过程] 生成文件名时出错:', error)
           console.warn('从任务记录获取图片URL失败，使用默认文件名:', error)
         }
       }
@@ -549,6 +572,7 @@ async function save() {
     // 如果没有找到图片素材或获取失败，使用默认文件名
     const defaultFileName = `${state.title || '未命名作品'}.png`
     const fileName = customFileName ? `${customFileName}.png` : defaultFileName
+    console.log('[命名过程] 最终使用的文件名:', fileName, customFileName ? '(自定义)' : '(默认)')
     
     let blob: Blob
     
