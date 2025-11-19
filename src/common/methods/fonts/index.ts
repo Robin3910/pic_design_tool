@@ -41,6 +41,18 @@ export const useFontStore = {
         woff_size: 0,
       },
       {
+        id: 544,
+        alias: '阿里巴巴数黑体',
+        preview: '',
+        ttf: null,
+        woff: '',
+        value: '阿里巴巴数黑体',
+        font_family: '',
+        size: 0,
+        lang: 'zh',
+        woff_size: 0,
+      },
+      {
         id: 543,
         alias: '站酷快乐体',
         preview: '',
