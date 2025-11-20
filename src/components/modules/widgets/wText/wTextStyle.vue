@@ -66,13 +66,22 @@ import { useControlStore, useForceStore, useWidgetStore } from '@/store'
 import { TUpdateWidgetPayload } from '@/store/design/widget/actions/widget'
 import { TUpdateAlignData } from '@/store/design/widget/actions/align'
 
+type TFontItem = {
+  id: number | string
+  oid: string
+  value: string
+  url: string
+  alias: string
+  preview: string
+}
+
 type TState = {
   activeNames: string[]
   innerElement: TwTextData
   tag: boolean
   ingoreKeys: string[]
   fontSizeList: number[]
-  fontClassList: Record<string, any> // 不能设空字体系统默认字体，因为截图服务的默认字体无法保证一致
+  fontClassList: TFontItem[] // 不能设空字体系统默认字体，因为截图服务的默认字体无法保证一致
   lineHeightList: number[]
   letterSpacingList: number[]
   layerIconList: TIconItemSelectData[]
@@ -90,7 +99,7 @@ const state = reactive<TState>({
   tag: false,
   ingoreKeys: ['left', 'top', 'name', 'width', 'height', 'text', 'color', 'backgroundColor'],
   fontSizeList: [12, 14, 24, 26, 28, 30, 36, 48, 60, 72, 96, 108, 120, 140, 180, 200, 250, 300, 400, 500],
-  fontClassList: {}, // 不能设空字体系统默认字体，因为截图服务的默认字体无法保证一致
+  fontClassList: [], // 不能设空字体系统默认字体，因为截图服务的默认字体无法保证一致
   lineHeightList: [1, 1.5, 2],
   letterSpacingList: [0, 10, 25, 50, 75, 100, 200],
   layerIconList,
@@ -168,14 +177,29 @@ function changeValue() {
 
 function loadFonts() {
   const localFonts = useFontStore.list
-  const fontLists: Record<string, any> = { 当前页面: [], 中文: [], 英文: [] }
-  for (const font of localFonts) {
-    const { id, oid, value, url, alias, preview, lang } = font
-    const item = { id, oid, value, url, alias, preview }
-    lang === 'zh' ? fontLists['中文'].unshift(item) : fontLists['英文'].unshift(item)
+  const uniqueFonts: TFontItem[] = []
+  const seen = new Set<number | string>()
+
+  function appendFont(item?: Partial<TFontItem>) {
+    if (!item || item.id === undefined) {
+      return
+    }
+    if (seen.has(item.id)) {
+      return
+    }
+    seen.add(item.id)
+    uniqueFonts.push(item as TFontItem)
   }
-  fontLists['当前页面'] = usePageFontsFilter()
-  state.fontClassList = fontLists
+
+  const pageFonts = usePageFontsFilter()
+  pageFonts.forEach((font) => appendFont(font))
+
+  for (const font of localFonts) {
+    const { id, oid, value, url, alias, preview } = font
+    appendFont({ id, oid, value, url, alias, preview })
+  }
+
+  state.fontClassList = uniqueFonts
 }
 
 function finish(key: string, value: number | Record<string, any> | string) {
@@ -229,6 +253,7 @@ async function alignAction(item: TIconItemSelectData) {
 }
 
 function changeStyleIconList() {
+  const innerElement = state.innerElement as Record<string, any>
   for (let i = 0; i < state.styleIconList1.length; ++i) {
     let key = state.styleIconList1[i].key
     state.styleIconList1[i].select = false
@@ -236,7 +261,7 @@ function changeStyleIconList() {
     switch (key) {
       case 'fontWeight':
       case 'fontStyle':
-        if (state.innerElement[key] !== unchecked && state.innerElement[key] == checked) {
+        if (innerElement[key as keyof typeof innerElement] !== unchecked && innerElement[key as keyof typeof innerElement] == checked) {
           state.styleIconList1[i].select = !state.styleIconList1[i].select
         }
         break
@@ -245,7 +270,7 @@ function changeStyleIconList() {
   for (let i = 0; i < state.styleIconList2.length; i++) {
     let key = state.styleIconList2[i].key
     state.styleIconList2[i].select = false
-    if (['textAlign', 'textAlignLast'].includes(key || '') && state.innerElement[key] === state.styleIconList2[i].value) {
+    if (['textAlign', 'textAlignLast'].includes(key || '') && innerElement[key as keyof typeof innerElement] === state.styleIconList2[i].value) {
       state.styleIconList2[i].select = true
       continue
     }

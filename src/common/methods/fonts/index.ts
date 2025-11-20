@@ -64,6 +64,18 @@ export const useFontStore = {
         lang: 'zh',
         woff_size: 0,
       },
+      {
+        id: 546,
+        alias: 'Dancing Script',
+        preview: '',
+        ttf: null,
+        woff: '',
+        value: 'Dancing Script',
+        font_family: '',
+        size: 0,
+        lang: 'en',
+        woff_size: 0,
+      },
     ]
 
     if (this.list.length === 0) {
