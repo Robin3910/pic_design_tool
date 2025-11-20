@@ -47,6 +47,7 @@ import DragHelper from '@/common/hooks/dragHelper'
 import setItem2Data from '@/common/methods/DesignFeatures/setImage'
 import { useControlStore, useCanvasStore, useWidgetStore, useTemplateStore, useAuthStore } from '@/store'
 import type { Template } from '@/api/template'
+import { applyTemplateImageDefaults } from '@/store/design/widget/utils/templateWidget'
 
 type TState = {
   loading: boolean
@@ -259,20 +260,14 @@ const selectItem = async (item: any) => {
     group.forEach((element: any) => {
       element.left += (pW - parent.width) / 2
       element.top += (pH - parent.height) / 2
-      // 从模板添加的图片命名为"模板图片"
-      if (element.type === 'w-image') {
-        element.name = '模板图片'
-      }
+      applyTemplateImageDefaults(element)
     })
     widgetStore.addGroup(group)
   } else {
     group.text && (group.text = decodeURIComponent(group.text))
     group.left = pW / 2 - group.fontSize * (group.text.length / 2)
     group.top = pH / 2 - group.fontSize / 2
-    // 从模板添加的图片命名为"模板图片"
-    if (group.type === 'w-image') {
-      group.name = '模板图片'
-    }
+    applyTemplateImageDefaults(group)
     widgetStore.addWidget(group)
   }
 }

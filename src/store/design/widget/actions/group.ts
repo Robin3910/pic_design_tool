@@ -8,6 +8,7 @@
 
 import { useCanvasStore, useHistoryStore } from "@/store"
 import { TWidgetStore, TdWidgetData } from ".."
+import { applyTemplateImageDefaults } from "../utils/templateWidget"
 import { customAlphabet } from 'nanoid/non-secure'
 const nanoid = customAlphabet('1234567890abcdef', 12)
 
@@ -24,9 +25,7 @@ export function addGroup(store: TWidgetStore, group: TdWidgetData[]) {
     !item.isContainer && parent && (item.parent = parent.uuid) // 重设父id
     item.text && (item.text = decodeURIComponent(item.text))
     // 从模板添加的图片命名为"模板图片"
-    if (item.type === 'w-image') {
-      item.name = '模板图片'
-    }
+    applyTemplateImageDefaults(item)
     store.dWidgets.push(item)
   })
   // 选中组件

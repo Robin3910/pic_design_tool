@@ -167,13 +167,22 @@ export function addWidget(store: TWidgetStore, setting: TdWidgetData) {
   canvasStore.reChangeCanvas()
 }
 
+export type TDeleteWidgetPayload = {
+  uuid?: string
+}
+
 /** 删除组件 */
-export function deleteWidget(store: TWidgetStore) {
+export function deleteWidget(store: TWidgetStore, payload?: TDeleteWidgetPayload) {
   const historyStore = useHistoryStore()
   const canvasStore = useCanvasStore()
   const widgets = store.dWidgets
   const selectWidgets = store.dSelectWidgets
-  const activeElement = store.dActiveElement
+  let activeElement = store.dActiveElement
+
+  if (payload?.uuid) {
+    activeElement = widgets.find((item) => item.uuid === payload.uuid) || null
+  }
+
   if (!activeElement) return
 
   let count = 0 // 记录容器里的组件数量

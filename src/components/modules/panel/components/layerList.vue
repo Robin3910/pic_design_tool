@@ -25,6 +25,7 @@
           <span :class="['widget-name', 'line-clamp-1', `${element.type}`]">{{ element.text || element.name }} {{ element.mask ? '(容器)' : '' }}</span>
           <div class="widget-out" :data-type="element.type" :data-uuid="element.uuid">
             <img src="/置顶.svg" :class="['top-icon', { 'top-icon-active': element.isTop }]" @click.stop="topLayer(element)" :title="element.isTop ? '取消置顶' : '置顶'" />
+            <i :class="['delete-icon']" @click.stop="deleteLayer(element)" title="删除" />
             <i :class="['icon', element.lock ? 'sd-suoding' : 'sd-jiesuo']" @click.stop="lockLayer(element)" />
           </div>
         </li>
@@ -160,8 +161,12 @@ export default defineComponent({
         isGroup: item.isContainer
       })
     }
+    const deleteLayer = (item: TdWidgetData) => {
+      widgetStore.selectWidget({ uuid: item.uuid })
+      widgetStore.deleteWidget({ uuid: item.uuid })
+    }
 
-    return { lockLayer, topLayer, onDone, onMove, selectLayer, hoverLayer, widgets, getWidgets, getIsActive, ...toRefs(state), dragOptions, showItem }
+    return { lockLayer, topLayer, deleteLayer, onDone, onMove, selectLayer, hoverLayer, widgets, getWidgets, getIsActive, ...toRefs(state), dragOptions, showItem }
   },
   watch: {
     data: {
@@ -225,7 +230,8 @@ export default defineComponent({
       align-items: center;
     }
     .widget-out:hover > .sd-jiesuo,
-    .widget-out:hover > .top-icon {
+    .widget-out:hover > .top-icon,
+    .widget-out:hover > .delete-icon {
       opacity: 1;
     }
   }
@@ -251,7 +257,7 @@ export default defineComponent({
   font-size: 18px;
   cursor: default;
   color: #444444;
-  right: 12px;
+  right: 40px;
 }
 .sd-jiesuo {
   opacity: 0;
@@ -261,7 +267,7 @@ export default defineComponent({
 }
 .top-icon {
   position: absolute;
-  right: 40px;
+  right: 68px;
   width: 18px;
   height: 18px;
   cursor: pointer;
@@ -271,6 +277,19 @@ export default defineComponent({
     opacity: 1;
     filter: brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(2476%) hue-rotate(86deg) brightness(118%) contrast(119%);
   }
+}
+.delete-icon {
+  position: absolute;
+  right: 12px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  display: inline-block;
+  background-color: #444444;
+  -webkit-mask: url('/delete.svg') center / contain no-repeat;
+  mask: url('/delete.svg') center / contain no-repeat;
 }
 .sd-xiaji {
   margin: 0 -4px 0 32px !important;

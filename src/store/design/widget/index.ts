@@ -11,7 +11,7 @@ import { useCanvasStore } from '@/store'
 import { TInidDMovePayload, TMovePayload, dMove, initDMove, setDropOver, setMouseEvent, setdActiveElement, updateGroupSize, updateHoverUuid } from "./actions";
 import { TPageState } from "@/store/design/canvas/d";
 import { TInitResize, TSize, TdResizePayload, dResize, initDResize, resize, autoResizeAll } from "./actions/resize";
-import { TUpdateWidgetMultiplePayload, TUpdateWidgetPayload, TsetWidgetStyleData, addWidget, deleteWidget, setDWidgets, updateDWidgets, setWidgetStyle, updateWidgetData, updateWidgetMultiple, lockWidgets, setDLayouts } from "./actions/widget";
+import { TUpdateWidgetMultiplePayload, TUpdateWidgetPayload, TsetWidgetStyleData, TDeleteWidgetPayload, addWidget, deleteWidget, setDWidgets, updateDWidgets, setWidgetStyle, updateWidgetData, updateWidgetMultiple, lockWidgets, setDLayouts } from "./actions/widget";
 import { addGroup } from "./actions/group";
 import { setTemplate } from "./actions/template";
 import { copyWidget, pasteWidget } from "./actions/clone";
@@ -107,7 +107,7 @@ type TAction = {
   /** setTemplate */
   setTemplate: (template: TdWidgetData[]) => void
   /** 删除组件 */
-  deleteWidget: () => void
+  deleteWidget: (payload?: TDeleteWidgetPayload) => void
   /** 拷贝组件 */
   copyWidget: () => void
   /** 粘贴组件 */
@@ -183,7 +183,7 @@ const WidgetStore = defineStore<"widgetStore", TWidgetState, TGetter, TAction>("
     addWidget(setting) { addWidget(this, setting) },
     addGroup(group) { addGroup(this, group) },
     setTemplate(template) { setTemplate(this, template) },
-    deleteWidget() { deleteWidget(this) },
+    deleteWidget(payload) { deleteWidget(this, payload) },
     copyWidget() { copyWidget(this) },
     pasteWidget() { pasteWidget(this) },
     selectWidget(data) { selectWidget(this, data) },

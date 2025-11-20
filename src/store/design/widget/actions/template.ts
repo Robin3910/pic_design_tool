@@ -10,6 +10,7 @@
 import { customAlphabet } from 'nanoid/non-secure'
 import { TWidgetStore, TdWidgetData } from '..'
 import { useCanvasStore, useWidgetStore } from '@/store'
+import { applyTemplateImageDefaults } from '../utils/templateWidget'
 const nanoid = customAlphabet('1234567890abcdef', 12)
 
 // TODO: 选择模板
@@ -21,9 +22,7 @@ export function setTemplate(store: TWidgetStore, allWidgets: TdWidgetData[]) {
     Number(item.uuid) < 0 && (item.uuid = nanoid()) // 重设id
     item.text && (item.text = decodeURIComponent(item.text))
     // 从模板加载的图片命名为"模板图片"
-    if (item.type === 'w-image') {
-      item.name = '模板图片'
-    }
+    applyTemplateImageDefaults(item)
     store.dWidgets.push(item)
   })
   widgetStore.updateDWidgets()
