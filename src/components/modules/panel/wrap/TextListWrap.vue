@@ -422,6 +422,8 @@ const selectText = (text: TTextData) => {
   setting.text = text.text
   setting.fontSize = text.fontSize
   setting.fontWeight = text.fontWeight
+  setting.sortId = text.sortId ?? ''
+  setting.sortIndex = text.sortIndex
   const { width: pW, height: pH } = dPage.value
   
   // 计算文字宽度（简单估算）
@@ -437,7 +439,9 @@ const dragStart = (event: MouseEvent, text: TTextData) => {
     name: text.name,
     text: text.text,
     fontSize: text.fontSize,
-    fontWeight: text.fontWeight
+    fontWeight: text.fontWeight,
+    sortId: text.sortId ?? '',
+    sortIndex: text.sortIndex
   }
   
   widgetStore.setSelectItem({ data: { value: textData }, type: 'text' })

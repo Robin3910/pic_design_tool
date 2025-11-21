@@ -30,6 +30,9 @@ export type TwTextData = {
   opacity: number
   backgroundColor: string
   parent: string
+  /** 素材排序信息 */
+  sortId?: number | string
+  sortIndex?: number
   record: {
     width: number
     height: number
@@ -96,6 +99,8 @@ export const wTextSetting: TwTextData = {
   opacity: 1,
   backgroundColor: '',
   parent: '-1',
+  sortId: '',
+  sortIndex: undefined,
   record: {
     width: 0,
     height: 0,
