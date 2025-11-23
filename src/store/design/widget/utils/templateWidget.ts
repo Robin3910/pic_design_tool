@@ -6,7 +6,8 @@ export const applyTemplateImageDefaults = (widget: TdWidgetData) => {
   }
 
   widget.name = '模板图片'
-  widget.lock = true
-  widget.isTop = true
+  // 已取消自动锁定和自动置顶
+  // widget.lock = true
+  // widget.isTop = true
 }
 
