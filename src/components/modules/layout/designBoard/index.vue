@@ -7,19 +7,19 @@
 -->
 <template>
   <div id="main">
-    <div id="page-design" ref="page_design" :style="{ paddingTop: dPaddingTop + 'px', minWidth: Math.round((dPage.width * dZoom) / 100 + (padding ?? dPresetPadding) * 2) + 'px' }">
+    <div id="page-design" ref="page_design" :style="{ paddingTop: dPaddingTop + 'px', minWidth:  (dPage.width * dZoom) / 100 + (padding ?? dPresetPadding) * 2 + 'px' }">
       <div
         id="out-page"
         class="out-page"
         :style="{
           padding: padding ?? dPresetPadding + 'px',
-          width: Math.round((dPage.width * dZoom) / 100 + (padding ?? dPresetPadding) * 2) + 'px',
-          height: Math.round((dPage.height * dZoom) / 100 + (padding ?? dPresetPadding) * 2) + 'px',
+          width: (dPage.width * dZoom) / 100 + (padding ?? dPresetPadding) * 2 + 'px',
+          height: (dPage.height * dZoom) / 100 + (padding ?? dPresetPadding) * 2 + 'px',
           opacity: 1 - (dZoom < 100 ? dPage.tag : 0),
         }"
       >
         <slot />
-        <resize-page v-if="needTools" :width="Math.round((dPage.width * dZoom) / 100)" :height="Math.round((dPage.height * dZoom) / 100)" />
+        <resize-page v-if="needTools" :width="(dPage.width * dZoom) / 100" :height="(dPage.height * dZoom) / 100" />
         <div
           :id="props.pageDesignCanvasId"
           class="design-canvas"

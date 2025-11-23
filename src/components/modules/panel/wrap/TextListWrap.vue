@@ -62,6 +62,7 @@
                 class="text-item"
                 @click="selectText(text)"
                 @mousedown="dragStart($event, text)"
+                @contextmenu.prevent="showContextMenu($event, text)"
               >
                 <div class="text-content">
                   {{ text.text }}
@@ -80,6 +81,19 @@
       <div v-show="state.loading" class="loading"><i class="el-icon-loading" /> 拼命加载中</div>
       <div v-show="state.loadDone && state.textList.length > 0" class="loading">全部加载完毕</div>
     </div>
+    <!-- 右键菜单 -->
+    <div 
+      v-if="contextMenu.visible"
+      class="context-menu"
+      :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+      @click.stop
+      @contextmenu.prevent.stop
+    >
+      <div class="context-menu-item" @click.stop="handleDelete(contextMenu.text)">
+        <i class="el-icon-delete"></i>
+        <span>撤销</span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -88,9 +102,11 @@ import { reactive, onMounted, onBeforeUnmount, ref, nextTick, computed } from 'v
 import { storeToRefs } from 'pinia'
 import { wTextSetting } from '../../widgets/wText/wTextSetting'
 import RefreshIcon from '@/components/common/Icon/RefreshIcon.vue'
-import { useControlStore, useCanvasStore, useWidgetStore } from '@/store'
+import { useControlStore, useCanvasStore, useWidgetStore, useUiStore } from '@/store'
 import api from '@/api'
 import eventBus from '@/utils/plugins/eventBus'
+import { ElMessage } from 'element-plus'
+import { taskRecordCache } from '@/utils/taskRecordCache'
 
 type TTextData = {
   name: string
@@ -122,6 +138,7 @@ type TState = {
 
 const controlStore = useControlStore()
 const widgetStore = useWidgetStore()
+const uiStore = useUiStore()
 
 const { dPage } = storeToRefs(useCanvasStore())
 
@@ -134,6 +151,19 @@ const state = reactive<TState>({
 })
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
+
+// 右键菜单状态
+const contextMenu = reactive<{
+  visible: boolean
+  x: number
+  y: number
+  text: TTextData | null
+}>({
+  visible: false,
+  x: 0,
+  y: 0,
+  text: null,
+})
 
 const pageOptions = { pageNo: 1, pageSize: 40 }
 
@@ -191,15 +221,162 @@ const toggleGroup = (sortId: number | string) => {
   }
 }
 
+// 显示右键菜单
+const showContextMenu = (event: MouseEvent, text: TTextData) => {
+  event.preventDefault()
+  event.stopPropagation()
+  contextMenu.visible = true
+  // 获取缩放比例，调整坐标以适配缩放
+  const scale = uiStore.uiZoom / 100
+  // 由于菜单在应用了 transform: scale() 的容器内，position: fixed 会相对于该容器定位
+  // 需要将坐标除以缩放比例
+  contextMenu.x = event.clientX / scale
+  contextMenu.y = event.clientY / scale
+  contextMenu.text = text
+}
+
+// 隐藏右键菜单
+const hideContextMenu = () => {
+  contextMenu.visible = false
+  contextMenu.text = null
+}
+
+// 处理文档点击事件，点击外部关闭右键菜单
+const handleDocumentClick = (e: MouseEvent) => {
+  if (contextMenu.visible) {
+    hideContextMenu()
+  }
+}
+
+// 删除文本素材（从 need_redraw_index 中移除对应序号）
+const handleDelete = async (text: TTextData | null) => {
+  // 先隐藏右键菜单
+  hideContextMenu()
+  
+  if (!text) {
+    return
+  }
+  
+  if (!text.sortId || text.sortIndex == null) {
+    ElMessage.warning('无法删除：缺少必要的任务信息')
+    return
+  }
+
+  try {
+    // 查询任务记录详情
+    const taskId = typeof text.sortId === 'string' ? parseInt(text.sortId, 10) : text.sortId
+    if (isNaN(taskId)) {
+      ElMessage.error('任务ID格式错误')
+      return
+    }
+
+    // 优先使用缓存的任务数据
+    let taskData = taskRecordCache.get(taskId)
+    if (!taskData) {
+      // 如果缓存中没有，从接口获取
+      taskData = await api.redrawTask.getRedrawTaskById(taskId)
+      if (taskData) {
+        // 缓存任务数据
+        taskRecordCache.set(taskId, taskData)
+      } else {
+        ElMessage.error('获取任务详情失败')
+        return
+      }
+    }
+
+    // 获取 orderId 和 orderNo（兼容驼峰和蛇形命名）
+    const orderId = (taskData as any).orderId ?? (taskData as any).order_id
+    const orderNo = (taskData as any).orderNo ?? (taskData as any).order_no
+
+    // 检查必要字段是否存在
+    if (!orderId || !orderNo || (typeof orderNo === 'string' && orderNo.trim().length === 0)) {
+      // 如果缓存数据缺少必要字段，从接口重新查询
+      console.warn(`任务记录 ${taskId} 缓存数据不完整（缺少 orderId 或 orderNo），从接口重新查询`)
+      taskData = await api.redrawTask.getRedrawTaskById(taskId)
+      if (taskData) {
+        taskRecordCache.set(taskId, taskData)
+        const retryOrderId = (taskData as any).orderId ?? (taskData as any).order_id
+        const retryOrderNo = (taskData as any).orderNo ?? (taskData as any).order_no
+        if (!retryOrderId || !retryOrderNo || (typeof retryOrderNo === 'string' && retryOrderNo.trim().length === 0)) {
+          ElMessage.error('获取任务详情失败：缺少必要的订单信息')
+          return
+        }
+      } else {
+        ElMessage.error('获取任务详情失败')
+        return
+      }
+    }
+
+    // 获取当前的 need_redraw_index
+    const raw = taskData.need_redraw_index ?? taskData.needRedrawIndex
+    let indices: number[] = []
+    if (Array.isArray(raw)) {
+      indices = raw.map((n) => parseInt(String(n), 10)).filter((n) => !isNaN(n))
+    } else if (typeof raw === 'string') {
+      indices = raw
+        .split(',')
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => !isNaN(n))
+    } else if (typeof raw === 'number') {
+      indices = [raw]
+    }
+
+    // 移除对应的序号
+    const indexToRemove = text.sortIndex
+    const newIndices = indices.filter((idx) => idx !== indexToRemove)
+
+    if (newIndices.length === indices.length) {
+      ElMessage.warning('该文本素材不在需重制列表中')
+      return
+    }
+
+    // 获取最终的 orderId 和 orderNo（如果重新查询了，使用新的值）
+    const finalOrderId = (taskData as any).orderId ?? (taskData as any).order_id
+    const finalOrderNo = (taskData as any).orderNo ?? (taskData as any).order_no
+
+    // 更新 need_redraw_index（使用驼峰命名）
+    const updateData: any = {
+      id: taskId,
+      orderId: finalOrderId,
+      orderNo: finalOrderNo,
+      needRedrawIndex: newIndices.length > 0 ? newIndices.join(',') : '',
+    }
+
+    // 调用更新接口
+    const updateRes = await api.redrawTask.updateRedrawTask(updateData)
+    if (updateRes.code === 0) {
+      ElMessage.success('删除成功')
+      // 更新缓存（兼容驼峰和蛇形命名）
+      taskRecordCache.set(taskId, { 
+        ...taskData, 
+        need_redraw_index: updateData.needRedrawIndex,
+        needRedrawIndex: updateData.needRedrawIndex
+      })
+      // 刷新列表
+      await handleRefresh()
+    } else {
+      ElMessage.error(updateRes.msg || '删除失败')
+    }
+  } catch (error: any) {
+    console.error('删除文本素材失败:', error)
+    ElMessage.error(error?.message || '删除失败')
+  }
+}
+
 onMounted(() => {
   loadTextsFromApi(true)
   // 监听刷新事件
   eventBus.on('refreshTextList', handleRefresh)
+  // 监听点击事件，点击外部关闭右键菜单
+  document.addEventListener('click', handleDocumentClick)
+  document.addEventListener('contextmenu', handleDocumentClick)
 })
 
 onBeforeUnmount(() => {
   // 清理事件监听
   eventBus.off('refreshTextList', handleRefresh)
+  document.removeEventListener('click', handleDocumentClick)
+  document.removeEventListener('contextmenu', handleDocumentClick)
 })
 
 const loadTextsFromApi = async (init: boolean = false) => {
@@ -217,19 +394,10 @@ const loadTextsFromApi = async (init: boolean = false) => {
       pageNo: pageOptions.pageNo, 
       pageSize: pageOptions.pageSize 
     })
-    console.log('文字素材API响应:', res)
-    console.log('API响应结构:', {
-      code: res.code,
-      hasData: !!res.data,
-      dataType: typeof res.data,
-      dataKeys: res.data ? Object.keys(res.data) : [],
-      dataValue: res.data
-    })
     
     // 根据API文档，返回格式为: {code: 0, data: {list: [...], total: ...}, msg: ...}
     // templateRequest.get 返回 res.data，所以 res = {code: 0, data: {list: [...], total: ...}, msg: ...}
     const list = res.data?.list || []
-    console.log('解析后的列表:', list, '列表长度:', list.length)
     
     const results: TTextData[] = []
 
@@ -237,12 +405,6 @@ const loadTextsFromApi = async (init: boolean = false) => {
       // 解析需重制序号（支持 number、字符串"1,2,3"、数组）
       // 必须先检查 need_redraw_index，如果没有则跳过整个任务项
       const raw = (item as any).need_redraw_index ?? (item as any).needRedrawIndex
-      console.log('处理任务项:', {
-        id: item.id,
-        orderNo: item.orderNo || item.order_no,
-        need_redraw_index: raw,
-        'need_redraw_index类型': typeof raw
-      })
       
       let indices: number[] = []
       if (Array.isArray(raw)) {
@@ -258,18 +420,14 @@ const loadTextsFromApi = async (init: boolean = false) => {
 
       // 如果没有 need_redraw_index 或解析后为空，跳过整个任务项
       if (!raw || indices.length === 0) {
-        console.log('任务项无need_redraw_index或解析为空，跳过整个任务项')
         return
       }
       const indexSet = new Set(indices)
-      console.log('need_redraw_index解析后的索引集合:', Array.from(indexSet))
 
       // 支持驼峰和蛇形命名两种格式（API文档使用驼峰 customTextList，但后端可能返回蛇形 custom_text_list）
       const customTextList = item.customTextList || item.custom_text_list
-      console.log('customTextList:', customTextList, '类型:', typeof customTextList)
       
       if (!customTextList) {
-        console.log('任务项无customTextList，跳过')
         return
       }
 
@@ -286,7 +444,6 @@ const loadTextsFromApi = async (init: boolean = false) => {
       } else if (typeof customTextList === 'string') {
         const trimmed = customTextList.trim()
         if (!trimmed) {
-          console.log('customTextList为空字符串，跳过')
           return
         }
         
@@ -299,14 +456,12 @@ const loadTextsFromApi = async (init: boolean = false) => {
               textList = parsed
                 .filter((t) => typeof t === 'string' && t.trim().length > 0)
                 .map((t) => t.trim())
-              console.log('解析为JSON数组:', textList)
             } else {
               // JSON对象但不是数组，当作逗号分隔字符串处理
               textList = trimmed
                 .split(',')
                 .map((s: string) => s.trim())
                 .filter((s: string) => s.length > 0)
-              console.log('JSON解析后非数组，按逗号分隔处理:', textList)
             }
           } catch {
             // JSON解析失败，按逗号分隔字符串处理
@@ -314,7 +469,6 @@ const loadTextsFromApi = async (init: boolean = false) => {
               .split(',')
               .map((s: string) => s.trim())
               .filter((s: string) => s.length > 0)
-            console.log('JSON解析失败，按逗号分隔字符串解析:', textList)
           }
         } else {
           // 不是JSON格式，直接按英文逗号分隔处理（最常见的情况）
@@ -323,14 +477,10 @@ const loadTextsFromApi = async (init: boolean = false) => {
             .split(',')
             .map((s: string) => s.trim())
             .filter((s: string) => s.length > 0)
-          console.log('按英文逗号分隔字符串解析:', textList)
         }
       } else {
-        console.log('customTextList格式不支持:', typeof customTextList, customTextList)
         return
       }
-      
-      console.log('解析后的文字列表:', textList, '数量:', textList.length)
 
       // 将文字列表转换为文字素材，只显示need_redraw_index中指定的文字
       // 命名规则和图片素材一样：{id}_{index}
@@ -354,16 +504,10 @@ const loadTextsFromApi = async (init: boolean = false) => {
               categoryName: item.categoryName || item.category_name || '',
             })
             addedCount++
-            console.log(`添加文字素材: ${name}, 文本: ${text}, 索引: ${idx}`)
           }
-        } else {
-          console.log(`跳过文字索引 ${idx}，不在need_redraw_index中`)
         }
       })
-      console.log(`任务项 ${item.id} 共添加了 ${addedCount} 个文字素材`)
     })
-
-    console.log('最终文字素材列表:', results)
     // 不排序，保持接口输出的原始顺序
     
     if (init) {
@@ -646,6 +790,39 @@ defineExpose({
   
   &:hover {
     background: rgba(0, 0, 0, 0.05);
+  }
+}
+
+.context-menu {
+  position: fixed;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  z-index: 9999;
+  min-width: 120px;
+  
+  .context-menu-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    color: #333;
+    
+    &:hover {
+      background-color: #f5f5f5;
+    }
+    
+    i {
+      margin-right: 8px;
+      font-size: 14px;
+      color: #f56c6c;
+    }
+    
+    span {
+      font-size: 14px;
+    }
   }
 }
 </style>

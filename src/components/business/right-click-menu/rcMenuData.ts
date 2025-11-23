@@ -29,6 +29,7 @@ export type TWidgetItemData = {
     | 'index-top'
     | 'del'
     | 'ungroup'
+    | 'color-text'
   text: string
 }
 

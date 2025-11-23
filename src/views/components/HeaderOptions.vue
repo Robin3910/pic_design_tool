@@ -260,6 +260,14 @@ async function load(cb: () => void) {
     let content, title, templateState: _state, width, height
     
     if (tempId && !id) {
+      // 检查登录状态，如果未登录则跳过API调用
+      if (!authStore.isLoggedIn) {
+        console.log('用户未登录，跳过模板加载')
+        initBoard()
+        cb()
+        return
+      }
+      
       // 使用新后端API获取模板详情
       const template = await templateStore.fetchTemplateById(tempId as string)
       content = template.data
@@ -569,126 +577,50 @@ async function save() {
       }
     }
 
-    // 新情况：没有目标图片时，尝试使用文字素材生成文件名
+    // 新情况：没有目标图片时（已过滤模板图片），尝试使用文字内容生成文件名
     if (!customFileName && imageWidgets.length === 0) {
-      console.log('[命名过程] 无目标图片，尝试根据文字素材生成文件名')
+      console.log('[命名过程] 无目标图片（已过滤模板图片），尝试根据文字内容生成文件名')
       const textWidgets: any[] = currentLayout?.layers?.filter((widget: any) => widget.type === 'w-text' && widget.sortId) || []
       console.log('[命名过程] 过滤后的文字widgets数量:', textWidgets.length, textWidgets)
 
-      const extractIndexFromUrl = (u: string): number | null => {
-        try {
-          const withoutQuery = u.split('?')[0]
-          const lastSlash = withoutQuery.lastIndexOf('/')
-          const fileName = lastSlash >= 0 ? withoutQuery.slice(lastSlash + 1) : withoutQuery
-          const nameOnly = fileName.replace(/\.[^.]*$/, '')
-          const match = nameOnly.match(/(\d+)$/)
-          return match ? parseInt(match[1], 10) : null
-        } catch (e) {
-          return null
-        }
-      }
-
-      const extractFileNameFromUrl = (url: string): string | null => {
-        try {
-          const withoutQuery = url.split('?')[0]
-          const lastSlash = withoutQuery.lastIndexOf('/')
-          const fileName = lastSlash >= 0 ? withoutQuery.slice(lastSlash + 1) : withoutQuery
-          return fileName || null
-        } catch (e) {
-          return null
-        }
-      }
-
-      const extractLastNumberFromUrl = (url: string): string | null => {
-        try {
-          const withoutQuery = url.split('?')[0]
-          const lastSlash = withoutQuery.lastIndexOf('/')
-          const fileName = lastSlash >= 0 ? withoutQuery.slice(lastSlash + 1) : withoutQuery
-          const nameOnly = fileName.replace(/\.[^.]*$/, '')
-          const match = nameOnly.match(/(\d+)$/)
-          return match ? match[1] : null
-        } catch (e) {
-          return null
-        }
-      }
-
+      // 从文字widget中提取文字内容用于命名
       for (const textWidget of textWidgets) {
-        const sortId = Number(textWidget.sortId)
+        const textContent = textWidget.text
         const sortIndex = textWidget.sortIndex
-        console.log('[命名过程] 文字素材信息:', { sortId, sortIndex, widgetName: textWidget.name })
+        console.log('[命名过程] 文字素材信息:', { sortId: textWidget.sortId, sortIndex, widgetName: textWidget.name, textContent })
 
-        if (!sortId || sortIndex === undefined) {
-          console.warn('[命名过程] 文字素材缺少sortId或sortIndex，跳过')
+        if (!textContent || typeof textContent !== 'string' || textContent.trim().length === 0) {
+          console.warn('[命名过程] 文字素材内容为空，跳过')
+          continue
+        }
+
+        if (sortIndex === undefined || sortIndex === null) {
+          console.warn('[命名过程] 文字素材缺少sortIndex，跳过')
           continue
         }
 
         try {
-          let task = taskRecordCache.get(sortId) || null
-          console.log('[命名过程] 从缓存获取任务记录:', sortId, task ? '命中' : '未命中')
-
-          if (!task) {
-            console.log(`[命名过程] 任务记录 ${sortId} 不在缓存中，尝试查询以获取图片URL`)
-            try {
-              task = await api.redrawTask.getRedrawTaskById(sortId)
-              if (task) {
-                taskRecordCache.set(sortId, task)
-                console.log('[命名过程] 查询任务记录成功:', sortId)
-              }
-            } catch (e) {
-              console.warn(`[命名过程] 查询任务记录 ${sortId} 失败，跳过该文字素材:`, e)
-              continue
-            }
-          }
-
-          if (!task) {
-            console.warn('[命名过程] 未找到任务记录，无法生成自定义文件名')
+          // 去除HTML标签，只保留纯文本
+          const textOnly = textContent.replace(/<[^>]*>/g, '').trim()
+          
+          if (textOnly.length === 0) {
+            console.warn('[命名过程] 去除HTML标签后文字内容为空，跳过')
             continue
           }
 
-          const imageUrlsStr = task.customImageUrls ?? (task as any).custom_image_urls
-          console.log('[命名过程] 使用customImageUrls字段（文字素材）')
-
-          if (typeof imageUrlsStr !== 'string' || imageUrlsStr.trim().length === 0) {
-            console.warn('[命名过程] 图片URL字符串为空或无效（文字素材）')
-            continue
-          }
-
-          const imageList: string[] = imageUrlsStr
-            .split(',')
-            .map((s: string) => s.trim())
-            .filter((s: string) => s.length > 0)
-          console.log('[命名过程] 解析后的图片URL列表数量（文字素材）:', imageList.length)
-
-          let targetUrl: string | null = null
-          for (const url of imageList) {
-            const idx = extractIndexFromUrl(url)
-            if (idx === sortIndex) {
-              targetUrl = url
-              console.log('[命名过程] 文字素材匹配到URL (sortIndex=' + sortIndex + '):', url)
-              break
-            }
-          }
-
-          if (!targetUrl) {
-            console.warn(`[命名过程] 未找到序号 ${sortIndex} 对应的图片URL（文字素材）`)
-            continue
-          }
-
-          const fileName = extractFileNameFromUrl(targetUrl)
-          if (!fileName) {
-            console.warn('[命名过程] 无法从URL提取文件名（文字素材）')
-            continue
-          }
-
-          const nameWithoutExt = fileName.replace(/\.[^.]*$/, '')
-          const safeFileName = nameWithoutExt.replace(/[^a-zA-Z0-9._-]/g, '_')
-          const lastNumber = extractLastNumberFromUrl(targetUrl) ?? String(sortIndex)
-
-          customFileName = `${safeFileName}_template_result_re_${lastNumber}`
-          console.log('[命名过程] 文字素材生成的文件名:', customFileName)
+          // 将文字内容中的特殊字符替换为下划线，使其文件名安全
+          // 保留中文字符、字母、数字、点、下划线、连字符
+          const safeText = textOnly.replace(/[^a-zA-Z0-9._\-\u4e00-\u9fa5]/g, '_')
+          
+          // 限制文件名长度，避免过长（保留前50个字符）
+          const truncatedText = safeText.length > 50 ? safeText.substring(0, 50) : safeText
+          
+          // 生成文件名：_文字_序号.png（无后缀，后续会添加.png）
+          customFileName = `_${truncatedText}_${sortIndex}`
+          console.log('[命名过程] 文字内容生成的文件名:', customFileName)
           break
         } catch (error) {
-          console.error('[命名过程] 文字素材生成文件名时出错:', error)
+          console.error('[命名过程] 文字内容生成文件名时出错:', error)
         }
       }
 
@@ -775,7 +707,24 @@ async function save() {
     // 按sortId分组，收集需要更新的任务记录
     const taskUpdateMap = new Map<number, { sortIds: number[], taskId: number }>()
     
+    // 收集图片widget的任务记录（排除模板图片）
     imageWidgets.forEach((widget: any) => {
+      const sortId = Number(widget.sortId)
+      const sortIndex = widget.sortIndex
+      if (sortId && sortIndex !== undefined) {
+        if (!taskUpdateMap.has(sortId)) {
+          taskUpdateMap.set(sortId, { sortIds: [], taskId: sortId })
+        }
+        const entry = taskUpdateMap.get(sortId)!
+        if (!entry.sortIds.includes(sortIndex)) {
+          entry.sortIds.push(sortIndex)
+        }
+      }
+    })
+    
+    // 收集文字widget的任务记录（补充只有模板图片和文字的情况）
+    const textWidgets = currentLayout?.layers?.filter((widget: any) => widget.type === 'w-text' && widget.sortId) || []
+    textWidgets.forEach((widget: any) => {
       const sortId = Number(widget.sortId)
       const sortIndex = widget.sortIndex
       if (sortId && sortIndex !== undefined) {

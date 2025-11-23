@@ -30,7 +30,8 @@
       <!-- </el-collapse-item> -->
 
       <div style="flex-wrap: nowrap" class="line-layout style-item">
-        <color-select v-model="state.innerElement.color" label="颜色" @finish="(value) => finish('color', value)" />
+        <color-select v-model="state.innerElement.color" label="颜色" @finish="(value) => finish('color', value)" @enter="saveSelectionBeforeColorChange" @change="saveSelectionBeforeColorChange" />
+        <color-select v-model="state.textColorSelectionColor" label="染色颜色" @finish="(value) => saveTextColorSelectionColor(value)" />
         <!-- <color-select v-model="innerElement.backgroundColor" label="背景颜色" @finish="(value) => finish('backgroundColor', value)" /> -->
       </div>
       <icon-item-select class="style-item" :data="layerIconList" @finish="layerAction" />
@@ -48,7 +49,7 @@
 <script lang="ts" setup>
 // 文本组件样式
 const NAME = 'w-text-style'
-import { defineComponent, reactive, toRefs, computed, watch, nextTick, onMounted } from 'vue'
+import { defineComponent, reactive, toRefs, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { styleIconList1, styleIconList2, alignIconList, TStyleIconData, TStyleIconData2 } from '@/assets/data/TextIconsData'
 import layerIconList from '@/assets/data/LayerIconList'
@@ -88,11 +89,18 @@ type TState = {
   styleIconList1: TStyleIconData[]
   styleIconList2: TStyleIconData2[]
   alignIconList: TIconItemSelectData[]
+  textColorSelectionColor: string // 染色颜色
 }
 
 const widgetStore = useWidgetStore()
 const forceStore = useForceStore()
 const route = useRoute()
+// 从 localStorage 读取染色颜色，如果没有则使用默认红色
+const getDefaultTextColorSelectionColor = (): string => {
+  const saved = localStorage.getItem('textColorSelectionColor')
+  return saved || '#ff0000ff'
+}
+
 const state = reactive<TState>({
   activeNames: [],
   innerElement: JSON.parse(JSON.stringify(wTextSetting)),
@@ -106,6 +114,7 @@ const state = reactive<TState>({
   styleIconList1,
   styleIconList2,
   alignIconList,
+  textColorSelectionColor: getDefaultTextColorSelectionColor(),
 })
 const dActiveElement = computed(() => widgetStore.dActiveElement)
 // const dMoving = computed(() => store.getters.dMoving)
@@ -136,6 +145,18 @@ onMounted(() => {
   setTimeout(() => {
     loadFonts()
   }, 100)
+  // 设置选中监听器
+  setupSelectionListener()
+  // 从 localStorage 加载染色颜色
+  state.textColorSelectionColor = getDefaultTextColorSelectionColor()
+})
+
+onUnmounted(() => {
+  // 移除选中监听器
+  if (selectionChangeListener) {
+    document.removeEventListener('selectionchange', selectionChangeListener)
+    selectionChangeListener = null
+  }
 })
 
 function change() {
@@ -202,7 +223,455 @@ function loadFonts() {
   state.fontClassList = uniqueFonts
 }
 
+// 保存选中范围的全局变量
+let savedSelectionRange: Range | null = null
+let savedSelectionElement: HTMLElement | null = null
+let savedSelectionText: string = ''
+let savedStartOffset: number = 0
+let savedEndOffset: number = 0
+let selectionChangeListener: (() => void) | null = null
+
+// 从保存的信息恢复选中状态
+function restoreSelectionFromSavedInfo(textElement: HTMLElement): Range | null {
+  if (!savedSelectionText || savedStartOffset === savedEndOffset) {
+    return null
+  }
+  
+  try {
+    // 获取元素的纯文本内容
+    const textContent = textElement.textContent || ''
+    
+    // 如果保存的偏移量超出范围，返回 null
+    if (savedStartOffset > textContent.length || savedEndOffset > textContent.length) {
+      return null
+    }
+    
+    // 创建新的范围
+    const range = document.createRange()
+    const walker = document.createTreeWalker(
+      textElement,
+      NodeFilter.SHOW_TEXT,
+      null
+    )
+    
+    let currentOffset = 0
+    let startNode: Node | null = null
+    let startOffset = 0
+    let endNode: Node | null = null
+    let endOffset = 0
+    
+    let node: Node | null
+    while ((node = walker.nextNode())) {
+      const nodeLength = node.textContent?.length || 0
+      const nodeStart = currentOffset
+      const nodeEnd = currentOffset + nodeLength
+      
+      // 查找起始位置
+      if (!startNode && savedStartOffset >= nodeStart && savedStartOffset <= nodeEnd) {
+        startNode = node
+        startOffset = savedStartOffset - nodeStart
+      }
+      
+      // 查找结束位置
+      if (!endNode && savedEndOffset >= nodeStart && savedEndOffset <= nodeEnd) {
+        endNode = node
+        endOffset = savedEndOffset - nodeStart
+      }
+      
+      if (startNode && endNode) {
+        break
+      }
+      
+      currentOffset = nodeEnd
+    }
+    
+    if (startNode && endNode) {
+      range.setStart(startNode, startOffset)
+      range.setEnd(endNode, endOffset)
+      return range
+    }
+  } catch (e) {
+    console.error('恢复选中状态失败:', e)
+  }
+  
+  return null
+}
+
+// 直接操作 DOM 来应用颜色到选中文本
+function applyColorToSelection(textElement: HTMLElement, range: Range, color: string): boolean {
+  try {
+    // 保存原始 contenteditable 状态
+    const wasEditable = textElement.contentEditable === 'true'
+    const originalContentEditable = textElement.contentEditable
+    
+    // 临时设置为可编辑
+    if (!wasEditable) {
+      textElement.contentEditable = 'true'
+    }
+    
+    // 确保文本元素获得焦点
+    textElement.focus()
+    
+    // 恢复选中范围
+    const selection = window.getSelection()
+    if (selection) {
+      selection.removeAllRanges()
+      selection.addRange(range)
+    }
+    
+    // 检查选中范围是否有效
+    if (range.collapsed) {
+      if (!wasEditable) {
+        textElement.contentEditable = originalContentEditable
+      }
+      return false
+    }
+    
+    // 创建一个 span 元素来包装选中的文本
+    const span = document.createElement('span')
+    span.style.color = color
+    
+    try {
+      // 尝试使用 surroundContents 来包装选中内容
+      range.surroundContents(span)
+      console.log('使用 surroundContents 成功')
+    } catch (e) {
+      // 如果 surroundContents 失败（比如选中内容跨越了多个节点），使用另一种方法
+      console.log('surroundContents 失败，使用 extractContents:', e)
+      
+      // 保存 range 的边界点
+      const startContainer = range.startContainer
+      const startOffset = range.startOffset
+      const endContainer = range.endContainer
+      const endOffset = range.endOffset
+      
+      // 提取选中的内容
+      const contents = range.extractContents()
+      
+      // 将内容添加到 span 中
+      if (contents) {
+        span.appendChild(contents)
+      }
+      
+      // 创建一个新的 range 来插入 span
+      const newRange = document.createRange()
+      newRange.setStart(startContainer, startOffset)
+      newRange.collapse(true) // 折叠到起始位置
+      
+      // 将 span 插入到原来的位置
+      newRange.insertNode(span)
+    }
+    
+    // 合并相邻的文本节点，避免产生空的文本节点
+    textElement.normalize()
+    
+    // 恢复原始 contenteditable 状态
+    if (!wasEditable) {
+      textElement.contentEditable = originalContentEditable
+    }
+    
+    return true
+  } catch (e) {
+    console.error('应用颜色到选中文本失败:', e)
+    // 恢复原始 contenteditable 状态
+    const wasEditable = textElement.contentEditable === 'true'
+    const originalContentEditable = textElement.getAttribute('contenteditable')
+    if (originalContentEditable !== null && !wasEditable) {
+      textElement.contentEditable = originalContentEditable
+    }
+    return false
+  }
+}
+
+// 保存选中状态的辅助函数
+function saveSelectionForElement(textElement: HTMLElement) {
+  // 保存原始 contenteditable 状态
+  const wasEditable = textElement.contentEditable === 'true'
+  const originalContentEditable = textElement.contentEditable
+  
+  // 临时设置为可编辑，以便能够获取选中状态
+  let needRestore = false
+  if (!wasEditable) {
+    textElement.contentEditable = 'true'
+    needRestore = true
+  }
+  
+  const selection = window.getSelection()
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0)
+      const isInElement = textElement.contains(range.commonAncestorContainer)
+      if (!range.collapsed && isInElement) {
+        // 保存选中文本和位置信息，以便在选中状态丢失时恢复
+        const newSelectionText = range.toString()
+        
+        // 计算选中文本在元素中的位置
+        const preRange = document.createRange()
+        preRange.selectNodeContents(textElement)
+        preRange.setEnd(range.startContainer, range.startOffset)
+        const newStartOffset = preRange.toString().length
+        const newEndOffset = newStartOffset + newSelectionText.length
+        
+        // 只在状态真正改变时才更新和输出日志
+        const stateChanged = 
+          savedSelectionText !== newSelectionText ||
+          savedStartOffset !== newStartOffset ||
+          savedEndOffset !== newEndOffset ||
+          savedSelectionElement !== textElement
+        
+        if (stateChanged) {
+          // 保存选中范围
+          savedSelectionRange = range.cloneRange()
+          savedSelectionElement = textElement
+          savedSelectionText = newSelectionText
+          savedStartOffset = newStartOffset
+          savedEndOffset = newEndOffset
+          
+          console.log('保存选中状态:', {
+            text: savedSelectionText,
+            start: savedStartOffset,
+            end: savedEndOffset,
+            wasEditable
+          })
+        }
+      } else {
+      // 如果没有选中文本，但元素匹配，不清除之前保存的状态
+      // 只有在元素不匹配时才清除
+      if (savedSelectionElement !== textElement) {
+        savedSelectionRange = null
+        savedSelectionElement = null
+        savedSelectionText = ''
+        savedStartOffset = 0
+        savedEndOffset = 0
+      }
+    }
+  } else {
+    // 如果没有选中状态，但元素匹配，不清除之前保存的状态
+    // 只有在元素不匹配时才清除
+    if (savedSelectionElement !== textElement) {
+      savedSelectionRange = null
+      savedSelectionElement = null
+      savedSelectionText = ''
+      savedStartOffset = 0
+      savedEndOffset = 0
+    }
+  }
+  
+  // 恢复原始 contenteditable 状态
+  if (needRestore) {
+    textElement.contentEditable = originalContentEditable
+  }
+}
+
+// 在颜色改变前保存选中状态
+function saveSelectionBeforeColorChange() {
+  const uuid = dActiveElement.value?.uuid
+  if (uuid) {
+    // 使用属性选择器，避免 UUID 以数字开头时选择器无效的问题
+    const selector = `[id="${uuid}"] .edit-text`
+    const textElement = document.querySelector(selector) as HTMLElement
+    
+    if (textElement) {
+      // 检查当前是否有选中状态
+      const selection = window.getSelection()
+      const hasCurrentSelection = selection && selection.rangeCount > 0 && !selection.getRangeAt(0).collapsed
+      
+      // 如果当前有选中状态，保存它
+      if (hasCurrentSelection) {
+        const range = selection!.getRangeAt(0)
+        const isInElement = textElement.contains(range.commonAncestorContainer)
+        if (isInElement) {
+          // 立即保存选中状态
+          saveSelectionForElement(textElement)
+          return
+        }
+      }
+      
+      // 如果当前没有选中状态，但之前保存了选中状态且元素匹配，保留之前保存的状态
+      if (savedSelectionElement === textElement && savedSelectionText) {
+        console.log('当前没有选中状态，但保留了之前保存的选中状态:', savedSelectionText)
+        return
+      }
+      
+      // 否则，尝试保存当前状态（可能为空）
+      saveSelectionForElement(textElement)
+    }
+  }
+}
+
+// 设置全局选中监听器，实时保存选中状态
+function setupSelectionListener() {
+  // 移除旧的监听器
+  if (selectionChangeListener) {
+    document.removeEventListener('selectionchange', selectionChangeListener)
+    selectionChangeListener = null
+  }
+  
+  // 添加新的监听器
+  selectionChangeListener = () => {
+    const uuid = dActiveElement.value?.uuid
+    if (uuid) {
+      const selector = `[id="${uuid}"] .edit-text`
+      const textElement = document.querySelector(selector) as HTMLElement
+      
+      if (textElement) {
+        // 检查选中状态是否在文本元素内
+        const selection = window.getSelection()
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0)
+          const isInElement = textElement.contains(range.commonAncestorContainer)
+          if (!range.collapsed && isInElement) {
+            // 实时保存选中状态
+            saveSelectionForElement(textElement)
+          }
+        }
+      }
+    }
+  }
+  
+  document.addEventListener('selectionchange', selectionChangeListener)
+}
+
 function finish(key: string, value: number | Record<string, any> | string) {
+  // 如果是颜色选择，检查是否有选中文本
+  if (key === 'color' && typeof value === 'string') {
+    const uuid = dActiveElement.value?.uuid
+    if (uuid) {
+      // 通过 DOM 查找对应的文本编辑元素
+      // 使用属性选择器，避免 UUID 以数字开头时选择器无效的问题
+      const selector = `[id="${uuid}"] .edit-text`
+      const textElement = document.querySelector(selector) as HTMLElement
+      
+      if (textElement) {
+        // 如果还没有保存选中状态，尝试现在保存（可能在点击色块时丢失了）
+        if (!savedSelectionRange || savedSelectionElement !== textElement) {
+          saveSelectionBeforeColorChange()
+        }
+        
+        // 首先尝试使用保存的选中范围
+        let rangeToUse: Range | null = null
+        let selection = window.getSelection()
+        
+        console.log('应用颜色前检查:', {
+          hasSavedRange: !!savedSelectionRange,
+          savedElement: savedSelectionElement === textElement,
+          savedText: savedSelectionText,
+          currentSelection: selection && selection.rangeCount > 0 ? selection.toString() : null
+        })
+        
+        // 如果有保存的选中范围且元素匹配，使用保存的范围
+        if (savedSelectionRange && savedSelectionElement === textElement) {
+          // 验证保存的范围是否仍然有效
+          try {
+            // 尝试克隆范围并验证其有效性
+            const clonedRange = savedSelectionRange.cloneRange()
+            // 验证范围是否仍然指向有效的 DOM 节点
+            const startContainer = clonedRange.startContainer
+            const endContainer = clonedRange.endContainer
+            // 检查节点是否仍然在文档中
+            if (document.contains(startContainer) && document.contains(endContainer)) {
+              // 检查范围是否仍然在文本元素内
+              if (textElement.contains(startContainer) && textElement.contains(endContainer)) {
+                rangeToUse = clonedRange
+                console.log('使用保存的选中范围')
+              } else {
+                throw new Error('范围不在文本元素内')
+              }
+            } else {
+              throw new Error('范围的节点不在文档中')
+            }
+          } catch (e) {
+            // 如果保存的范围无效，尝试使用保存的文本和位置信息恢复
+            console.log('保存的范围无效，尝试恢复:', e)
+            rangeToUse = restoreSelectionFromSavedInfo(textElement)
+            if (rangeToUse) {
+              console.log('从保存信息恢复选中状态成功')
+            }
+          }
+        } else if (savedSelectionText && savedSelectionElement === textElement) {
+          // 如果保存的范围丢失了，但保存了文本信息，尝试恢复选中状态
+          console.log('保存的范围丢失，尝试从文本信息恢复')
+          rangeToUse = restoreSelectionFromSavedInfo(textElement)
+          if (rangeToUse) {
+            console.log('从文本信息恢复选中状态成功')
+          }
+        } else if (selection && selection.rangeCount > 0) {
+          // 否则尝试使用当前的选中范围
+          const range = selection.getRangeAt(0)
+          const isInElement = textElement.contains(range.commonAncestorContainer)
+          if (!range.collapsed && isInElement) {
+            rangeToUse = range.cloneRange()
+            console.log('使用当前选中范围')
+          }
+        }
+        
+        // 如果找到了有效的选中范围，应用颜色
+        if (rangeToUse && !rangeToUse.collapsed) {
+          // 使用保存的颜色值（已经是 #rrggbbaa 格式）
+          const colorValue = value
+          
+          console.log('准备应用颜色到选中文本:', {
+            color: colorValue,
+            selectedText: rangeToUse.toString()
+          })
+          
+          // 直接操作 DOM 来应用颜色
+          const success = applyColorToSelection(textElement, rangeToUse, colorValue)
+          
+          if (success) {
+            // 更新文本内容
+            const newText = textElement.innerHTML
+            
+            console.log('成功应用颜色到选中文本')
+            
+            // 在应用颜色后，尝试更新保存的选中状态，使其指向新的 DOM 结构
+            // 这样用户就可以继续对同一段文本应用不同的颜色
+            try {
+              // 尝试从保存的文本信息恢复选中状态（因为 DOM 结构已经改变）
+              const updatedRange = restoreSelectionFromSavedInfo(textElement)
+              if (updatedRange && !updatedRange.collapsed) {
+                // 更新保存的选中范围
+                savedSelectionRange = updatedRange.cloneRange()
+                savedSelectionElement = textElement
+                console.log('更新保存的选中状态成功')
+              } else {
+                // 如果无法恢复，清除保存的状态
+                console.log('无法更新保存的选中状态，清除保存的状态')
+                savedSelectionRange = null
+                savedSelectionElement = null
+                savedSelectionText = ''
+                savedStartOffset = 0
+                savedEndOffset = 0
+              }
+            } catch (e) {
+              console.error('更新保存的选中状态失败:', e)
+              // 如果更新失败，清除保存的状态
+              savedSelectionRange = null
+              savedSelectionElement = null
+              savedSelectionText = ''
+              savedStartOffset = 0
+              savedEndOffset = 0
+            }
+            
+            widgetStore.updateWidgetData({
+              uuid: uuid,
+              key: 'text',
+              value: newText,
+            })
+            
+            // 选中文本时只更新选中部分的颜色，不更新整体颜色属性
+            return
+          } else {
+            console.log('应用颜色到选中文本失败')
+          }
+        } else {
+          console.log('没有找到有效的选中范围，将更新整个文本的颜色')
+        }
+      }
+    }
+    // 如果没有选中文本，继续执行下面的逻辑更新整个文本的颜色
+  }
+  
+  // 更新组件属性（包括颜色、字体等）
   widgetStore.updateWidgetData({
     uuid: dActiveElement.value?.uuid || '',
     key: key as TUpdateWidgetPayload['key'],
@@ -250,6 +719,12 @@ async function alignAction(item: TIconItemSelectData) {
   await nextTick()
   forceStore.setUpdateRect()
   // store.commit('updateRect')
+}
+
+// 保存染色颜色到 localStorage
+function saveTextColorSelectionColor(color: string) {
+  state.textColorSelectionColor = color
+  localStorage.setItem('textColorSelectionColor', color)
 }
 
 function changeStyleIconList() {

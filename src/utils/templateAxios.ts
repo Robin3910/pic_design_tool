@@ -74,10 +74,11 @@ templateAxios.interceptors.response.use(
       // 如果是401错误（未授权/Token过期），需要触发token刷新
       // 但是，如果是重试请求，不应该再次触发刷新（避免无限循环）
       if (response.data.code === 401 && !response.config._isRetryRequest) {
-        console.warn('检测到401错误（Token过期），开始刷新Token:', {
-          url: response.config.url,
-          msg: response.data.msg
-        })
+        // 静默处理401错误，减少控制台噪音
+        // console.warn('检测到401错误（Token过期），开始刷新Token:', {
+        //   url: response.config.url,
+        //   msg: response.data.msg
+        // })
         
         const config = response.config
         if (!config) {
@@ -90,16 +91,18 @@ templateAxios.interceptors.response.use(
         try {
           // 使用共享的 token 刷新管理器处理 401 错误
           const { handle401Error } = await import('@/utils/tokenRefreshManager')
-          console.log('调用 handle401Error 刷新Token...')
+          // 静默处理，减少控制台日志
+          // console.log('调用 handle401Error 刷新Token...')
           const retryResponse = await handle401Error(config, templateAxios)
           
           // 确保返回的是完整的 AxiosResponse 格式
           if (retryResponse && retryResponse.config) {
-            console.log('Token刷新成功，重试请求成功:', {
-              url: retryResponse.config.url,
-              status: retryResponse.status,
-              code: retryResponse.data?.code
-            })
+            // 静默处理成功情况，减少控制台日志
+            // console.log('Token刷新成功，重试请求成功:', {
+            //   url: retryResponse.config.url,
+            //   status: retryResponse.status,
+            //   code: retryResponse.data?.code
+            // })
             return retryResponse
           } else {
             // 如果返回格式不正确，记录错误并拒绝
@@ -109,11 +112,11 @@ templateAxios.interceptors.response.use(
             return Promise.reject(error)
           }
         } catch (refreshError: any) {
-          // 刷新token失败，已跳转登录
-          console.error('Token刷新失败，已跳转登录:', {
-            message: refreshError?.message,
-            error: refreshError
-          })
+          // 刷新token失败，已跳转登录（静默处理，减少控制台日志）
+          // console.error('Token刷新失败，已跳转登录:', {
+          //   message: refreshError?.message,
+          //   error: refreshError
+          // })
           const error = new Error(refreshError?.message || '登录状态已过期，请重新登录')
           ;(error as any).code = 401
           return Promise.reject(error)
@@ -146,12 +149,13 @@ templateAxios.interceptors.response.use(
       // 如果是401错误（未授权/Token过期）
       // 但是，如果是重试请求，不应该再次触发刷新（避免无限循环）
       if ((code === 401 || response.status === 401) && !config?._isRetryRequest) {
-        console.warn('错误处理分支：检测到401错误（Token过期），开始刷新Token:', {
-          url: config?.url,
-          code,
-          status: response.status,
-          msg
-        })
+        // 静默处理401错误，减少控制台噪音
+        // console.warn('错误处理分支：检测到401错误（Token过期），开始刷新Token:', {
+        //   url: config?.url,
+        //   code,
+        //   status: response.status,
+        //   msg
+        // })
         
         // 如果没有config（请求配置丢失），直接拒绝
         if (!config) {
@@ -162,16 +166,18 @@ templateAxios.interceptors.response.use(
         try {
           // 使用共享的 token 刷新管理器处理 401 错误
           const { handle401Error } = await import('@/utils/tokenRefreshManager')
-          console.log('错误处理分支：调用 handle401Error 刷新Token...')
+          // 静默处理，减少控制台日志
+          // console.log('错误处理分支：调用 handle401Error 刷新Token...')
           const retryResponse = await handle401Error(config, templateAxios)
           
           // 确保返回的是完整的 AxiosResponse 格式
           if (retryResponse && retryResponse.config) {
-            console.log('错误处理分支：Token刷新成功，重试请求成功:', {
-              url: retryResponse.config.url,
-              status: retryResponse.status,
-              code: retryResponse.data?.code
-            })
+            // 静默处理成功情况，减少控制台日志
+            // console.log('错误处理分支：Token刷新成功，重试请求成功:', {
+            //   url: retryResponse.config.url,
+            //   status: retryResponse.status,
+            //   code: retryResponse.data?.code
+            // })
             return retryResponse
           } else {
             // 如果返回格式不正确，记录错误并拒绝
@@ -181,11 +187,11 @@ templateAxios.interceptors.response.use(
             return Promise.reject(error)
           }
         } catch (refreshError: any) {
-          // 刷新token失败，已跳转登录
-          console.error('错误处理分支：Token刷新失败，已跳转登录:', {
-            message: refreshError?.message,
-            error: refreshError
-          })
+          // 刷新token失败，已跳转登录（静默处理，减少控制台日志）
+          // console.error('错误处理分支：Token刷新失败，已跳转登录:', {
+          //   message: refreshError?.message,
+          //   error: refreshError
+          // })
           const error = new Error(refreshError?.message || '登录状态已过期，请重新登录')
           ;(error as any).code = 401
           return Promise.reject(error)
@@ -203,10 +209,11 @@ templateAxios.interceptors.response.use(
     // 如果是HTTP 401错误（未授权/Token过期），且未在业务错误码中处理
     // 但是，如果是重试请求，不应该再次触发刷新（避免无限循环）
     if (response && response.status === 401 && (!response.data || response.data.code !== 401) && !config?._isRetryRequest) {
-      console.warn('错误处理分支：检测到HTTP 401错误（Token过期），开始刷新Token:', {
-        url: config?.url,
-        status: response.status
-      })
+      // 静默处理401错误，减少控制台噪音
+      // console.warn('错误处理分支：检测到HTTP 401错误（Token过期），开始刷新Token:', {
+      //   url: config?.url,
+      //   status: response.status
+      // })
       
       // 如果没有config（请求配置丢失），直接拒绝
       if (!config) {
@@ -217,17 +224,19 @@ templateAxios.interceptors.response.use(
       try {
         // 使用共享的 token 刷新管理器处理 401 错误
         const { handle401Error } = await import('@/utils/tokenRefreshManager')
-        console.log('错误处理分支：调用 handle401Error 刷新Token...')
+        // 静默处理，减少控制台日志
+        // console.log('错误处理分支：调用 handle401Error 刷新Token...')
         const retryResponse = await handle401Error(config, templateAxios)
-        console.log('错误处理分支：Token刷新成功，重试请求成功:', {
-          url: retryResponse.config?.url || retryResponse.url,
-          status: retryResponse.status || retryResponse.code,
-          code: retryResponse.data?.code
-        })
+        // 静默处理成功情况，减少控制台日志
+        // console.log('错误处理分支：Token刷新成功，重试请求成功:', {
+        //   url: retryResponse.config?.url || retryResponse.url,
+        //   status: retryResponse.status || retryResponse.code,
+        //   code: retryResponse.data?.code
+        // })
         return retryResponse
       } catch (refreshError: any) {
-        // 刷新token失败，已跳转登录
-        console.error('错误处理分支：Token刷新失败，已跳转登录:', refreshError)
+        // 刷新token失败，已跳转登录（静默处理，减少控制台日志）
+        // console.error('错误处理分支：Token刷新失败，已跳转登录:', refreshError)
         const error = new Error(refreshError?.message || '登录状态已过期，请重新登录')
         ;(error as any).code = 401
         return Promise.reject(error)

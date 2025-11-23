@@ -45,6 +45,8 @@ let requestList: Array<() => void> = []
 let isRefreshing = false
 // 是否正在显示重新登录对话框（防止重复弹窗）
 const isRelogin = { show: false }
+// 是否已经检测到无refreshToken（避免重复尝试）
+let hasNoRefreshToken = false
 // 主动刷新定时器
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
 
@@ -64,6 +66,8 @@ function clearTokens() {
   localStorage.removeItem(LocalStorageKey.expiresTimeKey)
   // 停止主动刷新定时器
   stopAutoRefreshInternal()
+  // 重置无refreshToken标志
+  hasNoRefreshToken = false
 }
 
 // 跳转到登录页（带 redirect 参数）
@@ -387,19 +391,20 @@ export async function handle401Error(config: any, service: any): Promise<any> {
   const refreshTokenValue = getRefreshToken()
   const expiresTime = localStorage.getItem(LocalStorageKey.expiresTimeKey)
   
-  console.log('handle401Error被调用:', {
-    url: config?.url,
-    method: config?.method,
-    isRefreshing,
-    hasAccessToken: !!accessToken,
-    hasRefreshToken: !!refreshTokenValue,
-    accessTokenLength: accessToken?.length,
-    refreshTokenLength: refreshTokenValue?.length,
-    expiresTime,
-    localStorageKeys: Object.keys(localStorage).filter(key => 
-      key.includes('token') || key.includes('Token') || key.includes('auth') || key.includes('Auth')
-    )
-  })
+  // 减少详细日志输出，只在调试时启用
+  // console.log('handle401Error被调用:', {
+  //   url: config?.url,
+  //   method: config?.method,
+  //   isRefreshing,
+  //   hasAccessToken: !!accessToken,
+  //   hasRefreshToken: !!refreshTokenValue,
+  //   accessTokenLength: accessToken?.length,
+  //   refreshTokenLength: refreshTokenValue?.length,
+  //   expiresTime,
+  //   localStorageKeys: Object.keys(localStorage).filter(key => 
+  //     key.includes('token') || key.includes('Token') || key.includes('auth') || key.includes('Auth')
+  //   )
+  // })
 
   // 如果是刷新token的接口或登录接口返回401，直接跳转登录（避免循环依赖）
   if (config?.url && isRefreshOrLoginUrl(config.url)) {
@@ -409,19 +414,24 @@ export async function handle401Error(config: any, service: any): Promise<any> {
     return Promise.reject('登录状态已过期')
   }
 
+  // 如果已经检测到无refreshToken，直接跳转登录（避免重复尝试）
+  if (hasNoRefreshToken) {
+    console.log('已检测到无refreshToken，直接跳转登录，跳过刷新流程')
+    return handleAuthorized()
+  }
+
   // 如果未认证，并且未进行刷新令牌，说明可能是访问令牌过期了
   if (!isRefreshing) {
-    console.log('开始刷新Token流程...')
+    // 静默处理，减少控制台日志
+    // console.log('开始刷新Token流程...')
     isRefreshing = true
     
     // 1. 如果获取不到刷新令牌，则只能执行登出操作
     if (!refreshTokenValue) {
-      console.error('无法获取refreshToken，可能的原因:', {
-        refreshTokenExists: !!refreshTokenValue,
-        localStorageHasToken: !!localStorage.getItem(LocalStorageKey.tokenKey),
-        localStorageHasRefreshToken: !!localStorage.getItem(LocalStorageKey.refreshTokenKey),
-        allLocalStorageKeys: Object.keys(localStorage)
-      })
+      // 静默处理，减少控制台日志
+      // console.warn('无法获取refreshToken，用户未登录，直接跳转登录页')
+      hasNoRefreshToken = true
+      isRefreshing = false
       return handleAuthorized()
     }
     
@@ -512,14 +522,21 @@ export async function handle401Error(config: any, service: any): Promise<any> {
     } catch (e: any) {
       // 为什么需要 catch 异常呢？刷新失败时，请求因为 Promise.reject 触发异常。
       // 2.2 刷新失败，只回放队列的请求（不回放当前请求，避免递归）
+      const errorMsg = e?.message || String(e) || '未知错误'
+      
+      // 如果是刷新令牌相关的错误，标记为无refreshToken
+      if (errorMsg.includes('刷新令牌') || errorMsg.includes('无效的刷新令牌') || 
+          errorMsg.includes('刷新令牌已过期') || errorMsg.includes('刷新令牌无效')) {
+        console.warn('刷新令牌无效或过期，标记为无refreshToken状态')
+        hasNoRefreshToken = true
+      }
+      
       console.error('Token刷新流程异常:', {
-        error: e?.message,
+        error: errorMsg,
         errorType: e?.constructor?.name,
         response: e?.response?.data,
         status: e?.response?.status,
-        code: e?.code,
-        fullError: e,
-        stack: e?.stack
+        code: e?.code
       })
       
       requestList.forEach((cb: any) => {

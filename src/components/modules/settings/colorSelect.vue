@@ -32,6 +32,7 @@ type TEmits = {
   (event: 'finish', data: string): void
   (event: 'update:modelValue', data: string): void
   (event: 'change', data: colorChangeData): void
+  (event: 'enter'): void
 }
 
 type TState = {
@@ -83,6 +84,8 @@ watch(
       first = false
       return
     }
+    // 颜色改变时触发 finish 事件
+    emit('finish', value)
   },
 )
 
@@ -120,6 +123,8 @@ const inputBlur = (color: string) => {
 const enter = () => {
   // store.commit('setShowMoveable', false) // 清理掉上一次的选择框
   controlStore.setShowMoveable(false) // 清理掉上一次的选择框
+  // 触发 enter 事件，让父组件可以保存选中状态
+  emit('enter')
 }
 
 const hide = () => {
@@ -130,6 +135,8 @@ const hide = () => {
 
 const colorChange = (color: colorChangeData) => {
   emit('change', color)
+  // 颜色改变时也触发 finish 事件
+  emit('finish', color.color)
 }
 
 defineExpose({

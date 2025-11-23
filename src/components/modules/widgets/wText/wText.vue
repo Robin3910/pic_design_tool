@@ -4,6 +4,8 @@
     ref="widget"
     v-loading="state.loading"
     :class="['w-text', { editing: state.editable, 'layer-lock': params.lock, 'layer-top': params.isTop }, params.uuid]"
+    data-type="w-text"
+    :data-uuid="params.uuid"
     :style="{
       position: 'absolute',
       left: params.left - parent.left + 'px',
@@ -28,7 +30,7 @@
     }"
     @dblclick="(e) => dblclickText(e)"
   >
-    <div ref="editWrap" :style="{ fontFamily: `'${params.fontClass.value}'` }" class="edit-text" spellcheck="false" :contenteditable="state.editable ? 'plaintext-only' : false" @input="writingText($event)" @blur="writeDone($event)" v-html="params.text"></div>
+    <div ref="editWrap" :style="{ fontFamily: `'${params.fontClass.value}'` }" class="edit-text" spellcheck="false" :contenteditable="state.editable ? 'true' : false" @input="writingText($event)" @blur="writeDone($event)" v-html="params.text"></div>
   </div>
 </template>
 
