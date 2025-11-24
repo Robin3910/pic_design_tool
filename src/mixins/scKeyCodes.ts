@@ -12,30 +12,6 @@ function isMacOS() {
 
 export default [
   {
-    feat: `拖拽画布`,
-    info: `空格 + 鼠标拖拽`,
-  },
-  {
-    feat: `画布缩小`,
-    info: `${ctrlKey} - / ${ctrlKey} + 滚轮`,
-  },
-  {
-    feat: `画布放大`,
-    info: `${ctrlKey} + / ${ctrlKey} + 滚轮`,
-  },
-  {
-    feat: `保存`,
-    info: `${ctrlKey} + S`,
-  },
-  {
-    feat: `撤销`,
-    info: `${ctrlKey} + Z`,
-  },
-  {
-    feat: `重做`,
-    info: `${ctrlKey} + Shift + Z`,
-  },
-  {
     feat: `复制`,
     info: `${ctrlKey} + C`,
   },
@@ -56,15 +32,7 @@ export default [
     info: `Shift + ← ↑ → ↓`,
   },
   {
-    feat: `多选`,
-    info: `${ctrlKey} / Shift + 点选`,
-  },
-  {
-    feat: `成组`,
-    info: `${ctrlKey} + G`,
-  },
-  {
-    feat: `取消选中`,
-    info: `ESC`,
+    feat: `缩放元素`,
+    info: `${ctrlKey} + 滚轮`,
   },
 ]

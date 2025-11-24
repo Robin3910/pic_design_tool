@@ -49,6 +49,12 @@ const isRelogin = { show: false }
 let hasNoRefreshToken = false
 // 主动刷新定时器
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
+// 页面可见性变化监听器
+let visibilityChangeHandler: (() => void) | null = null
+// 窗口焦点变化监听器
+let focusHandler: (() => void) | null = null
+// 记录页面隐藏的时间戳（用于判断是否长时间休眠）
+let hiddenTimestamp: number | null = null
 
 // 停止主动刷新定时器（提前声明，供clearTokens使用）
 function stopAutoRefreshInternal(): void {
@@ -59,6 +65,20 @@ function stopAutoRefreshInternal(): void {
   }
 }
 
+// 停止页面可见性和焦点监听器
+function stopVisibilityListeners(): void {
+  if (visibilityChangeHandler) {
+    document.removeEventListener('visibilitychange', visibilityChangeHandler)
+    visibilityChangeHandler = null
+  }
+  if (focusHandler) {
+    window.removeEventListener('focus', focusHandler)
+    focusHandler = null
+  }
+  hiddenTimestamp = null
+  console.log('页面可见性监听已停止')
+}
+
 // 清除token的工具函数
 function clearTokens() {
   localStorage.removeItem(LocalStorageKey.tokenKey)
@@ -66,6 +86,8 @@ function clearTokens() {
   localStorage.removeItem(LocalStorageKey.expiresTimeKey)
   // 停止主动刷新定时器
   stopAutoRefreshInternal()
+  // 停止页面可见性监听
+  stopVisibilityListeners()
   // 重置无refreshToken标志
   hasNoRefreshToken = false
 }
@@ -384,173 +406,31 @@ function handleAuthorized(): Promise<never> {
 }
 
 // 处理 401 错误并刷新 token（被动刷新机制）
-// 参考文档逻辑：https://www.dashingdog.cn/article/11
+// 按照以下步骤处理：
+// 1. 请求返回401错误
+// 2. 检查是否有refreshToken
+// 3. 调用 /system/auth/refresh-token 接口
+// 4. 获取新的token并更新存储
+// 5. 重试原请求
+// 6. 如果刷新失败，清除token并跳转登录页
 export async function handle401Error(config: any, service: any): Promise<any> {
-  // 详细检查 localStorage 中的 token 状态
-  const accessToken = getAccessToken()
-  const refreshTokenValue = getRefreshToken()
-  const expiresTime = localStorage.getItem(LocalStorageKey.expiresTimeKey)
+  // 步骤1: 请求返回401错误（已在响应拦截器中检测，这里直接处理）
   
-  // 减少详细日志输出，只在调试时启用
-  // console.log('handle401Error被调用:', {
-  //   url: config?.url,
-  //   method: config?.method,
-  //   isRefreshing,
-  //   hasAccessToken: !!accessToken,
-  //   hasRefreshToken: !!refreshTokenValue,
-  //   accessTokenLength: accessToken?.length,
-  //   refreshTokenLength: refreshTokenValue?.length,
-  //   expiresTime,
-  //   localStorageKeys: Object.keys(localStorage).filter(key => 
-  //     key.includes('token') || key.includes('Token') || key.includes('auth') || key.includes('Auth')
-  //   )
-  // })
-
-  // 如果是刷新token的接口或登录接口返回401，直接跳转登录（避免循环依赖）
+  // 特殊处理：如果是刷新token的接口或登录接口返回401，直接跳转登录（避免循环依赖）
   if (config?.url && isRefreshOrLoginUrl(config.url)) {
     console.warn('刷新token或登录接口返回401，直接跳转登录')
     clearTokens()
-    handleAuthorized()
-    return Promise.reject('登录状态已过期')
+    return handleAuthorized()
   }
 
   // 如果已经检测到无refreshToken，直接跳转登录（避免重复尝试）
   if (hasNoRefreshToken) {
-    console.log('已检测到无refreshToken，直接跳转登录，跳过刷新流程')
+    console.log('已检测到无refreshToken，直接跳转登录')
     return handleAuthorized()
   }
 
-  // 如果未认证，并且未进行刷新令牌，说明可能是访问令牌过期了
-  if (!isRefreshing) {
-    // 静默处理，减少控制台日志
-    // console.log('开始刷新Token流程...')
-    isRefreshing = true
-    
-    // 1. 如果获取不到刷新令牌，则只能执行登出操作
-    if (!refreshTokenValue) {
-      // 静默处理，减少控制台日志
-      // console.warn('无法获取refreshToken，用户未登录，直接跳转登录页')
-      hasNoRefreshToken = true
-      isRefreshing = false
-      return handleAuthorized()
-    }
-    
-    // 2. 进行刷新访问令牌
-    try {
-      console.log('准备调用 refreshToken() 函数...')
-      const refreshTokenRes = await refreshToken()
-      console.log('refreshToken() 调用完成，结果:', {
-        hasResult: !!refreshTokenRes,
-        hasAccessToken: !!refreshTokenRes?.accessToken,
-        hasRefreshToken: !!refreshTokenRes?.refreshToken,
-        result: refreshTokenRes
-      })
-      
-      // 2.1 刷新成功，则回放队列的请求 + 当前请求
-      if (refreshTokenRes) {
-        saveTokens(refreshTokenRes.accessToken, refreshTokenRes.refreshToken, refreshTokenRes.expiresTime)
-        
-        // 同步更新Store的token状态
-        try {
-          const authStore = useAuthStore()
-          authStore.token = refreshTokenRes.accessToken
-        } catch (storeError) {
-          console.warn('Failed to update auth store token:', storeError)
-        }
-        
-        // 确保headers对象存在
-        if (!config.headers) {
-          config.headers = {}
-        }
-        // 更新请求头，使用新刷新的token
-        config.headers.Authorization = 'Bearer ' + refreshTokenRes.accessToken
-        
-        console.log('Token刷新成功，准备重试请求:', {
-          url: config.url,
-          method: config.method,
-          newToken: refreshTokenRes.accessToken.substring(0, 20) + '...'
-        })
-        
-        // 回放队列的请求
-        requestList.forEach((cb: any) => {
-          cb()
-        })
-        requestList = []
-        
-        // 重试当前请求（使用新的token）
-        // 标记这是一个重试请求，避免响应拦截器再次处理401
-        config._retry = true
-        config._isRetryRequest = true
-        
-        try {
-          const retryResponse = await service(config)
-          console.log('重试请求成功:', {
-            url: config.url,
-            status: retryResponse?.status || retryResponse?.code,
-            isAxiosResponse: retryResponse?.config !== undefined,
-            hasData: !!retryResponse?.data,
-            dataCode: retryResponse?.data?.code
-          })
-          
-          // 确保返回的是完整的 AxiosResponse 格式
-          // templateAxios 返回的是 AxiosResponse，响应拦截器会处理
-          return retryResponse
-        } catch (retryError: any) {
-          console.error('重试请求失败:', {
-            url: config.url,
-            error: retryError?.message,
-            status: retryError?.response?.status,
-            code: retryError?.code || retryError?.response?.data?.code,
-            responseData: retryError?.response?.data,
-            isRetryRequest: config._isRetryRequest
-          })
-          
-          // 如果重试仍然失败，可能是token无效或其他问题
-          if (retryError?.response?.status === 401 || retryError?.code === 401 || retryError?.response?.data?.code === 401) {
-            // 再次401，说明刷新后的token也无效，需要重新登录
-            console.error('重试后仍然401，刷新后的token无效，需要重新登录')
-            isRefreshing = false // 重置刷新状态
-            return handleAuthorized()
-          }
-          throw retryError
-        }
-      } else {
-        // 刷新失败，执行登出
-        console.error('refreshToken() 返回 null，刷新失败，执行登出')
-        return handleAuthorized()
-      }
-    } catch (e: any) {
-      // 为什么需要 catch 异常呢？刷新失败时，请求因为 Promise.reject 触发异常。
-      // 2.2 刷新失败，只回放队列的请求（不回放当前请求，避免递归）
-      const errorMsg = e?.message || String(e) || '未知错误'
-      
-      // 如果是刷新令牌相关的错误，标记为无refreshToken
-      if (errorMsg.includes('刷新令牌') || errorMsg.includes('无效的刷新令牌') || 
-          errorMsg.includes('刷新令牌已过期') || errorMsg.includes('刷新令牌无效')) {
-        console.warn('刷新令牌无效或过期，标记为无refreshToken状态')
-        hasNoRefreshToken = true
-      }
-      
-      console.error('Token刷新流程异常:', {
-        error: errorMsg,
-        errorType: e?.constructor?.name,
-        response: e?.response?.data,
-        status: e?.response?.status,
-        code: e?.code
-      })
-      
-      requestList.forEach((cb: any) => {
-        cb()
-      })
-      requestList = []
-      
-      // 提示是否要登出。即不回放当前请求！不然会形成递归
-      return handleAuthorized()
-    } finally {
-      isRefreshing = false
-    }
-  } else {
-    // 添加到队列，等待刷新获取到新的令牌
+  // 如果正在刷新中，将请求加入队列等待
+  if (isRefreshing) {
     return new Promise((resolve, reject) => {
       requestList.push(() => {
         // 确保headers对象存在
@@ -562,32 +442,104 @@ export async function handle401Error(config: any, service: any): Promise<any> {
         if (currentToken) {
           config.headers.Authorization = 'Bearer ' + currentToken
         }
-        // 重试请求
         // 标记这是重试请求，避免响应拦截器再次处理401
         config._retry = true
         config._isRetryRequest = true
         
         service(config)
           .then((response: any) => {
-            console.log('队列请求重试成功:', {
-              url: config.url,
-              status: response?.status || response?.code,
-              dataCode: response?.data?.code
-            })
             resolve(response)
           })
           .catch((error: any) => {
-            console.error('队列请求重试失败:', {
-              url: config.url,
-              error: error?.message,
-              status: error?.response?.status,
-              code: error?.code || error?.response?.data?.code,
-              responseData: error?.response?.data
-            })
             reject(error)
           })
       })
     })
+  }
+
+  // 开始刷新流程
+  isRefreshing = true
+  
+  try {
+    // 步骤2: 检查是否有refreshToken
+    const refreshTokenValue = getRefreshToken()
+    if (!refreshTokenValue) {
+      console.warn('无refreshToken，无法刷新token')
+      hasNoRefreshToken = true
+      return handleAuthorized()
+    }
+    
+    // 步骤3: 调用 /system/auth/refresh-token 接口
+    const refreshTokenRes = await refreshToken()
+    
+    // 步骤4: 获取新的token并更新存储
+    if (!refreshTokenRes) {
+      console.error('刷新token失败，返回null')
+      return handleAuthorized()
+    }
+    
+    // 保存新的token到localStorage
+    saveTokens(refreshTokenRes.accessToken, refreshTokenRes.refreshToken, refreshTokenRes.expiresTime)
+    
+    // 同步更新Store的token状态
+    try {
+      const authStore = useAuthStore()
+      authStore.token = refreshTokenRes.accessToken
+    } catch (storeError) {
+      console.warn('Failed to update auth store token:', storeError)
+    }
+    
+    // 更新请求头，使用新刷新的token
+    if (!config.headers) {
+      config.headers = {}
+    }
+    config.headers.Authorization = 'Bearer ' + refreshTokenRes.accessToken
+    
+    // 回放队列中的请求（使用新token）
+    requestList.forEach((cb: any) => {
+      cb()
+    })
+    requestList = []
+    
+    // 步骤5: 重试原请求
+    // 标记这是重试请求，避免响应拦截器再次处理401
+    config._retry = true
+    config._isRetryRequest = true
+    
+    try {
+      const retryResponse = await service(config)
+      return retryResponse
+    } catch (retryError: any) {
+      // 如果重试仍然返回401，说明刷新后的token也无效
+      if (retryError?.response?.status === 401 || retryError?.code === 401 || retryError?.response?.data?.code === 401) {
+        console.error('重试后仍然401，刷新后的token无效')
+        return handleAuthorized()
+      }
+      throw retryError
+    }
+  } catch (error: any) {
+    // 步骤6: 如果刷新失败，清除token并跳转登录页
+    const errorMsg = error?.message || String(error) || '未知错误'
+    
+    // 如果是刷新令牌相关的错误，标记为无refreshToken
+    if (errorMsg.includes('刷新令牌') || errorMsg.includes('无效的刷新令牌') || 
+        errorMsg.includes('刷新令牌已过期') || errorMsg.includes('刷新令牌无效')) {
+      hasNoRefreshToken = true
+    }
+    
+    console.error('Token刷新失败:', errorMsg)
+    
+    // 回放队列中的请求（但不会重试当前请求，避免递归）
+    requestList.forEach((cb: any) => {
+      cb()
+    })
+    requestList = []
+    
+    // 清除token并跳转登录页
+    clearTokens()
+    return handleAuthorized()
+  } finally {
+    isRefreshing = false
   }
 }
 
@@ -647,11 +599,45 @@ async function checkAndRefreshTokenIfNeeded(): Promise<void> {
   }
 }
 
+// 处理页面可见性变化
+function handleVisibilityChange(): void {
+  if (document.hidden) {
+    // 页面隐藏时，记录时间戳
+    hiddenTimestamp = Date.now()
+    console.log('页面已隐藏/休眠')
+  } else {
+    // 页面恢复可见时，立即检查并刷新token（无论隐藏时间长短）
+    // 因为即使隐藏时间很短，token也可能已经过期
+    const now = Date.now()
+    const hiddenDuration = hiddenTimestamp ? now - hiddenTimestamp : 0
+    
+    if (hiddenDuration > 0) {
+      console.log('页面已恢复可见，隐藏时长:', Math.floor(hiddenDuration / 1000) + '秒')
+    } else {
+      console.log('页面已恢复可见')
+    }
+    
+    // 立即检查并刷新token（如果已过期或即将过期）
+    checkAndRefreshTokenIfNeeded()
+    
+    hiddenTimestamp = null
+  }
+}
+
+// 处理窗口焦点变化（作为页面可见性的补充）
+function handleWindowFocus(): void {
+  console.log('窗口获得焦点，检查token状态')
+  // 窗口获得焦点时，也检查并刷新token
+  checkAndRefreshTokenIfNeeded()
+}
+
 // 启动主动刷新定时器
 // 每5分钟检查一次Token是否即将过期
+// 同时监听页面可见性变化，在页面恢复时立即刷新token
 export function startAutoRefresh(): void {
-  // 先清除旧的定时器
+  // 先清除旧的定时器和监听器
   stopAutoRefreshInternal()
+  stopVisibilityListeners()
 
   // 立即检查一次
   checkAndRefreshTokenIfNeeded()
@@ -661,12 +647,21 @@ export function startAutoRefresh(): void {
     checkAndRefreshTokenIfNeeded()
   }, 5 * 60 * 1000) // 5分钟
 
-  console.log('Token主动刷新机制已启动（每5分钟检查一次）')
+  // 监听页面可见性变化（切屏、休眠等场景）
+  visibilityChangeHandler = handleVisibilityChange
+  document.addEventListener('visibilitychange', visibilityChangeHandler)
+
+  // 监听窗口焦点变化（作为补充）
+  focusHandler = handleWindowFocus
+  window.addEventListener('focus', focusHandler)
+
+  console.log('Token主动刷新机制已启动（每5分钟检查一次，页面恢复时立即检查）')
 }
 
 // 停止主动刷新定时器（导出函数）
 export function stopAutoRefresh(): void {
   stopAutoRefreshInternal()
+  stopVisibilityListeners()
 }
 
 // 导出工具函数和配置
