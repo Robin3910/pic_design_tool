@@ -9,7 +9,7 @@
 // import { getImage } from '../getImgDetail'
 import setImageData from '@/common/methods/DesignFeatures/setImage'
 // import wText from '@/components/modules/widgets/wText/wText.vue'
-import { wTextSetting } from '@/components/modules/widgets/wText/wTextSetting'
+import { wTextSetting, getLastSelectedFont } from '@/components/modules/widgets/wText/wTextSetting'
 // import wImage from '@/components/modules/widgets/wImage/wImage.vue'
 import wImageSetting from '@/components/modules/widgets/wImage/wImageSetting'
 import { wSvgSetting } from '@/components/modules/widgets/wSvg/wSvgSetting'
@@ -18,6 +18,14 @@ export default async function(type: string, item: TCommonItemData, data: Record<
   let setting = data
   if (type === 'text') {
     !item.fontFamily && !item.color ? (setting = JSON.parse(JSON.stringify(wTextSetting))) : (setting = item)
+    // 如果使用默认设置，应用记忆的字体
+    if (!item.fontFamily && !item.color) {
+      const lastFont = getLastSelectedFont()
+      if (lastFont) {
+        setting.fontClass = lastFont
+        setting.fontFamily = lastFont.value
+      }
+    }
     !setting.text ? (setting.text = '双击编辑文字') : (setting.text = decodeURIComponent(setting.text)) // item.text
     setting.fontSize = item.fontSize
     setting.width = item.width || item.fontSize * setting.text.length

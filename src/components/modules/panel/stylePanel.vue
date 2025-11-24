@@ -4,6 +4,14 @@
     <div class="layer-wrap">
       <div class="layer-header">
         <span class="layer-title">图层</span>
+        <el-button
+          ref="clearButtonRef"
+          size="small"
+          class="clear-materials-btn"
+          @click="handleClearMaterials"
+        >
+          清除素材
+        </el-button>
       </div>
       <div class="layer-content">
         <layer-list :data="dWidgets" @change="layerChange" />
@@ -72,15 +80,19 @@ import iconItemSelect, { TIconItemSelectData } from '../settings/iconItemSelect.
 import layerList from './components/layerList.vue'
 import { ref, watch, computed } from 'vue';
 // import { useSetupMapGetters } from '@/common/hooks/mapGetters';
-import { useControlStore, useGroupStore, useHistoryStore, useWidgetStore } from '@/store';
+import { useControlStore, useGroupStore, useHistoryStore, useWidgetStore, useCanvasStore } from '@/store';
 import { storeToRefs } from 'pinia';
 import { TdWidgetData } from '@/store/design/widget';
 import type { TUpdateAlignData } from '@/store/design/widget/actions/align'
+import useNotification from '@/common/methods/notification'
+import eventBus from '@/utils/plugins/eventBus'
+import { onMounted, onBeforeUnmount } from 'vue'
 
 const widgetStore = useWidgetStore()
 const controlStore = useControlStore()
 const groupStore = useGroupStore()
 const historyStore = useHistoryStore()
+const pageStore = useCanvasStore()
 
 // 从 store 获取预览图 URL
 const previewImageUrl = computed(() => controlStore.previewImageUrl)
@@ -94,9 +106,11 @@ const handleImageError = (event: Event) => {
 const iconList = ref<AlignListData[]>(alignIconList)
 const showGroupCombined = ref(false)
 const showPreviewDialog = ref(false)
+const clearButtonRef = ref<HTMLElement | null>(null)
 
 // const { dActiveElement, dWidgets, dSelectWidgets } = useSetupMapGetters(['dActiveElement', 'dWidgets', 'dSelectWidgets'])
 const { dActiveElement, dWidgets, dSelectWidgets } = storeToRefs(widgetStore)
+const { dLayouts } = storeToRefs(widgetStore)
 
 watch(
   dSelectWidgets,
@@ -133,6 +147,58 @@ function layerChange(newLayer: TdWidgetData[]) {
   controlStore.setShowMoveable(false)
 }
 
+// 清除素材（仅保留锁定图层）
+function handleClearMaterials() {
+  try {
+    const currentPage = pageStore.dCurrentPage
+    const currentLayout = dLayouts.value[currentPage]
+    
+    if (!currentLayout || !currentLayout.layers) {
+      useNotification('提示', '当前画版没有素材', { type: 'info' })
+      return
+    }
+    
+    // 过滤出需要保留的图层：仅锁定图层
+    const preservedLayers = currentLayout.layers.filter((widget: any) => widget.lock === true)
+    
+    // 统计要清除的素材数量
+    const clearCount = currentLayout.layers.length - preservedLayers.length
+    
+    if (clearCount === 0) {
+      useNotification('提示', '没有需要清除的素材', { type: 'info' })
+      return
+    }
+    
+    // 更新当前页面的图层，只保留已锁定图层
+    currentLayout.layers = preservedLayers
+    
+    // 更新 dWidgets（同步到 dWidgets）
+    widgetStore.setDWidgets(widgetStore.getWidgets())
+    
+    // 清除选中状态
+    controlStore.setShowMoveable(false)
+    widgetStore.selectWidget({ uuid: '-1' })
+    
+    // 更新画版
+    pageStore.reChangeCanvas()
+    
+    const lockedCount = preservedLayers.length
+    useNotification('成功', `已清除 ${clearCount} 个素材，仅保留 ${lockedCount} 个锁定图层`, { type: 'success' })
+  } catch (error: any) {
+    console.error('清除素材失败:', error)
+    useNotification('错误', error.message || '清除素材失败，请重试', { type: 'error' })
+  }
+}
+
+// 监听清除素材事件
+onMounted(() => {
+  eventBus.on('clearMaterials', handleClearMaterials)
+})
+
+onBeforeUnmount(() => {
+  eventBus.off('clearMaterials', handleClearMaterials)
+})
+
 </script>
 
 <style lang="less" scoped>
@@ -167,12 +233,20 @@ function layerChange(newLayer: TdWidgetData[]) {
       padding: 14px 20px;
       border-bottom: 1px solid @background-color-transparent;
       background-color: @color0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       
       .layer-title {
         font-size: 15px;
         color: #444444;
         font-weight: 600;
         user-select: none;
+      }
+      
+      .clear-materials-btn {
+        font-size: 12px;
+        padding: 4px 12px;
       }
     }
     

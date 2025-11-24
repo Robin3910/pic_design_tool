@@ -22,16 +22,6 @@
     <slot />
     <!-- <el-button :loading="state.loading" size="large" class="primary-btn" :disabled="tempEditing" plain type="primary" @click="download">下载作品</el-button> -->
     <!-- </copyRight> -->
-    <!-- 清除素材按钮 -->
-    <el-button
-      ref="clearButtonRef"
-      v-if="!tempEditing"
-      size="large"
-      class="primary-btn primary-btn--clear"
-      @click="handleClearMaterials"
-    >
-      清除素材
-    </el-button>
     <!-- 登出按钮 -->
     <el-button 
       v-if="authStore.isLoggedIn"
@@ -88,7 +78,6 @@ const widgetStore = useWidgetStore()
 const authStore = useAuthStore()
 
 const canvasImage = ref<typeof SaveImage | null>(null)
-const clearButtonRef = ref<HTMLElement | null>(null)
 
 // 获取用户头像 - 使用 computed 使其响应式
 const userAvatar = computed(() => authStore.user?.avatar)
@@ -360,49 +349,6 @@ function draw() {
 
 function jump2Edit() {
   userStore.managerEdit(true)
-}
-
-// 清除素材（仅保留锁定图层）
-function handleClearMaterials() {
-  try {
-    const currentPage = pageStore.dCurrentPage
-    const currentLayout = dLayouts.value[currentPage]
-    
-    if (!currentLayout || !currentLayout.layers) {
-      useNotification('提示', '当前画版没有素材', { type: 'info' })
-      return
-    }
-    
-    // 过滤出需要保留的图层：仅锁定图层
-    const preservedLayers = currentLayout.layers.filter((widget: any) => widget.lock === true)
-    
-    // 统计要清除的素材数量
-    const clearCount = currentLayout.layers.length - preservedLayers.length
-    
-    if (clearCount === 0) {
-      useNotification('提示', '没有需要清除的素材', { type: 'info' })
-      return
-    }
-    
-    // 更新当前页面的图层，只保留已锁定图层
-    currentLayout.layers = preservedLayers
-    
-    // 更新 dWidgets（同步到 dWidgets）
-    widgetStore.setDWidgets(widgetStore.getWidgets())
-    
-    // 清除选中状态
-    controlStore.setShowMoveable(false)
-    widgetStore.selectWidget({ uuid: '-1' })
-    
-    // 更新画版
-    pageStore.reChangeCanvas()
-    
-    const lockedCount = preservedLayers.length
-    useNotification('成功', `已清除 ${clearCount} 个素材，仅保留 ${lockedCount} 个锁定图层`, { type: 'success' })
-  } catch (error: any) {
-    console.error('清除素材失败:', error)
-    useNotification('错误', error.message || '清除素材失败，请重试', { type: 'error' })
-  }
 }
 
 function checkDownloadPoster({ layers }: any) {
@@ -978,7 +924,7 @@ async function save() {
     // 保存成功后自动触发清除素材功能
     // 使用 setTimeout 确保通知显示后再执行清除操作
     setTimeout(() => {
-      handleClearMaterials()
+      eventBus.emit('clearMaterials')
     }, 500)
     
     // 保存成功后触发图片素材刷新
@@ -1001,7 +947,6 @@ defineExpose({
   // saveTemp, // 已注释，依赖后端服务
   // stateChange, // 已注释，依赖后端服务
   load,
-  clearButtonRef,
 })
 </script>
 

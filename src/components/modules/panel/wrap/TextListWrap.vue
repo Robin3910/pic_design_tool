@@ -100,7 +100,7 @@
 <script lang="ts" setup>
 import { reactive, onMounted, onBeforeUnmount, ref, nextTick, computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { wTextSetting } from '../../widgets/wText/wTextSetting'
+import { wTextSetting, getLastSelectedFont } from '../../widgets/wText/wTextSetting'
 import RefreshIcon from '@/components/common/Icon/RefreshIcon.vue'
 import { useControlStore, useCanvasStore, useWidgetStore, useUiStore } from '@/store'
 import api from '@/api'
@@ -563,6 +563,12 @@ const selectText = (text: TTextData) => {
   controlStore.setShowMoveable(false) // 清理掉上一次的选择
 
   let setting = JSON.parse(JSON.stringify(wTextSetting))
+  // 应用记忆的字体
+  const lastFont = getLastSelectedFont()
+  if (lastFont) {
+    setting.fontClass = lastFont
+    setting.fontFamily = lastFont.value
+  }
   setting.text = text.text
   setting.fontSize = text.fontSize
   setting.fontWeight = text.fontWeight

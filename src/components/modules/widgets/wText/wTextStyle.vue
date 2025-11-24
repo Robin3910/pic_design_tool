@@ -679,6 +679,14 @@ function finish(key: string, value: number | Record<string, any> | string) {
   })
   setTimeout(() => {
     if (key === 'fontClass') {
+      // 保存字体选择到 localStorage
+      if (value && typeof value === 'object') {
+        try {
+          localStorage.setItem('lastSelectedFont', JSON.stringify(value))
+        } catch (e) {
+          console.error('保存字体选择失败:', e)
+        }
+      }
       // 重新加载字体列表以确保显示最新
       loadFonts()
     }

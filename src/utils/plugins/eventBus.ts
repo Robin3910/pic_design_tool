@@ -4,6 +4,7 @@ type Events = {
   refreshUserImages: any;
   refreshPhotoList: any;
   refreshTextList: any;
+  clearMaterials: any;
 };
 
 const emitter = mitt<Events>();

@@ -30,7 +30,7 @@
           </div>
         </div>
         <HeaderOptions ref="optionsRef" v-model="state.isContinue" @change="optionsChange">
-          <el-button ref="saveButtonRef" size="large" class="primary-btn primary-btn--save" @click="handleSave">保存</el-button>
+          <el-button ref="saveButtonRef" size="large" class="primary-btn primary-btn--save" @click="handleSave">上传图片</el-button>
           <el-button ref="ref4" size="large" class="primary-btn primary-btn--download" @click="dealWith('download')">{{ $t('header.download') }}</el-button>
         </HeaderOptions>
       </div>
@@ -70,7 +70,7 @@
       @done="state.downloadPercent = 0"
     />
     <!-- 漫游导航 -->
-    <Tour ref="tourRef" :steps="[undoRef, redoRef, saveButtonRef, clearButtonEl, zoomToolbarRef, ref2, ref3, ref4]" />
+    <Tour ref="tourRef" :steps="[undoRef, redoRef, saveButtonRef, zoomToolbarRef, ref2, ref3, ref4]" />
     <!-- 创建设计 -->
     <createDesign ref="createDesignRef" />
   </div>
@@ -104,7 +104,6 @@ useHistory()
 const undoRef = ref<HTMLDivElement | null>(null)
 const redoRef = ref<HTMLDivElement | null>(null)
 const saveButtonRef = ref<ButtonInstance | null>(null)
-const clearButtonEl = ref<HTMLElement | null>(null)
 const zoomToolbarRef = ref<HTMLDivElement | null>(null)
 const ref2 = ref<ButtonInstance>()
 const ref3 = ref<ButtonInstance>()
@@ -146,22 +145,12 @@ type HeaderOptionsExpose = {
   save: () => void
   download: () => void
   load: (cb: () => void) => void
-  clearButtonRef?: Ref<HTMLElement | null> | HTMLElement | null
 }
 const optionsRef = ref<HeaderOptionsExpose | null>(null)
 const zoomControlRef = ref<typeof zoomControl | null>(null)
 const controlStore = useControlStore()
 const createDesignRef: Ref<typeof createDesign | null> = ref(null)
 const uiStore = useUiStore()
-
-watchEffect(() => {
-  const exposed: Ref<HTMLElement | null> | HTMLElement | null | undefined = optionsRef.value?.clearButtonRef
-  if (exposed && isRef(exposed)) {
-    clearButtonEl.value = (exposed.value as HTMLElement | null)
-    return
-  }
-  clearButtonEl.value = (exposed as HTMLElement | null | undefined) ?? null
-})
 
 // 移除不再使用的 beforeUnload 函数，改用现代浏览器兼容的事件
 

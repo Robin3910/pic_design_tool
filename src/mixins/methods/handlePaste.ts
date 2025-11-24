@@ -18,7 +18,7 @@ import _config from '@/config'
 import { getImage } from '@/common/methods/getImgDetail'
 // import wImage from '@/components/modules/widgets/wImage/wImage.vue'
 import wImageSetting from '@/components/modules/widgets/wImage/wImageSetting'
-import { wTextSetting } from '@/components/modules/widgets/wText/wTextSetting'
+import { wTextSetting, getLastSelectedFont } from '@/components/modules/widgets/wText/wTextSetting'
 import eventBus from '@/utils/plugins/eventBus'
 import { useControlStore, useCanvasStore, useWidgetStore } from '@/store'
 // import wText from '@/components/modules/widgets/wText/wText.vue'
@@ -50,6 +50,12 @@ export default (pasteImageFile?: any) => {
             controlStore.setShowMoveable(false) // 清理掉上一次的选择
 
             const setting = JSON.parse(JSON.stringify(wTextSetting))
+            // 应用记忆的字体
+            const lastFont = getLastSelectedFont()
+            if (lastFont) {
+              setting.fontClass = lastFont
+              setting.fontFamily = lastFont.value
+            }
             setting.text = await navigator.clipboard.readText()
 
             widgetStore.addWidget(setting)
