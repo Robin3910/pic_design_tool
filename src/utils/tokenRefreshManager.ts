@@ -257,10 +257,10 @@ export async function refreshToken(): Promise<{ accessToken: string; refreshToke
       }
       
       // 安全解构：确保解构的对象存在
-      const tokenData = resultData
-      const accessToken = tokenData?.accessToken
-      const newRefreshToken = tokenData?.refreshToken
-      const expiresTime = tokenData?.expiresTime
+      const tokenData = resultData ?? {}
+      const accessToken = tokenData?.accessToken ?? tokenData?.access_token
+      const newRefreshToken = tokenData?.refreshToken ?? tokenData?.refresh_token
+      const expiresTime = tokenData?.expiresTime ?? tokenData?.expires_time
       
       if (!accessToken || typeof accessToken !== 'string') {
         console.error('刷新token返回的accessToken为空或格式错误:', { accessToken, tokenData })

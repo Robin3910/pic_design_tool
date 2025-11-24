@@ -53,14 +53,21 @@ export const useAuthStore = defineStore('auth', {
       try {
         const response = await login(username, password)
         if (response.code === 0) {
-          this.token = response.data.accessToken
+          const tokenPayload = response.data || ({} as any)
+          const accessToken = tokenPayload.accessToken ?? tokenPayload.access_token
+          const refreshToken = tokenPayload.refreshToken ?? tokenPayload.refresh_token
+          const expiresTime = tokenPayload.expiresTime ?? tokenPayload.expires_time
+          
+          this.token = accessToken || null
           // token已在login函数中保存（包括refreshToken和expiresTime）
-          localStorage.setItem(LocalStorageKey.tokenKey, response.data.accessToken)
-          if (response.data.refreshToken) {
-            localStorage.setItem(LocalStorageKey.refreshTokenKey, response.data.refreshToken)
+          if (accessToken) {
+            localStorage.setItem(LocalStorageKey.tokenKey, accessToken)
           }
-          if (response.data.expiresTime) {
-            localStorage.setItem(LocalStorageKey.expiresTimeKey, response.data.expiresTime)
+          if (refreshToken) {
+            localStorage.setItem(LocalStorageKey.refreshTokenKey, refreshToken)
+          }
+          if (expiresTime) {
+            localStorage.setItem(LocalStorageKey.expiresTimeKey, expiresTime)
           }
           
           // 登录成功后，获取用户权限信息（包含用户信息、角色、权限、菜单）
@@ -172,14 +179,21 @@ export const useAuthStore = defineStore('auth', {
       try {
         const response = await refreshToken()
         if (response.code === 0) {
-          this.token = response.data.accessToken
+          const tokenPayload = response.data || ({} as any)
+          const accessToken = tokenPayload.accessToken ?? tokenPayload.access_token
+          const refreshToken = tokenPayload.refreshToken ?? tokenPayload.refresh_token
+          const expiresTime = tokenPayload.expiresTime ?? tokenPayload.expires_time
+          
+          this.token = accessToken || null
           // token已在refreshToken函数中保存（包括refreshToken和expiresTime）
-          localStorage.setItem(LocalStorageKey.tokenKey, response.data.accessToken)
-          if (response.data.refreshToken) {
-            localStorage.setItem(LocalStorageKey.refreshTokenKey, response.data.refreshToken)
+          if (accessToken) {
+            localStorage.setItem(LocalStorageKey.tokenKey, accessToken)
           }
-          if (response.data.expiresTime) {
-            localStorage.setItem(LocalStorageKey.expiresTimeKey, response.data.expiresTime)
+          if (refreshToken) {
+            localStorage.setItem(LocalStorageKey.refreshTokenKey, refreshToken)
+          }
+          if (expiresTime) {
+            localStorage.setItem(LocalStorageKey.expiresTimeKey, expiresTime)
           }
           return true
         } else {

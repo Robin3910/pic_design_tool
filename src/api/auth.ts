@@ -213,7 +213,10 @@ export const login = async (username: string, password: string): Promise<ApiResp
     const apiResponse = response as unknown as ApiResponse
     // 保存token信息
     if (apiResponse.code === 0 && apiResponse.data) {
-      const { accessToken, refreshToken, expiresTime } = apiResponse.data
+      const tokenPayload = apiResponse.data as any
+      const accessToken = tokenPayload.accessToken ?? tokenPayload.access_token
+      const refreshToken = tokenPayload.refreshToken ?? tokenPayload.refresh_token
+      const expiresTime = tokenPayload.expiresTime ?? tokenPayload.expires_time
       if (accessToken) {
         saveTokens(accessToken, refreshToken || '', expiresTime)
       }
@@ -321,15 +324,21 @@ export const refreshToken = async (): Promise<ApiResponse> => {
   }
   
   // 保存token
-  saveTokens(tokenData.accessToken, tokenData.refreshToken, tokenData.expiresTime)
+  const accessToken = tokenData.accessToken ?? (tokenData as any).access_token
+  const refreshToken = tokenData.refreshToken ?? (tokenData as any).refresh_token
+  const expiresTime = tokenData.expiresTime ?? (tokenData as any).expires_time
+  if (!accessToken) {
+    throw new Error('刷新token失败：accessToken为空')
+  }
+  saveTokens(accessToken, refreshToken || '', expiresTime)
   
   // 返回格式化的响应
   return {
     code: 0,
     data: {
-      accessToken: tokenData.accessToken,
-      refreshToken: tokenData.refreshToken,
-      expiresTime: tokenData.expiresTime || ''
+      accessToken,
+      refreshToken: refreshToken || '',
+      expiresTime: expiresTime || ''
     }
   }
 }
