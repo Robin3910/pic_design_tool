@@ -400,6 +400,7 @@ const loadTextsFromApi = async (init: boolean = false) => {
     const list = res.data?.list || []
     
     const results: TTextData[] = []
+    const itemsWithTexts = new Set<string | number>()
 
     list.forEach((item: any) => {
       // 解析需重制序号（支持 number、字符串"1,2,3"、数组）
@@ -507,8 +508,29 @@ const loadTextsFromApi = async (init: boolean = false) => {
           }
         }
       })
+
+      if (addedCount > 0 && item.id != null) {
+        itemsWithTexts.add(item.id)
+      }
     })
     // 不排序，保持接口输出的原始顺序
+
+    let previewUrl: string | null = null
+    for (const item of list) {
+      if (item.id != null && itemsWithTexts.has(item.id)) {
+        const effectiveImgUrl = item.effectiveImgUrl ?? item.effective_img_url
+        if (typeof effectiveImgUrl === 'string' && effectiveImgUrl.trim().length > 0) {
+          previewUrl = effectiveImgUrl.trim()
+          break
+        }
+      }
+    }
+
+    if (previewUrl) {
+      controlStore.setPreviewImageUrl(previewUrl)
+    } else if (init) {
+      controlStore.setPreviewImageUrl(null)
+    }
     
     if (init) {
       state.textList = results
