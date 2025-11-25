@@ -38,6 +38,7 @@
 <script lang="ts" setup>
 import api from '@/api'
 import { reactive, toRefs, ref, computed } from 'vue'
+import dayjs from 'dayjs'
 import { taskRecordCache } from '@/utils/taskRecordCache'
 import { useRoute, useRouter } from 'vue-router'
 import _dl from '@/common/methods/download'
@@ -175,7 +176,7 @@ async function download() {
   emit('change', { downloadPercent: 1, downloadText: '保存数据中,请稍候..' })
   const currentRecord = pageStore.dCurrentPage
   const backEndCapture: boolean = checkDownloadPoster(dLayouts.value[currentRecord])
-  const fileName = `${state.title || '未命名作品'}.png`
+  const fileName = `${dayjs().format('YYYYMMDD_HHmmss')}.png`
   if (!backEndCapture) {
     // 无特殊条件命中则直接从前端出图
     const { blob } = await canvasImage.value?.createPoster()

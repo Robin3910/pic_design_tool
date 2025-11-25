@@ -5,6 +5,7 @@
  * @LastEditors: ShawnPhang <https://m.palxp.cn>
  * @LastEditTime: 2024-08-12 17:01:59
  */
+import dayjs from 'dayjs'
 
 type TCallBack = (progress: number, xhr: XMLHttpRequest) => void
 
@@ -18,8 +19,8 @@ export default (src: string, cb: TCallBack, fileName?: string) => {
         const a = document.createElement('a')
         const mE = new MouseEvent('click')
         const suffix = res.type ? res.type.split('/')[1] : 'png'
-        const randomName = String(new Date().getTime()) + `.${suffix || 'png'}`
-        a.download = fileName || randomName
+        const formattedName = `${dayjs().format('YYYYMMDD_HHmmss')}.${suffix || 'png'}`
+        a.download = fileName || formattedName
         a.href = event?.target?.result as string
         // 触发a的单击事件
         a.dispatchEvent(mE)
