@@ -46,8 +46,22 @@ const emit = defineEmits<TEmits>()
 const inputBorder = ref(false)
 const tagText = ref<string>('')
 
+// 将 HTML 转换为纯文本（去除标签）
+function stripHtmlTags(html: string): string {
+  if (!html) return ''
+  // 创建一个临时 DOM 元素来解析 HTML
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+  return tmp.textContent || tmp.innerText || ''
+}
+
 const dealValue = computed(() => {
-  return props.modelValue
+  // 如果文本包含 HTML 标签，转换为纯文本显示
+  const value = props.modelValue || ''
+  if (value.includes('<') && value.includes('>')) {
+    return stripHtmlTags(value)
+  }
+  return value
 })
 
 function updateValue(value: string) {
@@ -56,13 +70,16 @@ function updateValue(value: string) {
 
 function focusInput() {
   inputBorder.value = true
-  tagText.value = props.modelValue
+  // 保存原始值（可能是 HTML），用于比较
+  tagText.value = props.modelValue || ''
 }
 
 function blurInput() {
   inputBorder.value = false
-  let v = getValue(props.modelValue)
-  if (v !== tagText.value) {
+  let v = getValue(props.modelValue || '')
+  // 比较时也使用纯文本
+  const originalText = stripHtmlTags(tagText.value)
+  if (v !== originalText) {
     emit('finish', v)
   }
 }

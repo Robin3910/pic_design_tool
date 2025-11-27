@@ -10,9 +10,25 @@
         </div>
       </el-collapse-item>
       <!-- <el-collapse-item title="样式设置" name="2"> -->
-      <div class="line-layout style-item">
-        <value-select v-model="state.innerElement.fontClass" label="文字" :data="state.fontClassList" inputWidth="152px" :readonly="true" @finish="(font) => finish('fontClass', font)" />
-        <value-select v-model="state.innerElement.fontSize" label="大小" suffix="px" :data="state.fontSizeList" @finish="(value) => finish('fontSize', value)" />
+      <div class="line-layout style-item font-setting-row">
+        <value-select
+          class="font-name-select"
+          v-model="state.innerElement.fontClass"
+          label="文字"
+          :data="state.fontClassList"
+          inputWidth="100%"
+          :readonly="true"
+          @finish="(font) => finish('fontClass', font)"
+        />
+        <value-select
+          class="font-size-select"
+          v-model="state.innerElement.fontSize"
+          label="大小"
+          suffix="px"
+          :data="state.fontSizeList"
+          inputWidth="80px"
+          @finish="(value) => finish('fontSize', value)"
+        />
       </div>
 
       <icon-item-select class="style-item" :data="state.styleIconList1" @finish="textStyleAction" />
@@ -168,7 +184,13 @@ function change() {
     timer = null
   }, 300)
   state.tag = true
-  state.innerElement = JSON.parse(JSON.stringify(dActiveElement.value))
+  const activeElement = dActiveElement.value
+  if (!activeElement) {
+    state.innerElement = JSON.parse(JSON.stringify(wTextSetting))
+    resetStyleIconSelections()
+    return
+  }
+  state.innerElement = JSON.parse(JSON.stringify(activeElement))
   changeStyleIconList()
 }
 
@@ -705,28 +727,57 @@ function layerAction(item: TIconItemSelectData) {
 }
 
 async function textStyleAction(item: TIconItemSelectData) {
+  if (!dActiveElement.value || !item.key) return
   const innerText = state.innerElement as Record<string, any>
-  let value = ['textAlign', 'textAlignLast'].includes(item.key || '') ? item.value : (item.value as number[])[item.select ? 1 : 0]
-  // 分散对齐判断是否选中，选中时则为抹去属性
-  item.key === 'textAlignLast' && innerText[item.key] === value && (value = undefined)
+  
+  // 对于 textAlign 和 textAlignLast，直接使用 item.value（字符串）
+  // 对于其他属性（如 fontWeight, fontStyle），从数组中取值
+  let value: string | number | undefined
+  if (['textAlign', 'textAlignLast'].includes(item.key)) {
+    value = item.value as string
+    // 分散对齐判断是否选中，选中时则为抹去属性（设置为 'left' 作为默认值）
+    if (item.key === 'textAlignLast' && innerText[item.key] === value) {
+      value = 'left' // 使用 'left' 作为默认值，而不是 undefined
+    }
+  } else {
+    // 对于其他属性，从数组中取值
+    const valueArray = item.value as number[]
+    value = valueArray[item.select ? 1 : 0]
+  }
+  
   // 设置属性
-  item.key && (innerText[item.key] = value)
+  if (value !== undefined) {
+    innerText[item.key] = value
+    // 直接调用 updateWidgetData 确保更改被保存
+    widgetStore.updateWidgetData({
+      uuid: dActiveElement.value.uuid,
+      key: item.key as TUpdateWidgetPayload['key'],
+      value: value as TUpdateWidgetPayload['value'],
+    })
+    
+    // 如果是 textAlign，需要更新所有 textAlign 按钮的选中状态
+    if (item.key === 'textAlign') {
+      // 重置所有 textAlign 按钮的选中状态
+      state.styleIconList2.forEach((btn) => {
+        if (btn.key === 'textAlign') {
+          btn.select = btn.value === value
+        }
+      })
+    }
+  }
+  
   await nextTick()
   forceStore.setUpdateRect()
 }
 
 async function alignAction(item: TIconItemSelectData) {
+  if (!dActiveElement.value) return
   widgetStore.updateAlign({
     align: item.value as TUpdateAlignData['align'],
-    uuid: dActiveElement.value?.uuid || '',
+    uuid: dActiveElement.value.uuid,
   })
-  // store.dispatch('updateAlign', {
-  //   align: item.value,
-  //   uuid: dActiveElement.value.uuid,
-  // })
   await nextTick()
   forceStore.setUpdateRect()
-  // store.commit('updateRect')
 }
 
 // 保存染色颜色到 localStorage
@@ -735,27 +786,42 @@ function saveTextColorSelectionColor(color: string) {
   localStorage.setItem('textColorSelectionColor', color)
 }
 
+function resetStyleIconSelections() {
+  state.styleIconList1.forEach((item) => (item.select = false))
+  state.styleIconList2.forEach((item) => (item.select = false))
+}
+
 function changeStyleIconList() {
-  const innerElement = state.innerElement as Record<string, any>
+  const innerElement = state.innerElement as Record<string, any> | null
+  if (!innerElement) {
+    resetStyleIconSelections()
+    return
+  }
+  // 更新 styleIconList1 的选中状态（fontWeight, fontStyle）
   for (let i = 0; i < state.styleIconList1.length; ++i) {
     let key = state.styleIconList1[i].key
     state.styleIconList1[i].select = false
-    const [unchecked, checked] = state.styleIconList1[i].value
+    const [unchecked, checked] = state.styleIconList1[i].value as string[]
     switch (key) {
       case 'fontWeight':
       case 'fontStyle':
         if (innerElement[key as keyof typeof innerElement] !== unchecked && innerElement[key as keyof typeof innerElement] == checked) {
-          state.styleIconList1[i].select = !state.styleIconList1[i].select
+          state.styleIconList1[i].select = true
         }
         break
     }
   }
+  // 更新 styleIconList2 的选中状态（textAlign, textAlignLast）
   for (let i = 0; i < state.styleIconList2.length; i++) {
     let key = state.styleIconList2[i].key
     state.styleIconList2[i].select = false
-    if (['textAlign', 'textAlignLast'].includes(key || '') && innerElement[key as keyof typeof innerElement] === state.styleIconList2[i].value) {
-      state.styleIconList2[i].select = true
-      continue
+    if (['textAlign', 'textAlignLast'].includes(key || '')) {
+      const currentValue = innerElement[key as keyof typeof innerElement]
+      const buttonValue = state.styleIconList2[i].value
+      // 严格比较值，确保类型一致
+      if (currentValue === buttonValue) {
+        state.styleIconList2[i].select = true
+      }
     }
   }
 }
@@ -783,6 +849,27 @@ defineExpose({
 .style-item {
   margin-bottom: 12px;
 }
+.font-setting-row {
+  flex-wrap: nowrap;
+  gap: 8px;
+  align-items: flex-end;
+  justify-content: flex-start;
+}
+.font-setting-row :deep(.font-name-select.value-select) {
+  flex: 1 1 70%;
+  min-width: 0;
+  width: auto;
+}
+.font-setting-row :deep(.font-name-select .input-wrap) {
+  width: 100%;
+}
+.font-setting-row :deep(.font-size-select.value-select) {
+  flex: 0 0 80px;
+  width: 80px;
+}
+.font-setting-row :deep(.font-size-select .input-wrap) {
+  width: 100%;
+}
 .setting-list {
   display: flex;
   flex-direction: row;
@@ -796,5 +883,70 @@ defineExpose({
   padding: 16px;
   background: #f3f5f7;
   border-radius: 6px;
+}
+
+// 确保图层按钮（包括置顶按钮）可见
+:deep(.icon-item-select) {
+  width: 100% !important;
+  
+  .btn__bar {
+    background: #f3f5f7 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: flex !important;
+    align-items: center !important;
+    list-style: none !important;
+    padding: 0 12px !important;
+    height: 40px !important;
+    border-radius: 6px !important;
+    margin-bottom: 12px !important;
+  }
+  
+  .list-item {
+    color: #444950 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    cursor: pointer !important;
+    list-style: none !important;
+    position: relative !important;
+    
+    i {
+      opacity: 1 !important;
+      visibility: visible !important;
+      color: #444950 !important;
+      display: inline-block !important;
+      font-size: 21px !important;
+      line-height: 1 !important;
+      font-style: normal !important;
+    }
+    
+    &:hover {
+      background-color: #e3e4e5 !important;
+      border-radius: 7px !important;
+    }
+  }
+  
+  .list-item.active {
+    color: @main-color !important;
+    font-weight: bold !important;
+    
+    i {
+      color: @main-color !important;
+    }
+  }
+  
+  // 确保 tooltip 包裹的元素也可见
+  .item {
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
 }
 </style>

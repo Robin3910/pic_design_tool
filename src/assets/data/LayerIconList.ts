@@ -23,7 +23,7 @@ export default [
   },
   {
     key: 'zIndex',
-    icon: 'icon-layer-top',
+    imgSrc: '/置顶.svg',
     tip: '置顶',
     value: 999,
   },

@@ -118,63 +118,106 @@ defineExpose({
 </script>
 
 <style lang="less" scoped>
+// 苹果风格变量
+@apple-bg: rgba(255, 255, 255, 0.85);
+@apple-border: rgba(0, 0, 0, 0.06);
+@apple-text-primary: #1d1d1f;
+@apple-text-secondary: #86868b;
+@apple-shadow: rgba(0, 0, 0, 0.08);
+@apple-shadow-hover: rgba(0, 0, 0, 0.12);
+@apple-accent: #007aff;
+
 .fail_img {
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #999999;
+  color: @apple-text-secondary;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
+
 .img-water-fall {
   position: relative;
   margin-left: 14px;
+  
   .img-box-wrapper {
     position: absolute !important;
     cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    &:hover {
+      transform: translateY(-2px);
+      z-index: 10;
+    }
   }
+  
   .img-box {
     position: relative;
     width: 100%;
-    background-color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     background-image: 
-      linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
-      linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
-      linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
-      linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+      linear-gradient(45deg, rgba(240, 240, 240, 0.5) 25%, transparent 25%),
+      linear-gradient(-45deg, rgba(240, 240, 240, 0.5) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, rgba(240, 240, 240, 0.5) 75%),
+      linear-gradient(-45deg, transparent 75%, rgba(240, 240, 240, 0.5) 75%);
     background-size: 12px 12px;
     background-position: 0 0, 0 6px, 6px -6px, -6px 0px;
-    border: 1px solid #e0e5ea;
+    border: 1px solid @apple-border;
+    border-radius: 10px;
     overflow: hidden;
+    box-shadow: 0 2px 8px @apple-shadow;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    
     .img {
       display: block;
       width: 100%;
       height: 100%;
+      object-fit: cover;
     }
   }
-  .img-box-wrapper:hover .img-box::before {
-    content: ' ';
-    background: rgba(0, 0, 0, 0.15);
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1;
-    pointer-events: none;
+  
+  .img-box-wrapper:hover .img-box {
+    box-shadow: 0 6px 20px @apple-shadow-hover;
+    border-color: @apple-accent;
+    
+    &::before {
+      content: ' ';
+      background: rgba(0, 122, 255, 0.08);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+      border-radius: 10px;
+    }
   }
+  
   .template-title {
-    margin-top: 6px;
+    margin-top: 8px;
     font-size: 12px;
-    color: #666;
+    color: @apple-text-secondary;
     line-height: 20px;
     height: 20px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 0 2px;
+    padding: 0 4px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    transition: color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .img-box-wrapper:hover .template-title {
+    color: @apple-text-primary;
   }
 }
+
 .list {
   &__mask {
     position: absolute;
@@ -182,10 +225,15 @@ defineExpose({
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    border-radius: 10px;
   }
 }
 </style>

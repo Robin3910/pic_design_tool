@@ -459,6 +459,28 @@ async function cutImageDone(url: string) {
 .transform-btn {
   flex: 1;
   min-width: 90px;
+  
+  // 增加按钮对比度，使文字更清晰
+  background-color: #409eff !important;
+  color: #ffffff !important;
+  border-color: #409eff !important;
+  
+  &:hover {
+    background-color: #66b1ff !important;
+    border-color: #66b1ff !important;
+    color: #ffffff !important;
+  }
+  
+  &:active {
+    background-color: #3a8ee6 !important;
+    border-color: #3a8ee6 !important;
+    color: #ffffff !important;
+  }
+  
+  // 确保图标颜色也是白色
+  .icon {
+    color: #ffffff !important;
+  }
 }
 
 .slide-wrap {
@@ -472,5 +494,70 @@ async function cutImageDone(url: string) {
 .inner-bar {
   margin: 0 10px;
   width: 240px;
+}
+
+// 确保图层按钮（包括置顶按钮）可见
+:deep(.icon-item-select) {
+  width: 100% !important;
+  
+  .btn__bar {
+    background: #f3f5f7 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: flex !important;
+    align-items: center !important;
+    list-style: none !important;
+    padding: 0 12px !important;
+    height: 40px !important;
+    border-radius: 6px !important;
+    margin-bottom: 12px !important;
+  }
+  
+  .list-item {
+    color: #444950 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    cursor: pointer !important;
+    list-style: none !important;
+    position: relative !important;
+    
+    i {
+      opacity: 1 !important;
+      visibility: visible !important;
+      color: #444950 !important;
+      display: inline-block !important;
+      font-size: 21px !important;
+      line-height: 1 !important;
+      font-style: normal !important;
+    }
+    
+    &:hover {
+      background-color: #e3e4e5 !important;
+      border-radius: 7px !important;
+    }
+  }
+  
+  .list-item.active {
+    color: @main-color !important;
+    font-weight: bold !important;
+    
+    i {
+      color: @main-color !important;
+    }
+  }
+  
+  // 确保 tooltip 包裹的元素也可见
+  .item {
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
 }
 </style>

@@ -249,27 +249,55 @@ async function selectItem(item: any) {
   setTempId(item.id)
 
   let result = null
+  let templateData = null
   if (!item.data) {
     // 如果没有数据，从新后端获取模板详情
     try {
-      const template = await templateStore.fetchTemplateById(item.id)
-      result = JSON.parse(template.data || '{}')
+      templateData = await templateStore.fetchTemplateById(item.id)
+      result = JSON.parse(templateData.data || '{}')
     } catch (error) {
       console.error('获取模板详情失败:', error)
       return
     }
   } else {
     result = JSON.parse(item.data)
+    // 从 item 中获取模板信息（包含 margin）
+    templateData = item
+  }
+  
+  // 获取边距值，默认为 0
+  const marginLeft = templateData?.marginLeft || 0
+  const marginTop = templateData?.marginTop || 0
+  
+  // 调整素材位置的辅助函数
+  const adjustWidgetsPosition = (widgets: any[]) => {
+    if (!widgets || !Array.isArray(widgets)) return widgets
+    return widgets.map((widget: any) => {
+      // 递归处理分组内的元素
+      if (widget.layers && Array.isArray(widget.layers)) {
+        widget.layers = adjustWidgetsPosition(widget.layers)
+      }
+      // 调整位置，添加边距
+      if (typeof widget.left === 'number') {
+        widget.left = widget.left + marginLeft
+      }
+      if (typeof widget.top === 'number') {
+        widget.top = widget.top + marginTop
+      }
+      return widget
+    })
   }
   
   if (Array.isArray(result)) {
     const { global, layers } = result[0]
     pageStore.setDPage(global)
-    widgetStore.setTemplate(layers)
+    const adjustedLayers = adjustWidgetsPosition(layers)
+    widgetStore.setTemplate(adjustedLayers)
   } else {
     const { page, widgets } = result
     pageStore.setDPage(page)
-    widgetStore.setTemplate(widgets)
+    const adjustedWidgets = adjustWidgetsPosition(widgets)
+    widgetStore.setTemplate(adjustedWidgets)
   }
   setTimeout(() => {
     forceStore.setZoomScreenChange()
@@ -293,75 +321,80 @@ defineExpose({
 </script>
 
 <style lang="less" scoped>
+// 苹果风格变量
+@apple-bg: rgba(255, 255, 255, 0.85);
+@apple-border: rgba(0, 0, 0, 0.06);
+@apple-text-primary: #1d1d1f;
+@apple-text-secondary: #86868b;
+@apple-shadow: rgba(0, 0, 0, 0.08);
+@apple-shadow-hover: rgba(0, 0, 0, 0.12);
+@apple-accent: #007aff;
+
 .wrap {
   width: 100%;
   height: 100%;
   position: relative;
+  background: transparent;
 }
 
 .infinite-list {
   height: 100%;
-  margin-top: 1rem;
-  padding-bottom: 150px;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE 10+ */
+  margin-top: 0.5rem;
+  padding: 0 0.75rem 150px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+  
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+    
+    &:hover {
+      background: rgba(0, 0, 0, 0.3);
+    }
+  }
 }
-.infinite-list::-webkit-scrollbar {
-  display: none; /* Chrome Safari */
-}
-// .list {
-//   width: 100%;
-//   padding: 4px 0 0 10px;
-//   &__img {
-//     cursor: pointer;
-//     width: 128px;
-//     height: auto;
-//     position: relative;
-//     &-mask {
-//       opacity: 0;
-//       width: 100%;
-//       height: 100%;
-//       background: rgba(0, 0, 0, 0.12);
-//       position: absolute;
-//       z-index: 1;
-//       top: 0;
-//       left: 0;
-//     }
-//   }
-//   &__img:hover {
-//     background: rgba(0, 0, 0, 0.04);
-//   }
-//   &__img:hover > &__img-mask {
-//     opacity: 1;
-//   }
-// }
 
 .loading {
-  padding-top: 1rem;
+  padding-top: 1.5rem;
   text-align: center;
-  font-size: 14px;
-  color: #999;
+  font-size: 13px;
+  color: @apple-text-secondary;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .header-with-refresh {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 1.7rem 0 0.5rem 0;
+  margin: 1.5rem 0 0.75rem 0;
   padding: 0 1rem;
 }
 
 .header-title {
-  font-weight: bold;
-  font-size: 14px;
+  font-weight: 600;
+  font-size: 15px;
+  color: @apple-text-primary;
+  letter-spacing: -0.02em;
 }
 
-.refresh-btn {
-  padding: 4px;
+:deep(.refresh-btn) {
+  padding: 6px;
   min-width: auto;
+  border-radius: 8px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   
   &:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(0, 0, 0, 0.06);
+    transform: rotate(90deg);
   }
 }
 </style>

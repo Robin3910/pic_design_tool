@@ -28,7 +28,8 @@
       class="logout-btn"
       @click="handleLogout"
     >
-      登出
+      <img src="/登出.svg" alt="登出" />
+      <span>登出</span>
     </el-button>
   </div>
   <!-- 生成图片组件 -->
@@ -973,10 +974,44 @@ defineExpose({
   
   .logout-btn {
     margin-left: auto;
-    border-radius: 4px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 16px;
+    height: 36px;
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: #1d1d1f;
+    font-weight: 500;
+    font-size: 13px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    img {
+      width: 14px;
+      height: 14px;
+      object-fit: contain;
+      opacity: 0.8;
+    }
+    
+    span {
+      margin-left: 0;
+    }
     
     &:hover {
-      opacity: 0.8;
+      background: rgba(0, 0, 0, 0.08);
+      border-color: rgba(0, 0, 0, 0.15);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      
+      img {
+        opacity: 1;
+      }
+    }
+    
+    &:active {
+      transform: translateY(0);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
   }
 }

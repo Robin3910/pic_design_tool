@@ -19,7 +19,7 @@ export const menuList: TMenuItemData = {
 }
 
 export type TWidgetItemData = {
-  type:
+  type?:
     | 'copy'
     | 'paste'
     | 'rotate-left'
@@ -30,41 +30,64 @@ export type TWidgetItemData = {
     | 'del'
     | 'ungroup'
     | 'color-text'
-  text: string
+  text?: string
+  icon?: string
+  shortcut?: string
+  divider?: boolean
 }
 
 export const widgetMenu: TWidgetItemData[] = [
   {
     type: 'copy',
     text: '复制',
+    icon: 'copy',
+    shortcut: 'Ctrl+C',
   },
   {
     type: 'paste',
     text: '粘贴',
+    icon: 'paste',
+    shortcut: 'Ctrl+V',
+  },
+  {
+    divider: true,
   },
   {
     type: 'rotate-left',
     text: '向左旋转90度',
+    icon: 'rotate-left',
   },
   {
     type: 'rotate-right',
     text: '向右旋转90度',
+    icon: 'rotate-right',
+  },
+  {
+    divider: true,
   },
   {
     type: 'index-up',
     text: '上移一层',
+    icon: 'layer-up',
   },
   {
     type: 'index-down',
     text: '下移一层',
+    icon: 'layer-down',
   },
   {
     type: 'index-top',
     text: '置顶',
+    icon: 'layer-top',
+  },
+  {
+    divider: true,
   },
   {
     type: 'del',
     text: '删除',
+    icon: 'delete',
+    shortcut: 'Delete',
   },
 ]
 
@@ -72,5 +95,7 @@ export const pageMenu: TWidgetItemData[] = [
   {
     type: 'paste',
     text: '粘贴',
+    icon: 'paste',
+    shortcut: 'Ctrl+V',
   },
 ]

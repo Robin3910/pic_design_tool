@@ -200,4 +200,69 @@ function alignAction(item: TIconItemSelectData) {
 .options {
   margin-bottom: 0.7rem;
 }
+
+// 确保图层按钮（包括置顶按钮）可见
+:deep(.icon-item-select) {
+  width: 100% !important;
+  
+  .btn__bar {
+    background: #f3f5f7 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: flex !important;
+    align-items: center !important;
+    list-style: none !important;
+    padding: 0 12px !important;
+    height: 40px !important;
+    border-radius: 6px !important;
+    margin-bottom: 12px !important;
+  }
+  
+  .list-item {
+    color: #444950 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    cursor: pointer !important;
+    list-style: none !important;
+    position: relative !important;
+    
+    i {
+      opacity: 1 !important;
+      visibility: visible !important;
+      color: #444950 !important;
+      display: inline-block !important;
+      font-size: 21px !important;
+      line-height: 1 !important;
+      font-style: normal !important;
+    }
+    
+    &:hover {
+      background-color: #e3e4e5 !important;
+      border-radius: 7px !important;
+    }
+  }
+  
+  .list-item.active {
+    color: @main-color !important;
+    font-weight: bold !important;
+    
+    i {
+      color: @main-color !important;
+    }
+  }
+  
+  // 确保 tooltip 包裹的元素也可见
+  .item {
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+}
 </style>

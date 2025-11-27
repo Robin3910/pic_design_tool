@@ -13,20 +13,33 @@
         <div class="top-left">
           <div class="name">{{ state.APP_NAME }}</div>
           <div class="operation">
-            <div ref="undoRef" :class="['operation-item', { disable: !undoable }]" @click="undoable ? handleHistory('undo') : ''"><i class="iconfont icon-undo" /></div>
-            <div ref="redoRef" :class="['operation-item', { disable: !redoable }]" @click="redoable ? handleHistory('redo') : ''"><i class="iconfont icon-redo" /></div>
+            <div ref="undoRef" :class="['operation-item', { disable: !undoable }]" @click="undoable ? handleHistory('undo') : ''">
+              <img src="/撤销.svg" alt="撤销" />
+            </div>
+            <div ref="redoRef" :class="['operation-item', { disable: !redoable }]" @click="redoable ? handleHistory('redo') : ''">
+              <img src="/重做.svg" alt="重做" />
+            </div>
           </div>
           <el-divider direction="vertical" />
-          <Helper @select="dealWith"> <div class="operation-item"><i class="icon sd-bangzhu" /> <span class="text" >帮助</span></div> </Helper>
+          <Helper @select="dealWith">
+            <div class="operation-item">
+              <img src="/帮助.svg" alt="帮助" />
+              <span class="text">帮助</span>
+            </div>
+          </Helper>
           <!-- <el-tooltip effect="dark" :show-after="300" :offset="0" content="标尺" placement="bottom">
             <i style="font-size: 20px" class="icon sd-biaochi operation-item" @click="changeLineGuides" />
           </el-tooltip> -->
           <el-divider direction="vertical" />
           <!-- 全局界面缩放（模拟浏览器缩放） -->
           <div ref="zoomToolbarRef" class="operation">
-            <div class="operation-item" @click="uiStore.zoomOut()"><i class="iconfont icon-sub" /></div>
+            <div class="operation-item" @click="uiStore.zoomOut()">
+              <img src="/缩小.svg" alt="缩小" />
+            </div>
             <div class="operation-item" @click="uiStore.resetZoom()"><span class="text">{{ uiStore.uiZoom }}%</span></div>
-            <div class="operation-item" @click="uiStore.zoomIn()"><i class="iconfont icon-add" /></div>
+            <div class="operation-item" @click="uiStore.zoomIn()">
+              <img src="/放大.svg" alt="放大" />
+            </div>
           </div>
         </div>
         <HeaderOptions ref="optionsRef" v-model="state.isContinue" @change="optionsChange">
@@ -80,7 +93,7 @@
 import _config from '../config'
 import {
   CSSProperties, computed, nextTick,
-  onBeforeUnmount, onMounted, reactive, ref, Ref, watchEffect, isRef
+  onBeforeUnmount, onMounted, reactive, ref, Ref, watchEffect, isRef, watch
 } from 'vue'
 import RightClickMenu from '@/components/business/right-click-menu/RcMenu.vue'
 import Moveable from '@/components/business/moveable/Moveable.vue'
@@ -151,6 +164,22 @@ const zoomControlRef = ref<typeof zoomControl | null>(null)
 const controlStore = useControlStore()
 const createDesignRef: Ref<typeof createDesign | null> = ref(null)
 const uiStore = useUiStore()
+
+const updateOverlayUiZoomScale = (scale: number) => {
+  if (typeof document === 'undefined') {
+    return
+  }
+  document.body.classList.add('ui-zoom-enabled')
+  document.body.style.setProperty('--ui-zoom-scale', String(scale))
+}
+
+watch(
+  () => uiStore.uiZoom,
+  (value) => {
+    updateOverlayUiZoomScale(value / 100)
+  },
+  { immediate: true },
+)
 
 // 移除不再使用的 beforeUnload 函数，改用现代浏览器兼容的事件
 
@@ -255,6 +284,10 @@ onBeforeUnmount(() => {
   document.oncontextmenu = null
   window.removeEventListener('keydown', handleUiZoomKeydown)
   // window.removeEventListener('wheel', handleUiZoomWheel)
+  if (typeof document !== 'undefined') {
+    document.body.style.removeProperty('--ui-zoom-scale')
+    document.body.classList.remove('ui-zoom-enabled')
+  }
 })
 
 function handleHistory(data: "undo" | "redo") {

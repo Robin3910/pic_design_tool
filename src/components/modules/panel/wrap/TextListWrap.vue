@@ -62,12 +62,14 @@
                 class="text-item"
                 @click="selectText(text)"
                 @mousedown="dragStart($event, text)"
-                @contextmenu.prevent="showContextMenu($event, text)"
               >
                 <div class="text-content">
                   {{ text.text }}
                 </div>
                 <div class="text-name">{{ text.name }}</div>
+                <div class="undo-btn" @click.stop="handleDelete(text)" title="撤销">
+                  <img src="/删除.svg" alt="删除" />
+                </div>
               </div>
             </div>
           </div>
@@ -80,19 +82,6 @@
       </div>
       <div v-show="state.loading" class="loading"><i class="el-icon-loading" /> 拼命加载中</div>
       <div v-show="state.loadDone && state.textList.length > 0" class="loading">全部加载完毕</div>
-    </div>
-    <!-- 右键菜单 -->
-    <div 
-      v-if="contextMenu.visible"
-      class="context-menu"
-      :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
-      @click.stop
-      @contextmenu.prevent.stop
-    >
-      <div class="context-menu-item" @click.stop="handleDelete(contextMenu.text)">
-        <i class="el-icon-delete"></i>
-        <span>撤销</span>
-      </div>
     </div>
   </div>
 </template>
@@ -152,19 +141,6 @@ const state = reactive<TState>({
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
 
-// 右键菜单状态
-const contextMenu = reactive<{
-  visible: boolean
-  x: number
-  y: number
-  text: TTextData | null
-}>({
-  visible: false,
-  x: 0,
-  y: 0,
-  text: null,
-})
-
 const pageOptions = { pageNo: 1, pageSize: 40 }
 
 // 按 sortId 分组文字
@@ -221,37 +197,8 @@ const toggleGroup = (sortId: number | string) => {
   }
 }
 
-// 显示右键菜单
-const showContextMenu = (event: MouseEvent, text: TTextData) => {
-  event.preventDefault()
-  event.stopPropagation()
-  contextMenu.visible = true
-  // 获取缩放比例，调整坐标以适配缩放
-  const scale = uiStore.uiZoom / 100
-  // 由于菜单在应用了 transform: scale() 的容器内，position: fixed 会相对于该容器定位
-  // 需要将坐标除以缩放比例
-  contextMenu.x = event.clientX / scale
-  contextMenu.y = event.clientY / scale
-  contextMenu.text = text
-}
-
-// 隐藏右键菜单
-const hideContextMenu = () => {
-  contextMenu.visible = false
-  contextMenu.text = null
-}
-
-// 处理文档点击事件，点击外部关闭右键菜单
-const handleDocumentClick = (e: MouseEvent) => {
-  if (contextMenu.visible) {
-    hideContextMenu()
-  }
-}
-
 // 删除文本素材（从 need_redraw_index 中移除对应序号）
 const handleDelete = async (text: TTextData | null) => {
-  // 先隐藏右键菜单
-  hideContextMenu()
   
   if (!text) {
     return
@@ -367,16 +314,11 @@ onMounted(() => {
   loadTextsFromApi(true)
   // 监听刷新事件
   eventBus.on('refreshTextList', handleRefresh)
-  // 监听点击事件，点击外部关闭右键菜单
-  document.addEventListener('click', handleDocumentClick)
-  document.addEventListener('contextmenu', handleDocumentClick)
 })
 
 onBeforeUnmount(() => {
   // 清理事件监听
   eventBus.off('refreshTextList', handleRefresh)
-  document.removeEventListener('click', handleDocumentClick)
-  document.removeEventListener('contextmenu', handleDocumentClick)
 })
 
 const loadTextsFromApi = async (init: boolean = false) => {
@@ -639,92 +581,130 @@ defineExpose({
 </script>
 
 <style lang="less" scoped>
+// 苹果风格变量
+@apple-bg: rgba(255, 255, 255, 0.85);
+@apple-bg-blur: rgba(255, 255, 255, 0.7);
+@apple-border: rgba(0, 0, 0, 0.06);
+@apple-text-primary: #1d1d1f;
+@apple-text-secondary: #86868b;
+@apple-shadow: rgba(0, 0, 0, 0.08);
+@apple-shadow-hover: rgba(0, 0, 0, 0.12);
+@apple-accent: #007aff;
+
 .wrap {
   width: 100%;
   height: 100%;
-  padding: 1rem;
+  padding: 0;
   display: flex;
   flex-direction: column;
   position: relative;
+  background: transparent;
 }
 
 .text-materials-container {
   width: 100%;
   flex: 1;
   overflow-y: auto;
-  padding-bottom: 150px;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE 10+ */
-}
-.text-materials-container::-webkit-scrollbar {
-  display: none; /* Chrome Safari */
+  padding: 0 0.75rem 150px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+  
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+    
+    &:hover {
+      background: rgba(0, 0, 0, 0.3);
+    }
+  }
 }
 
 .empty-state {
-      text-align: center;
-  padding: 2rem;
-  color: #999;
+  text-align: center;
+  padding: 3rem 1rem;
+  color: @apple-text-secondary;
   
   p {
     margin: 0.5rem 0;
-    font-size: 0.9rem;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
   }
 }
 
 .groups-container {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .text-group {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: @apple-bg;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 12px;
+  border: 1px solid @apple-border;
+  box-shadow: 0 2px 12px @apple-shadow;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
   &:hover {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 20px @apple-shadow-hover;
+    transform: translateY(-1px);
   }
 }
 
 .group-header {
   display: flex;
   align-items: center;
-  padding: 0.75rem 1rem;
-  background: linear-gradient(135deg, #2d9f5f 0%, #2ba89a 100%);
-  color: #fff;
+  padding: 0.875rem 1rem;
+  background: linear-gradient(135deg, rgba(45, 159, 95, 0.15) 0%, rgba(43, 168, 154, 0.15) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: @apple-text-primary;
   cursor: pointer;
   user-select: none;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-bottom: 1px solid @apple-border;
   
   &:hover {
-    background: linear-gradient(135deg, #2ba89a 0%, #2d9f5f 100%);
+    background: linear-gradient(135deg, rgba(45, 159, 95, 0.2) 0%, rgba(43, 168, 154, 0.2) 100%);
   }
   
   .collapse-icon {
-    margin-right: 0.5rem;
+    margin-right: 0.75rem;
     font-size: 14px;
-    transition: transform 0.3s ease;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    color: #2d9f5f;
   }
   
   .group-title {
     flex: 1;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: @apple-text-primary;
   }
   
   .group-count {
     font-size: 12px;
-    opacity: 0.9;
+    color: @apple-text-secondary;
     margin-left: 0.5rem;
+    font-weight: 500;
   }
 }
 
 .group-content {
-  padding: 0.75rem;
-  animation: slideDown 0.3s ease;
+  padding: 0.875rem;
+  animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes slideDown {
@@ -741,116 +721,147 @@ defineExpose({
 .texts-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
+  gap: 0.625rem;
   padding: 0.25rem 0;
 }
 
 .text-item {
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
-  transition: all 0.3s ease;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid @apple-border;
+  box-shadow: 0 2px 8px @apple-shadow;
+  position: relative;
   
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 6px 20px @apple-shadow-hover;
+    border-color: #2d9f5f;
+    
+    .undo-btn {
+      opacity: 1;
+      visibility: visible;
+    }
   }
   
   &:active {
-    transform: translateY(0);
+    transform: translateY(-1px) scale(1);
   }
 }
 
 .text-content {
   width: 100%;
-  height: 65px;
+  height: 70px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0d737a 0%, #35a6aa 100%);
+  background: linear-gradient(135deg, rgba(13, 115, 122, 0.9) 0%, rgba(53, 166, 170, 0.9) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   color: #ffffff;
-  font-size: 14px;
-  font-weight: normal;
-  padding: 0.5rem;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0.625rem;
   text-align: center;
   word-break: break-word;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.4;
+  letter-spacing: -0.01em;
 }
 
 .text-name {
-  padding: 0.35rem;
-  font-size: 0.8rem;
-  color: #666;
+  padding: 0.5rem 0.375rem;
+  font-size: 11px;
+  color: @apple-text-secondary;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: #fafafa;
+  background: rgba(250, 250, 250, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.undo-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 50%;
+  border: 1px solid @apple-border;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
+  color: #f56c6c;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transform: scale(1.1);
+  }
+  
+  &:active {
+    transform: scale(0.95);
+  }
+  
+  img {
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
+  }
 }
 
 .loading {
-  padding-top: 1rem;
+  padding-top: 1.5rem;
   text-align: center;
-  font-size: 14px;
-  color: #999;
+  font-size: 13px;
+  color: @apple-text-secondary;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .header-with-refresh {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 1.7rem 0 0.5rem 0;
+  margin: 1.5rem 0 0.75rem 0;
   padding: 0 1rem;
 }
 
 .header-title {
-  font-weight: bold;
-  font-size: 14px;
+  font-weight: 600;
+  font-size: 15px;
+  color: @apple-text-primary;
+  letter-spacing: -0.02em;
 }
 
-.refresh-btn {
-  padding: 4px;
+:deep(.refresh-btn) {
+  padding: 6px;
   min-width: auto;
+  border-radius: 8px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   
   &:hover {
-    background: rgba(0, 0, 0, 0.05);
-  }
-}
-
-.context-menu {
-  position: fixed;
-  background: #fff;
-  border-radius: 4px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
-  padding: 4px 0;
-  z-index: 9999;
-  min-width: 120px;
-  
-  .context-menu-item {
-    display: flex;
-    align-items: center;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    color: #333;
-    
-    &:hover {
-      background-color: #f5f5f5;
-    }
-    
-    i {
-      margin-right: 8px;
-      font-size: 14px;
-      color: #f56c6c;
-    }
-    
-    span {
-      font-size: 14px;
-    }
+    background: rgba(0, 0, 0, 0.06);
+    transform: rotate(90deg);
   }
 }
 </style>

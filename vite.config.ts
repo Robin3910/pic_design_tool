@@ -14,8 +14,11 @@ import ElementPlus from 'unplugin-element-plus/vite'
 const resolve = (...data: string[]) => path.resolve(__dirname, ...data)
 
 // https://vitejs.dev/config/
+const isDev = process.env.NODE_ENV === 'development'
+const base = isDev ? '/' : '/design/'
+
 export default defineConfig({
-  base: '/design/',
+  base,
   plugins: [
     vue(),
     viteCompression({

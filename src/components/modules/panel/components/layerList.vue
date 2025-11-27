@@ -22,7 +22,7 @@
           <img v-if="element.imgUrl" class="widget-type widget-type__img" :src="element.imgUrl" />
           <img v-else-if="element.svgUrl" class="widget-type widget-type__img" :src="element.svgUrl" />
           <span v-else :class="['widget-type icon', `sd-${element.type}`, element.type]"></span>
-          <span :class="['widget-name', 'line-clamp-1', `${element.type}`]">{{ element.text || element.name }} {{ element.mask ? '(容器)' : '' }}</span>
+          <span :class="['widget-name', 'line-clamp-1', `${element.type}`]">{{ stripHtmlTags(element.text || element.name) }} {{ element.mask ? '(容器)' : '' }}</span>
           <div class="widget-out" :data-type="element.type" :data-uuid="element.uuid">
             <img src="/置顶.svg" :class="['top-icon', { 'top-icon-active': element.isTop }]" @click.stop="topLayer(element)" :title="element.isTop ? '取消置顶' : '置顶'" />
             <i :class="['delete-icon']" @click.stop="deleteLayer(element)" title="删除" />
@@ -166,7 +166,16 @@ export default defineComponent({
       widgetStore.deleteWidget({ uuid: item.uuid })
     }
 
-    return { lockLayer, topLayer, deleteLayer, onDone, onMove, selectLayer, hoverLayer, widgets, getWidgets, getIsActive, ...toRefs(state), dragOptions, showItem }
+    // 将 HTML 转换为纯文本（去除标签）
+    const stripHtmlTags = (html: string) => {
+      if (!html) return ''
+      // 创建一个临时 DOM 元素来解析 HTML
+      const tmp = document.createElement('div')
+      tmp.innerHTML = html
+      return tmp.textContent || tmp.innerText || ''
+    }
+
+    return { lockLayer, topLayer, deleteLayer, onDone, onMove, selectLayer, hoverLayer, widgets, getWidgets, getIsActive, stripHtmlTags, ...toRefs(state), dragOptions, showItem }
   },
   watch: {
     data: {
@@ -181,46 +190,92 @@ export default defineComponent({
 </script>
 
 <style lang="less" scoped>
-@color0: #ffffff;
-@color1: #999999;
-@color2: rgba(0, 0, 0, 0.05);
+// 苹果风格配色
+@apple-bg: rgba(255, 255, 255, 0.6);
+@apple-bg-hover: rgba(255, 255, 255, 0.8);
+@apple-bg-active: rgba(0, 122, 255, 0.12);
+@apple-border: rgba(0, 0, 0, 0.06);
+@apple-text-primary: #1d1d1f;
+@apple-text-secondary: #86868b;
+@apple-text-active: #007aff;
+@apple-shadow: rgba(0, 0, 0, 0.08);
+@apple-shadow-hover: rgba(0, 0, 0, 0.12);
 
 .widget-list {
   width: 100%;
+  padding: 4px 12px;
+  
   .widget {
     align-items: center;
-    background-color: #ffffff;
-    border-bottom: 1px solid @color2;
-    color: @color1;
-    // cursor: move;
+    background-color: @apple-bg;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    color: @apple-text-primary;
     cursor: grab;
     display: flex;
-    padding: 8px;
+    padding: 10px 12px;
     position: relative;
     width: 100%;
+    margin-bottom: 6px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    
+    &:hover {
+      background-color: @apple-bg-hover;
+      border-color: @apple-border;
+      box-shadow: 0 2px 8px @apple-shadow-hover;
+      transform: translateY(-1px);
+      
+      .widget-out > .sd-jiesuo,
+      .widget-out > .top-icon,
+      .widget-out > .delete-icon {
+        opacity: 1;
+      }
+    }
+    
+    &:active {
+      cursor: grabbing;
+      transform: translateY(0);
+    }
+    
     .widget-type {
-      // outline: 1px solid #dedede;
       align-items: center;
-      color: @color1;
+      color: @apple-text-secondary;
       display: flex;
       height: 30px;
       width: 30px;
       justify-content: center;
       margin-right: 10px;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+      
       &__img {
         object-fit: contain;
-        background-color: @color0;
-        background-image: -webkit-linear-gradient(45deg, #efefef 25%, transparent 25%, transparent 75%, #efefef 75%, #efefef), -webkit-linear-gradient(45deg, #efefef 25%, transparent 25%, transparent 75%, #efefef 75%, #efefef);
+        background-color: #ffffff;
+        background-image: -webkit-linear-gradient(45deg, #f5f5f5 25%, transparent 25%, transparent 75%, #f5f5f5 75%, #f5f5f5), 
+                          -webkit-linear-gradient(45deg, #f5f5f5 25%, transparent 25%, transparent 75%, #f5f5f5 75%, #f5f5f5);
         background-position: 0 0, 10px 10px;
         background-size: 21px 21px;
-        outline: 1px solid #dedede;
+        border: 1px solid @apple-border;
+        border-radius: 6px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
       }
     }
+    
     .widget-name {
       flex: 1;
-      font-size: 14px;
+      font-size: 13px;
+      font-weight: 500;
       padding-right: 22px;
+      color: @apple-text-primary;
+      letter-spacing: -0.01em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
+    
     .widget-out {
       height: 100%;
       margin-left: -12px;
@@ -228,43 +283,84 @@ export default defineComponent({
       width: 100%;
       display: flex;
       align-items: center;
+      pointer-events: none;
+      
+      > * {
+        pointer-events: auto;
+      }
     }
-    .widget-out:hover > .sd-jiesuo,
-    .widget-out:hover > .top-icon,
-    .widget-out:hover > .delete-icon {
+  }
+  
+  .widget.active {
+    background-color: @apple-bg-active;
+    border-color: rgba(0, 122, 255, 0.2);
+    color: @apple-text-active;
+    box-shadow: 0 2px 8px rgba(0, 122, 255, 0.15),
+                inset 0 0 0 1px rgba(0, 122, 255, 0.1);
+    
+    .widget-name {
+      color: @apple-text-active;
+      font-weight: 600;
+    }
+    
+    .widget-type {
+      color: @apple-text-active;
+    }
+    
+    .widget-out > .sd-jiesuo,
+    .widget-out > .top-icon,
+    .widget-out > .delete-icon {
       opacity: 1;
     }
   }
-  .widget.active {
-    background-color: #888888;
-    color: @color0;
-  }
+  
   .item-one {
     padding-left: 12px;
   }
-  // .item-two {
-  //   padding-left: 40px;
-  // }
 }
 
 .w-group {
-  font-weight: bold;
+  font-weight: 600;
 }
+
 // icons
 .sd-jiesuo,
 .sd-suoding {
   position: absolute;
-  font-size: 18px;
-  cursor: default;
-  color: #444444;
+  font-size: 16px;
+  cursor: pointer;
+  color: @apple-text-secondary;
   right: 40px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.06);
+    color: @apple-text-primary;
+    transform: scale(1.1);
+  }
 }
+
 .sd-jiesuo {
   opacity: 0;
 }
+
 .sd-suoding {
-  color: #70BC59;
+  color: #34c759;
+  opacity: 0.8;
+  
+  &:hover {
+    background-color: rgba(52, 199, 89, 0.1);
+    color: #34c759;
+  }
 }
+
 .top-icon {
   position: absolute;
   right: 68px;
@@ -272,12 +368,21 @@ export default defineComponent({
   height: 18px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 4px;
+  padding: 1px;
+  
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.06);
+    transform: scale(1.1);
+  }
+  
   &.top-icon-active {
     opacity: 1;
     filter: brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(2476%) hue-rotate(86deg) brightness(118%) contrast(119%);
   }
 }
+
 .delete-icon {
   position: absolute;
   right: 12px;
@@ -285,36 +390,57 @@ export default defineComponent({
   height: 18px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: inline-block;
-  background-color: #444444;
+  background-color: @apple-text-secondary;
   -webkit-mask: url('/delete.svg') center / contain no-repeat;
   mask: url('/delete.svg') center / contain no-repeat;
+  border-radius: 4px;
+  padding: 1px;
+  
+  &:hover {
+    background-color: #ff3b30;
+    transform: scale(1.1);
+  }
 }
+
 .sd-xiaji {
   margin: 0 -4px 0 32px !important;
 }
+
 .second-layer {
   margin-right: 40px;
+  width: 2px;
+  height: 20px;
+  background: linear-gradient(to bottom, transparent, @apple-border, transparent);
+  border-radius: 1px;
 }
 
 // dragable
 .choose {
-  border: 1px dashed #999999 !important;
+  border: 2px dashed @apple-text-active !important;
+  background-color: rgba(0, 122, 255, 0.08) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.2) !important;
 }
 
 .flip-list-move {
-  transition: transform 0.5s;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .no-move {
   transition: transform 0s;
 }
+
 .disable {
-  opacity: 0.3;
+  opacity: 0.4;
+  pointer-events: none;
 }
+
 .ghost {
-  opacity: 0.3;
-  background: @main-color;
+  opacity: 0.5;
+  background: rgba(0, 122, 255, 0.1) !important;
+  border: 2px dashed @apple-text-active !important;
+  border-radius: 10px !important;
 }
 </style>

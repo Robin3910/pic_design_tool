@@ -243,27 +243,55 @@ async function selectItem(item: any) {
   setTempId(item.id)
 
   let result = null
+  let templateData = null
   if (!item.data) {
     // 如果没有数据，从新后端获取模板详情
     try {
-      const template = await templateStore.fetchTemplateById(item.id)
-      result = JSON.parse(template.data || '{}')
+      templateData = await templateStore.fetchTemplateById(item.id)
+      result = JSON.parse(templateData.data || '{}')
     } catch (error) {
       console.error('获取模板详情失败:', error)
       return
     }
   } else {
     result = JSON.parse(item.data)
+    // 从 item 中获取模板信息（包含 margin）
+    templateData = item
+  }
+  
+  // 获取边距值，默认为 0
+  const marginLeft = templateData?.marginLeft || 0
+  const marginTop = templateData?.marginTop || 0
+  
+  // 调整素材位置的辅助函数
+  const adjustWidgetsPosition = (widgets: any[]) => {
+    if (!widgets || !Array.isArray(widgets)) return widgets
+    return widgets.map((widget: any) => {
+      // 递归处理分组内的元素
+      if (widget.layers && Array.isArray(widget.layers)) {
+        widget.layers = adjustWidgetsPosition(widget.layers)
+      }
+      // 调整位置，添加边距
+      if (typeof widget.left === 'number') {
+        widget.left = widget.left + marginLeft
+      }
+      if (typeof widget.top === 'number') {
+        widget.top = widget.top + marginTop
+      }
+      return widget
+    })
   }
   
   if (Array.isArray(result)) {
     const { global, layers } = result[0]
     pageStore.setDPage(global)
-    widgetStore.setTemplate(layers)
+    const adjustedLayers = adjustWidgetsPosition(layers)
+    widgetStore.setTemplate(adjustedLayers)
   } else {
     const { page, widgets } = result
     pageStore.setDPage(page)
-    widgetStore.setTemplate(widgets)
+    const adjustedWidgets = adjustWidgetsPosition(widgets)
+    widgetStore.setTemplate(adjustedWidgets)
   }
   setTimeout(() => {
     forceStore.setZoomScreenChange()

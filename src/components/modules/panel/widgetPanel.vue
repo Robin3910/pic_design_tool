@@ -8,7 +8,7 @@
               v-if="item.iconComponent" 
               :is="item.iconComponent" 
               :size="24" 
-              :color="state.activeWidgetClassify === index && state.active ? '#2254f4' : '#070707'"
+              :color="state.activeWidgetClassify === index && state.active ? '#ffffff' : '#070707'"
               :class="{ 'svg-icon': true }"
             />
             <i v-else :class="['iconfont', 'icon', item.icon]" :style="item.style" />
@@ -111,125 +111,195 @@ defineExpose({
 </script>
 
 <style lang="less" scoped>
-@color1: #3e4651;
+// 苹果风格变量
+@apple-bg: rgba(255, 255, 255, 0.85);
+@apple-bg-blur: rgba(255, 255, 255, 0.7);
+@apple-border: rgba(0, 0, 0, 0.06);
+@apple-text-primary: #1d1d1f;
+@apple-text-secondary: #86868b;
+@apple-shadow: rgba(0, 0, 0, 0.08);
+@apple-shadow-hover: rgba(0, 0, 0, 0.12);
+@apple-accent: #007aff;
+@apple-accent-hover: #0051d5;
 
 #widget-panel {
-  transition: all 1s;
-  color: @color1;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: @apple-text-primary;
   display: flex;
   flex-direction: row;
-  font-weight: 600;
+  font-weight: 500;
   height: 100%;
   position: relative;
-  // width: 360px;
+  
   .widget-classify {
     position: relative;
-    border-right: 1px solid rgba(0, 0, 0, 0.07);
-    background-color: #ffffff;
+    border-right: 1px solid @apple-border;
+    background: @apple-bg;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     height: 100%;
     text-align: center;
     width: 66px;
+    box-shadow: 2px 0 12px @apple-shadow;
+    
     .icon {
       font-size: 24px;
-      color: #070707c9;
+      color: @apple-text-primary;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
+    
     .classify-wrap {
-      padding-top: 3px;
+      padding-top: 8px;
       user-select: none;
       width: 100%;
+      
       .classify-item {
         position: relative;
         align-items: center;
         cursor: pointer;
         display: flex;
         flex-direction: column;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 500;
-        height: 68px;
+        height: 72px;
         justify-content: center;
         width: 100%;
-        p {
-          color: #666666;
-          font-weight: 600;
-          margin-top: 2px;
+        border-radius: 12px;
+        margin: 4px 8px;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        
+        &:hover {
+          background: rgba(0, 0, 0, 0.04);
+          transform: translateY(-1px);
         }
+        
+        p {
+          color: @apple-text-secondary;
+          font-weight: 500;
+          margin-top: 4px;
+          letter-spacing: -0.01em;
+          transition: color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
         .icon-box {
-          width: 24px;
-          height: 27px;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 8px;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .icon {
+          color: @apple-text-primary;
+        }
+        
+        .svg-icon {
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           align-items: center;
           justify-content: center;
         }
-        .icon {
-          color: #070707;
-        }
       }
+      
       .active-classify-item {
         position: relative;
-        .icon,
-        p {
-          color: @active-text-color;
+        background: rgba(0, 122, 255, 0.1);
+        
+        .icon-box {
+          background: @apple-accent;
+          box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
         }
-      }
-      .active-classify-item::after,
-      .classify-item:hover::after {
-        position: absolute;
-        content: '';
-        left: 0;
-        top: 17px;
-        width: 4px;
-        height: 37px;
-        background: @active-text-color;
+        
+        p {
+          color: @apple-accent;
+        }
+        
+        .icon {
+          color: #ffffff;
+        }
+        
+        .svg-icon {
+          color: #ffffff !important;
+          
+          :deep(path) {
+            fill: #ffffff !important;
+          }
+        }
+        
+        &::after {
+          position: absolute;
+          content: '';
+          left: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 3px;
+          height: 32px;
+          background: @apple-accent;
+          border-radius: 0 3px 3px 0;
+          box-shadow: 0 2px 8px rgba(0, 122, 255, 0.4);
+        }
       }
     }
   }
+  
   .widget-wrap {
     width: 328px;
-    transition: all .3s;
-    background-color: @color-white;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: @apple-bg;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     flex: 1;
     height: 100%;
+    overflow: hidden;
   }
+  
   .side-wrap {
     position: absolute;
     left: 394px;
     pointer-events: none;
     z-index: 99;
-    width: 15px;
+    width: 20px;
     height: 100%;
-    display: -webkit-box;
-    display: -webkit-flex;
-    display: -ms-flexbox;
     display: flex;
-    -webkit-box-align: center;
-    -webkit-align-items: center;
-    -ms-flex-align: center;
     align-items: center;
+    
     .pack__up {
-      // user-select: none;
-      // opacity: 0.7;
-      // color: rgba(0, 0, 0, 0.5);
-      // background: @color-white;
-      // height: 50px;
-      // width: 15px;
-      // border-radius: 0 100% 100% 0;
-      // cursor: pointer;
-      // line-height: 45px;
       pointer-events: all;
-      border-radius: 0 100% 100% 0;
+      border-radius: 0 12px 12px 0;
       cursor: pointer;
       width: 20px;
       height: 64px;
-      cursor: pointer;
-      background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAACACAMAAABOb9vcAAAAhFBMVEUAAAD///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8AAADHx8cODg50dHTx8fF2dnZ1dXWWlpZHR0c4ODhQpkZ5AAAAIXRSTlMA9t+/upkRAnPq5NXDfDEsKQjMeGlRThkMsquljTwzIWhBHpjgAAABJElEQVRYw+3YyW7CQBCEYbxig8ELGJyQkJRJyPb+75dj3zy/lD7kMH3+ZEuzSFO1mlZwhjOE2uwhVHJYMygNVwilhz2EUvNaMigledUFoE1anKYAtA9nVRuANpviOQBt0t2ZQSnZ9QxK6Qih9LSGUHkJobYlhGp6CPW4hlAVhckLhMop1InCjEK1FBYU1hSqo/BI4YXCjMIthTWFijDCCB3g7fuO4O1t/rkvQXPz/LUIzX0oAM0tQHOfCkBzC9DcuwLQXACao9Dv1yb9lsek2xaaxMcMH1x6Ff79dY0wwgj/DGv3p2tG4cX9wd55h4rCO/hk3uEs9w6QlXPIbXrfIJ6XrmVBOtJCA1YkXqVLkh1aUgyNk1fV1BxLxzpsuNLKzrME/AWr0ywwvyj83AAAAABJRU5ErkJggg==);
-      background-repeat: no-repeat;
-      background-size: cover;
-      background-position: 50%;
-      filter: drop-shadow(5px 0px 4px rgba(0, 0, 0, 0.03));
-    }
-    .pack__up:hover {
-      color: rgba(0, 0, 0, 0.9);
-      opacity: 0.9;
+      background: @apple-bg;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid @apple-border;
+      border-left: none;
+      box-shadow: 4px 0 12px @apple-shadow;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      
+      &::before {
+        content: '‹';
+        font-size: 20px;
+        color: @apple-text-secondary;
+        font-weight: 300;
+        line-height: 1;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      &:hover {
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow: 4px 0 16px @apple-shadow-hover;
+        transform: translateX(-2px);
+        
+        &::before {
+          color: @apple-text-primary;
+        }
+      }
     }
   }
 }

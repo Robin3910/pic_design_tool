@@ -1,17 +1,62 @@
 <template>
   <div v-show="showMenuBg" id="menu-bg" class="menu-bg" @click="closeMenu">
     <ul ref="menuList" class="menu-list" :style="styleObj">
-      <li
-        v-for="(item, index) in menuListData.list"
-        :key="index"
-        :class="{ 
-          'menu-item': true, 
-          'disable-menu': (dCopyElement.length === 0 && item.type === 'paste')
-        }"
-        @click.stop="selectMenu(item.type)"
-      >
-        {{ item.text }}
-      </li>
+      <template v-for="(item, index) in menuListData.list" :key="index">
+        <li
+          v-if="item.divider"
+          class="menu-divider"
+        ></li>
+        <li
+          v-else
+          :class="{ 
+            'menu-item': true, 
+            'disable-menu': (dCopyElement.length === 0 && item.type === 'paste')
+          }"
+          @click.stop="item.type && !((dCopyElement.length === 0 && item.type === 'paste')) && selectMenu(item.type)"
+        >
+          <span class="menu-item-content">
+            <span class="menu-item-left">
+              <svg v-if="item.icon" class="menu-icon" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path v-if="item.icon === 'copy'" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1H2z"/>
+                <template v-else-if="item.icon === 'paste'">
+                  <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                  <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+                </template>
+                <path v-else-if="item.icon === 'rotate-left'" fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/>
+                <path v-else-if="item.icon === 'rotate-right'" fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 0 .771.636A5.002 5.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zm3.1 6a5.002 5.002 0 0 1-4.757 2.818.5.5 0 1 0 .771.636A6.002 6.002 0 0 0 13.917 9H12.9z"/>
+                <template v-else-if="item.icon === 'layer-up'">
+                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                  <path d="M7.646 4.646a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 5.707V11.5a.5.5 0 0 1-1 0V5.707L5.354 8.354a.5.5 0 1 1-.708-.708l3-3z"/>
+                </template>
+                <template v-else-if="item.icon === 'layer-down'">
+                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                  <path d="M8 4a.5.5 0 0 1 .5.5v5.793l2.146-2.147a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 1 1 .708-.708L7.5 10.293V4.5A.5.5 0 0 1 8 4z"/>
+                </template>
+                <template v-else-if="item.icon === 'layer-top'">
+                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                  <path d="M7.646 4.646a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 5.707V11.5a.5.5 0 0 1-1 0V5.707L5.354 8.354a.5.5 0 1 1-.708-.708l3-3z"/>
+                  <path d="M4.5 11.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5z"/>
+                </template>
+                <template v-else-if="item.icon === 'delete'">
+                  <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                  <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                </template>
+                <template v-else-if="item.icon === 'ungroup'">
+                  <path d="M6.5 2A1.5 1.5 0 0 0 5 3.5v3A1.5 1.5 0 0 0 6.5 8h3A1.5 1.5 0 0 0 11 6.5v-3A1.5 1.5 0 0 0 9.5 2h-3zM6 3.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-3z"/>
+                  <path d="M2.5 10A1.5 1.5 0 0 0 1 11.5v3A1.5 1.5 0 0 0 2.5 16h3A1.5 1.5 0 0 0 7 14.5v-3A1.5 1.5 0 0 0 5.5 10h-3zm.5 1.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-3z"/>
+                  <path d="M10.5 10A1.5 1.5 0 0 0 9 11.5v3a1.5 1.5 0 0 0 1.5 1.5h3a1.5 1.5 0 0 0 1.5-1.5v-3A1.5 1.5 0 0 0 13.5 10h-3zm.5 1.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-3z"/>
+                </template>
+                <template v-else-if="item.icon === 'color'">
+                  <path d="M8 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm4 3a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5.5 7a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 3a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
+                  <path d="M2 13a2 2 0 1 0 4 0 2 2 0 0 0-4 0zm10.5-5.5a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM14 13a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM7.5 1a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+                </template>
+              </svg>
+              <span class="menu-text">{{ item.text }}</span>
+            </span>
+            <span v-if="item.shortcut" class="menu-shortcut">{{ item.shortcut }}</span>
+          </span>
+        </li>
+      </template>
     </ul>
   </div>
 </template>
@@ -26,7 +71,7 @@ import {
 } from './rcMenuData'
 import { getTarget } from '@/common/methods/target'
 import { storeToRefs } from 'pinia';
-import { useControlStore, useWidgetStore, useForceStore } from '@/store';
+import { useControlStore, useWidgetStore, useForceStore, useUiStore, useCanvasStore } from '@/store';
 
 const menuListData = ref<TMenuItemData>({...menu})
 const showMenuBg = ref<boolean>(false)
@@ -35,18 +80,24 @@ const pageMenu = ref<TWidgetItemData[]>([...page])
 
 const widgetStore = useWidgetStore()
 const forceStore = useForceStore()
+const uiStore = useUiStore()
+const canvasStore = useCanvasStore()
 
 const {dActiveElement, dWidgets, dCopyElement} = storeToRefs(widgetStore)
 const { dAltDown } = storeToRefs(useControlStore())
+const { dZoom } = storeToRefs(canvasStore)
 
 // 保存选中范围的变量
 let savedSelectionRange: Range | null = null
 let savedTextElement: HTMLElement | null = null
 
 const styleObj = computed(() => {
+  const zoomScale = dZoom.value / 100
   return {
     left: menuListData.value.left + 'px',
     top: menuListData.value.top + 'px',
+    transform: `scale(${zoomScale})`,
+    transformOrigin: 'top left',
   }
 })
 
@@ -193,6 +244,7 @@ function showMenu(e: MouseEvent) {
       {
         type: 'color-text',
         text: '染色',
+        icon: 'color',
       },
     ]
     menuListData.value.list = colorMenu.concat(menuListData.value.list)
@@ -203,21 +255,33 @@ function showMenu(e: MouseEvent) {
       {
         type: 'ungroup',
         text: '取消组合',
+        icon: 'ungroup',
       },
     ]
     menuListData.value.list = ungroup.concat(menuListData.value.list)
   }
   showMenuBg.value = true
-  // document.getElementById('menu-bg').addEventListener('click', this.closeMenu, false)
-  let mx = e.pageX
-  let my = e.pageY
-  let listWidth = 120
-  if (mx + listWidth > window.innerWidth) {
-    mx -= listWidth
+  // 使用 clientX/clientY（相对于视口的坐标），因为 menu-bg 使用 position: fixed
+  // fixed 定位相对于视口，不受滚动和父元素定位影响
+  const zoomScale = dZoom.value / 100
+  let mx = e.clientX
+  let my = e.clientY
+  // 计算原始菜单宽度（transform scale 不影响布局，但我们需要考虑缩放后的视觉宽度）
+  let listWidth = 180
+  // 边界检测：检查菜单是否会超出视口右边界（考虑缩放后的视觉宽度）
+  if (mx + listWidth * zoomScale > window.innerWidth) {
+    mx -= listWidth * zoomScale
   }
-  let listHeight = (14 + 10) * menuListData.value.list.length + 10
-  if (my + listHeight > window.innerHeight) {
-    my -= listHeight
+  // 边界检测：检查菜单是否会超出视口下边界
+  // 计算实际菜单高度（包括分隔线）
+  const itemHeight = 36 // 每个菜单项高度（padding 8px * 2 + line-height 1.5 * 14px ≈ 36px）
+  const dividerHeight = 13 // 分隔线高度（margin 6px * 2 + 1px）
+  let listHeight = menuListData.value.list.reduce((height, item) => {
+    return height + (item.divider ? dividerHeight : itemHeight)
+  }, 12) // 12px 是上下 padding
+  // 考虑缩放后的视觉高度
+  if (my + listHeight * zoomScale > window.innerHeight) {
+    my -= listHeight * zoomScale
   }
   menuListData.value.left = mx
   menuListData.value.top = my
@@ -471,31 +535,125 @@ function selectMenu(type: TWidgetItemData['type']) {
 
 <style lang="less" scoped>
 .menu-bg {
-  height: 100%;
-  position: absolute;
-  width: 100%;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
   z-index: 99999;
   .menu-list {
     background-color: @color-white;
-    box-shadow: 1px 0px 10px 3px rgba(0, 0, 0, 0.1);
-    padding: 5px;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1);
+    padding: 6px 0;
     position: absolute;
-    width: 120px;
+    min-width: 180px;
+    max-width: 240px;
+    animation: menuFadeIn 0.15s ease-out;
+    
     .menu-item {
       cursor: pointer;
       font-size: 14px;
-      line-height: 1;
-      padding: 5px 15px;
+      line-height: 1.5;
+      padding: 8px 16px;
       width: 100%;
-      &:hover {
-        background-color: #ececec;
+      transition: background-color 0.15s ease;
+      user-select: none;
+      
+      .menu-item-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        
+        .menu-item-left {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex: 1;
+          
+          .menu-icon {
+            width: 16px;
+            height: 16px;
+            color: #333;
+            flex-shrink: 0;
+          }
+          
+          .menu-text {
+            color: #333;
+            font-size: 14px;
+            line-height: 1.5;
+          }
+        }
+        
+        .menu-shortcut {
+          color: #999;
+          font-size: 12px;
+          margin-left: 16px;
+          font-family: 'Consolas', 'Monaco', monospace;
+        }
+      }
+      
+      &:hover:not(.disable-menu) {
+        background-color: #f5f5f5;
+        
+        .menu-item-content {
+          .menu-item-left {
+            .menu-icon {
+              color: #1890ff;
+            }
+            .menu-text {
+              color: #1890ff;
+            }
+          }
+        }
+      }
+      
+      &:active:not(.disable-menu) {
+        background-color: #e6f7ff;
       }
     }
+    
     .menu-item.disable-menu {
       background-color: @color-white;
-      color: #aaaaaa;
       cursor: not-allowed;
+      opacity: 0.5;
+      
+      .menu-item-content {
+        .menu-item-left {
+          .menu-icon {
+            color: #ccc;
+          }
+          .menu-text {
+            color: #aaa;
+          }
+        }
+        .menu-shortcut {
+          color: #ccc;
+        }
+      }
+      
+      &:hover {
+        background-color: @color-white;
+      }
     }
+    
+    .menu-divider {
+      height: 1px;
+      background-color: #e8e8e8;
+      margin: 6px 0;
+      padding: 0;
+      list-style: none;
+    }
+  }
+}
+
+@keyframes menuFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 </style>

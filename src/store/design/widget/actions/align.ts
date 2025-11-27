@@ -8,6 +8,7 @@
 
 import { useCanvasStore, useHistoryStore } from "@/store"
 import { TWidgetStore, TdWidgetData } from ".."
+import { updateWidgetData } from "./widget"
 
 type TAlign = 'left' | 'ch' | 'right' | 'top' | 'cv' | 'bottom'
 
@@ -28,7 +29,9 @@ export function updateAlign(store: TWidgetStore, { align, uuid, group }: TUpdate
 
   if (!target) return
 
-  if (target.parent !== '-1') {
+  // 如果传入了 group 参数，优先使用 group 作为对齐基准
+  // 否则，如果元素有父容器，使用父容器作为对齐基准
+  if (!group && target.parent !== '-1') {
     const tmp = widgets.find((item: any) => item.uuid === target.parent)
     tmp && (parent = tmp)
   }
@@ -43,30 +46,37 @@ export function updateAlign(store: TWidgetStore, { align, uuid, group }: TUpdate
     ph = parent.height
   }
 
-  const targetW = target.width
-  const targetH = target.height
+  // 对于文本元素，优先使用 record.width，因为实际宽度可能存储在 record 中
+  // 如果 record.width 不存在或为 0，则使用 target.width
+  const targetW = (target.type === 'w-text' && target.record?.width && target.record.width > 0) 
+    ? target.record.width 
+    : (target.width || 0)
+  const targetH = (target.type === 'w-text' && target.record?.height && target.record.height > 0) 
+    ? target.record.height 
+    : (target.height || 0)
   switch (align) {
     case 'left':
       left = parent.left
       break
     case 'ch': // 水平居中
-      left = parent.left + pw / 2 - targetW / 2
+      left = Math.round(parent.left + pw / 2 - targetW / 2)
       break
     case 'right':
-      left = parent.left + pw - targetW
+      left = Math.round(parent.left + pw - targetW)
       break
     case 'top':
       top = parent.top
       break
     case 'cv': // 垂直居中
-      top = parent.top + ph / 2 - targetH / 2
+      top = Math.round(parent.top + ph / 2 - targetH / 2)
       break
     case 'bottom':
-      top = parent.top + ph - targetH
+      top = Math.round(parent.top + ph - targetH)
       break
   }
 
   if (target.left !== left || target.top !== top) {
+    // 如果是容器，需要先更新子元素的位置
     if (target.isContainer) {
       const dLeft = target.left - left
       const dTop = target.top - top
@@ -79,6 +89,8 @@ export function updateAlign(store: TWidgetStore, { align, uuid, group }: TUpdate
         }
       }
     }
+    
+    // 直接修改属性，与 dMove 函数保持一致
     target.left = left
     target.top = top
 
