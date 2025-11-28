@@ -272,8 +272,8 @@ onMounted(() => {
   }
   // 绑定浏览器式快捷键：Ctrl + +/-/0
   window.addEventListener('keydown', handleUiZoomKeydown, { passive: false })
-  // 绑定 Ctrl + 滚轮（已禁用，只能通过头顶栏按钮缩放）
-  // window.addEventListener('wheel', handleUiZoomWheel, { passive: false })
+  // 绑定 Ctrl/⌘ + 滚轮，统一拦截浏览器缩放
+  window.addEventListener('wheel', handleUiZoomWheel, { passive: false })
 })
 
 onBeforeUnmount(() => {
@@ -283,7 +283,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('keyup', handleKeyup(controlStore, checkCtrl), false)
   document.oncontextmenu = null
   window.removeEventListener('keydown', handleUiZoomKeydown)
-  // window.removeEventListener('wheel', handleUiZoomWheel)
+  window.removeEventListener('wheel', handleUiZoomWheel)
   if (typeof document !== 'undefined') {
     document.body.style.removeProperty('--ui-zoom-scale')
     document.body.classList.remove('ui-zoom-enabled')
@@ -387,14 +387,14 @@ function handleUiZoomKeydown(e: KeyboardEvent) {
 }
 
 function handleUiZoomWheel(e: WheelEvent) {
-  if (!e.altKey) return
+  // 统一拦截 Ctrl/⌘ + 滚轮，避免浏览器层级缩放
+  if (!e.ctrlKey && !e.metaKey) return
+  // 输入区域保留默认行为
+  const target = e.target as HTMLElement | null
+  const tag = (target?.tagName || '').toLowerCase()
+  const isTyping = tag === 'input' || tag === 'textarea' || (target as any)?.isContentEditable
+  if (isTyping) return
   e.preventDefault()
-  const delta = e.deltaY
-  if (delta > 0) {
-    uiStore.zoomOut()
-  } else if (delta < 0) {
-    uiStore.zoomIn()
-  }
 }
 </script>
 
