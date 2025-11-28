@@ -89,26 +89,6 @@
         </div>
       </div>
     </teleport>
-      
-      <!-- 放大预览对话框 -->
-      <el-dialog
-        v-model="showPreviewDialog"
-        title="预览图"
-        width="80%"
-        :before-close="() => showPreviewDialog = false"
-        center
-        class="preview-dialog"
-      >
-        <div class="preview-dialog-content">
-          <img 
-            v-if="previewImageUrl" 
-            :src="previewImageUrl" 
-            alt="预览图"
-            class="preview-dialog-img"
-            @error="handleImageError"
-          />
-        </div>
-      </el-dialog>
   </div>
 </template>
 
@@ -124,7 +104,6 @@ import { useControlStore, useGroupStore, useHistoryStore, useWidgetStore, useCan
 import { storeToRefs } from 'pinia';
 import { TdWidgetData } from '@/store/design/widget';
 import type { TUpdateAlignData } from '@/store/design/widget/actions/align'
-import useNotification from '@/common/methods/notification'
 import eventBus from '@/utils/plugins/eventBus'
 
 const widgetStore = useWidgetStore()
@@ -144,19 +123,79 @@ const handleImageError = (event: Event) => {
 
 const iconList = ref<AlignListData[]>(alignIconList)
 const showGroupCombined = ref(false)
-const showPreviewDialog = ref(false)
 const clearButtonRef = ref<HTMLElement | null>(null)
 const floatingPreviewRef = ref<HTMLElement | null>(null)
-const floatingPreviewPosition = ref({ top: 220, left: 0 })
-const floatingPreviewSize = ref({ width: 220, height: 180 })
 
-// 从 localStorage 读取预览窗显示状态，默认为 false
-const getStoredPreviewState = (): boolean => {
-  const stored = localStorage.getItem('floatingPreviewVisible')
-  return stored !== null ? stored === 'true' : false
+const defaultPreviewPosition = { top: 220, left: 0 }
+const defaultPreviewSize = { width: 220, height: 180 }
+const PREVIEW_STATE_STORAGE_KEY = 'floatingPreviewState'
+
+type FloatingPreviewPersistState = {
+  visible: boolean
+  position: typeof defaultPreviewPosition
+  size: typeof defaultPreviewSize
+  contentUrl: string | null
 }
 
-const showFloatingPreview = ref(getStoredPreviewState())
+const getDefaultPreviewState = (): FloatingPreviewPersistState => ({
+  visible: false,
+  position: { ...defaultPreviewPosition },
+  size: { ...defaultPreviewSize },
+  contentUrl: null,
+})
+
+const safeNumber = (value: unknown, fallback: number) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const loadFloatingPreviewState = (): { state: FloatingPreviewPersistState; fromStorage: boolean } => {
+  try {
+    const stored = localStorage.getItem(PREVIEW_STATE_STORAGE_KEY)
+    if (!stored) return { state: getDefaultPreviewState(), fromStorage: false }
+    const parsed = JSON.parse(stored)
+    const defaults = getDefaultPreviewState()
+    const state: FloatingPreviewPersistState = {
+      visible: typeof parsed.visible === 'boolean' ? parsed.visible : defaults.visible,
+      position: {
+        top: safeNumber(parsed?.position?.top, defaults.position.top),
+        left: safeNumber(parsed?.position?.left, defaults.position.left),
+      },
+      size: {
+        width: safeNumber(parsed?.size?.width, defaults.size.width),
+        height: safeNumber(parsed?.size?.height, defaults.size.height),
+      },
+      contentUrl: typeof parsed.contentUrl === 'string' ? parsed.contentUrl : defaults.contentUrl,
+    }
+    return { state, fromStorage: true }
+  } catch (error) {
+    console.warn('加载预览窗状态失败:', error)
+    return { state: getDefaultPreviewState(), fromStorage: false }
+  }
+}
+
+const persistFloatingPreviewState = () => {
+  try {
+    const payload: FloatingPreviewPersistState = {
+      visible: showFloatingPreview.value,
+      position: { ...floatingPreviewPosition.value },
+      size: { ...floatingPreviewSize.value },
+      contentUrl: previewImageUrl.value ?? null,
+    }
+    localStorage.setItem(PREVIEW_STATE_STORAGE_KEY, JSON.stringify(payload))
+  } catch (error) {
+    console.warn('保存预览窗状态失败:', error)
+  }
+}
+
+const storedPreviewState = loadFloatingPreviewState()
+const floatingPreviewPosition = ref({ ...storedPreviewState.state.position })
+const floatingPreviewSize = ref({ ...storedPreviewState.state.size })
+const showFloatingPreview = ref(storedPreviewState.state.visible)
+
+if (storedPreviewState.state.contentUrl) {
+  controlStore.setPreviewImageUrl(storedPreviewState.state.contentUrl)
+}
 const dragState = reactive({
   isDragging: false,
   offsetX: 0,
@@ -232,6 +271,7 @@ function keepPreviewInViewport() {
     width: clamp(floatingPreviewSize.value.width, MIN_PREVIEW_WIDTH, maxWidth),
     height: clamp(floatingPreviewSize.value.height, MIN_PREVIEW_HEIGHT, maxHeight),
   }
+  persistFloatingPreviewState()
 }
 
 function handlePreviewMouseDown(event: MouseEvent) {
@@ -287,6 +327,7 @@ function handlePreviewMouseUp() {
   // 恢复文本选择和光标
   document.body.style.userSelect = ''
   document.body.style.cursor = ''
+  keepPreviewInViewport()
 }
 
 function handleResizeMouseDown(event: MouseEvent) {
@@ -329,17 +370,13 @@ function handleResizeMouseUp() {
 }
 
 function handlePreviewClick() {
-  if (dragState.hasMoved) {
-    dragState.hasMoved = false
-    return
-  }
-  showPreviewDialog.value = true
+  // 仅阻止事件冒泡，不再展开预览
+  dragState.hasMoved = false
 }
 
 function toggleFloatingPreview() {
   showFloatingPreview.value = !showFloatingPreview.value
-  // 保存状态到 localStorage
-  localStorage.setItem('floatingPreviewVisible', String(showFloatingPreview.value))
+  persistFloatingPreviewState()
 }
 
 function removeDragListeners() {
@@ -417,21 +454,19 @@ function handleClearMaterials() {
     const currentPage = pageStore.dCurrentPage
     const currentLayout = dLayouts.value[currentPage]
     
-    if (!currentLayout || !currentLayout.layers) {
-      useNotification('提示', '当前画版没有素材', { type: 'info' })
-      return
-    }
+    if (!currentLayout || !currentLayout.layers) return
     
-    // 过滤出需要保留的图层：仅锁定图层
-    const preservedLayers = currentLayout.layers.filter((widget: any) => widget.lock === true)
+    // 保留锁定图层以及模板图片，避免误删模版素材
+    const preservedLayers = currentLayout.layers.filter((widget: any) => {
+      const isLockedLayer = widget.lock === true
+      const isTemplateImage = widget.type === 'w-image' && widget.name === '模板图片'
+      return isLockedLayer || isTemplateImage
+    })
     
     // 统计要清除的素材数量
     const clearCount = currentLayout.layers.length - preservedLayers.length
     
-    if (clearCount === 0) {
-      useNotification('提示', '没有需要清除的素材', { type: 'info' })
-      return
-    }
+    if (clearCount === 0) return
     
     // 更新当前页面的图层，只保留已锁定图层
     currentLayout.layers = preservedLayers
@@ -446,18 +481,21 @@ function handleClearMaterials() {
     // 更新画版
     pageStore.reChangeCanvas()
     
-    const lockedCount = preservedLayers.length
-    useNotification('成功', `已清除 ${clearCount} 个素材，仅保留 ${lockedCount} 个锁定图层`, { type: 'success' })
   } catch (error: any) {
     console.error('清除素材失败:', error)
-    useNotification('错误', error.message || '清除素材失败，请重试', { type: 'error' })
   }
 }
+
+const hasStoredPreviewState = storedPreviewState.fromStorage
 
 // 监听清除素材事件以及预览拖拽初始化
 onMounted(() => {
   eventBus.on('clearMaterials', handleClearMaterials)
-  setInitialFloatingPreviewPosition()
+  if (hasStoredPreviewState) {
+    nextTick(() => keepPreviewInViewport())
+  } else {
+    setInitialFloatingPreviewPosition()
+  }
   window.addEventListener('resize', keepPreviewInViewport)
 })
 
@@ -472,6 +510,11 @@ watch(showFloatingPreview, (visible) => {
   removeDragListeners()
   resizeState.isResizing = false
   removeResizeListeners()
+  persistFloatingPreviewState()
+})
+
+watch(previewImageUrl, () => {
+  persistFloatingPreviewState()
 })
 
 onBeforeUnmount(() => {
@@ -961,60 +1004,6 @@ onBeforeUnmount(() => {
 .floating-preview:hover .floating-preview__body {
   border-color: @apple-accent;
   background: rgba(248, 248, 248, 0.8);
-}
-
-// 预览对话框样式
-:deep(.preview-dialog) {
-  .el-dialog {
-    border-radius: 20px;
-    overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2),
-                0 8px 24px rgba(0, 0, 0, 0.12);
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(30px) saturate(180%);
-    -webkit-backdrop-filter: blur(30px) saturate(180%);
-  }
-  
-  .el-dialog__header {
-    padding: 24px 24px 16px;
-    border-bottom: 1px solid @apple-border;
-    background: rgba(255, 255, 255, 0.5);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    
-    .el-dialog__title {
-      font-size: 18px;
-      font-weight: 600;
-      color: @apple-text-primary;
-      letter-spacing: -0.02em;
-    }
-  }
-  
-  .el-dialog__body {
-    padding: 0;
-  }
-  
-  .preview-dialog-content {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 400px;
-    background: rgba(248, 248, 248, 0.6);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: 0;
-    padding: 24px;
-    
-    .preview-dialog-img {
-      max-width: 100%;
-      max-height: 70vh;
-      height: auto;
-      display: block;
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12),
-                  0 2px 8px rgba(0, 0, 0, 0.08);
-    }
-  }
 }
 
 .gounp {

@@ -11,6 +11,13 @@
               :color="state.activeWidgetClassify === index && state.active ? '#ffffff' : '#070707'"
               :class="{ 'svg-icon': true }"
             />
+            <img
+              v-else-if="item.iconImage"
+              :src="item.iconImage"
+              alt=""
+              class="icon-image"
+              draggable="false"
+            />
             <i v-else :class="['iconfont', 'icon', item.icon]" :style="item.style" />
           </div>
           <p>{{ item.name }}</p>
@@ -195,6 +202,14 @@ defineExpose({
           color: @apple-text-primary;
         }
         
+        .icon-image {
+          width: 24px;
+          height: 24px;
+          object-fit: contain;
+          transition: filter 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          user-select: none;
+        }
+        
         .svg-icon {
           transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
@@ -218,6 +233,10 @@ defineExpose({
         
         .icon {
           color: #ffffff;
+        }
+        
+        .icon-image {
+          filter: brightness(0) invert(1);
         }
         
         .svg-icon {

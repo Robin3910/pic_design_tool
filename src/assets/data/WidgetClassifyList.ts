@@ -15,6 +15,7 @@ export type TWidgetClassifyData = {
   component: string
   style?: StyleValue
   iconComponent?: string
+  iconImage?: string
 }
 
 export default [
@@ -36,6 +37,13 @@ export default [
     show: false,
     style: { fontWeight: 600 },
     component: 'text-list-wrap',
+  },
+  {
+    name: '订单',
+    icon: 'icon-dingdan',
+    show: false,
+    component: 'order-list-wrap',
+    iconImage: '/订单.svg',
   },
   {
     name: '历史',

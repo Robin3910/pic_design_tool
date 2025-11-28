@@ -820,7 +820,7 @@ function changeStyleIconList() {
       const buttonValue = state.styleIconList2[i].value
       // 严格比较值，确保类型一致
       if (currentValue === buttonValue) {
-        state.styleIconList2[i].select = true
+      state.styleIconList2[i].select = true
       }
     }
   }

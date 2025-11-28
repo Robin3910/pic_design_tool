@@ -893,35 +893,32 @@ async function save() {
       emit('change', { downloadPercent: 100, downloadText: '上传成功', downloadMsg: url })
     const updateCount = taskUpdateMap.size
     
-    // 构建最终消息
-    let message = ''
-    let notificationType: 'success' | 'warning' = 'success'
+    // 构建最终消息（仅用于日志，取消弹窗）
+    let summaryMessage = ''
     
     if (updateCount > 0) {
-      message = `图片已上传到OSS`
+      summaryMessage = `图片已上传到OSS`
       
       // 添加更新任务记录的统计信息
       if (updateSuccessCount > 0) {
-        message += `，成功更新 ${updateSuccessCount} 条任务记录`
+        summaryMessage += `，成功更新 ${updateSuccessCount} 条任务记录`
       }
       if (updateFailCount > 0) {
-        message += `，${updateFailCount} 条任务记录更新失败`
-        notificationType = 'warning'
+        summaryMessage += `，${updateFailCount} 条任务记录更新失败`
       }
       
       // 检查是否有同步操作
       if (syncSuccess) {
-        message += `，已同步 ${syncCount} 条任务到订单`
+        summaryMessage += `，已同步 ${syncCount} 条任务到订单`
       } else if (syncError) {
         const errorMsg = syncError?.response?.data?.msg || syncError?.message || '未知错误'
-        message += `，但同步到订单失败: ${errorMsg}`
-        notificationType = 'warning'
+        summaryMessage += `，但同步到订单失败: ${errorMsg}`
       }
     } else {
-      message = `图片已上传到OSS`
+      summaryMessage = `图片已上传到OSS`
     }
     
-    useNotification('上传成功', message, { type: notificationType })
+    console.log('上传结果:', summaryMessage)
     
     // 保存成功后自动触发清除素材功能
     // 使用 setTimeout 确保通知显示后再执行清除操作

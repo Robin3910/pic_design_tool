@@ -628,7 +628,7 @@ defineExpose({
 }
 
 .empty-state {
-  text-align: center;
+      text-align: center;
   padding: 3rem 1rem;
   color: @apple-text-secondary;
   

@@ -358,7 +358,7 @@ export default defineComponent({
   &:hover {
     background-color: rgba(52, 199, 89, 0.1);
     color: #34c759;
-  }
+}
 }
 
 .top-icon {

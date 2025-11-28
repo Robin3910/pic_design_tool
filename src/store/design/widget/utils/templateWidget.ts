@@ -6,8 +6,11 @@ export const applyTemplateImageDefaults = (widget: TdWidgetData) => {
   }
 
   widget.name = '模板图片'
-  // 已取消自动锁定和自动置顶
-  // widget.lock = true
+  // 模板图片初次导入时默认锁定，避免误操作
+  if (widget.lock !== true) {
+    widget.lock = true
+  }
+  // 已取消自动置顶
   // widget.isTop = true
 }
 

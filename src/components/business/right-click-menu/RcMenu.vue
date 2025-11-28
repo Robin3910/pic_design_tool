@@ -6,14 +6,14 @@
           v-if="item.divider"
           class="menu-divider"
         ></li>
-        <li
+      <li
           v-else
-          :class="{ 
-            'menu-item': true, 
-            'disable-menu': (dCopyElement.length === 0 && item.type === 'paste')
-          }"
+        :class="{ 
+          'menu-item': true, 
+          'disable-menu': (dCopyElement.length === 0 && item.type === 'paste')
+        }"
           @click.stop="item.type && !((dCopyElement.length === 0 && item.type === 'paste')) && selectMenu(item.type)"
-        >
+      >
           <span class="menu-item-content">
             <span class="menu-item-left">
               <svg v-if="item.icon" class="menu-icon" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -55,7 +55,7 @@
             </span>
             <span v-if="item.shortcut" class="menu-shortcut">{{ item.shortcut }}</span>
           </span>
-        </li>
+      </li>
       </template>
     </ul>
   </div>
@@ -604,8 +604,8 @@ function selectMenu(type: TWidgetItemData['type']) {
             }
             .menu-text {
               color: #1890ff;
-            }
-          }
+      }
+    }
         }
       }
       

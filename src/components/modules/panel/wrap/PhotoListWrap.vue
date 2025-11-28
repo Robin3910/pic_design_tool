@@ -794,8 +794,8 @@ defineExpose({
   position: absolute;
   top: 6px;
   right: 6px;
-  display: flex;
-  align-items: center;
+    display: flex;
+    align-items: center;
   justify-content: center;
   width: 24px;
   height: 24px;
@@ -806,19 +806,19 @@ defineExpose({
   border-radius: 50%;
   border: 1px solid @apple-border;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  cursor: pointer;
+    cursor: pointer;
   opacity: 0;
   visibility: hidden;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 10;
   color: #f56c6c;
-  
-  &:hover {
+    
+    &:hover {
     background: rgba(255, 255, 255, 1);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     transform: scale(1.1);
-  }
-  
+    }
+    
   &:active {
     transform: scale(0.95);
   }
