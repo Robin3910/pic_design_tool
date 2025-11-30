@@ -126,8 +126,6 @@
                   <el-image
                     :src="item.image.url"
                     fit="cover"
-                    lazy
-                    loading="lazy"
                     class="image-thumb"
                   >
                     <template #placeholder>
