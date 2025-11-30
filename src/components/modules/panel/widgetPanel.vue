@@ -216,7 +216,7 @@ defineExpose({
           align-items: center;
           justify-content: center;
         }
-      }
+        }
       
       .active-classify-item {
         position: relative;
@@ -248,9 +248,9 @@ defineExpose({
         }
         
         &::after {
-          position: absolute;
-          content: '';
-          left: 0;
+        position: absolute;
+        content: '';
+        left: 0;
           top: 50%;
           transform: translateY(-50%);
           width: 3px;
@@ -258,9 +258,9 @@ defineExpose({
           background: @apple-accent;
           border-radius: 0 3px 3px 0;
           box-shadow: 0 2px 8px rgba(0, 122, 255, 0.4);
-        }
       }
     }
+  }
   }
   
   .widget-wrap {
@@ -308,7 +308,7 @@ defineExpose({
         font-weight: 300;
         line-height: 1;
         transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      }
+    }
       
       &:hover {
         background: rgba(255, 255, 255, 0.95);

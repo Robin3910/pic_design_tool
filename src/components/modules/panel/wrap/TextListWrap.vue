@@ -480,12 +480,11 @@ const loadTextsFromApi = async (init: boolean = false) => {
     
     if (init) {
       state.textList = results
-      // 初始化时，默认展开所有分组
+      // 默认展开所有组
       state.expandedGroups.clear()
-      results.forEach(item => {
-        if (item.sortId) {
-          state.expandedGroups.add(item.sortId)
-        }
+      const uniqueSortIds = new Set(results.map(item => item.sortId).filter(id => id != null))
+      uniqueSortIds.forEach(sortId => {
+        state.expandedGroups.add(sortId)
       })
       // 初始加载完成后，重置滚动位置到顶部
       await nextTick()
@@ -497,8 +496,8 @@ const loadTextsFromApi = async (init: boolean = false) => {
       results.forEach(newItem => {
         if (!state.textList.find(existing => existing.name === newItem.name && existing.text === newItem.text)) {
           state.textList.push(newItem)
-          // 新数据的分组默认展开
-          if (newItem.sortId && !state.expandedGroups.has(newItem.sortId)) {
+          // 默认展开新添加的组
+          if (newItem.sortId != null) {
             state.expandedGroups.add(newItem.sortId)
           }
         }

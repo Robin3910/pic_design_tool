@@ -62,7 +62,6 @@
               <div class="group-header__content">
                 <div class="group-title-row">
                   <div v-if="group.categoryName" class="group-category-chip">
-                    <span class="group-category__label">类目</span>
                     <span class="group-category__value">{{ group.categoryName }}</span>
                   </div>
                 </div>
@@ -89,16 +88,34 @@
                   'order-item--stacked': item.image && item.text
                 }"
               >
-                <div v-if="getItemSubtitle(item)" class="order-item__subtitle">
-                  {{ getItemSubtitle(item) }}
-                </div>
-                <div
-                  v-if="item.image && item.text"
-                  class="undo-btn order-item__undo"
-                  @click.stop="handleDeleteOrderItem(item)"
-                  title="撤销"
-                >
-                  <img src="/删除.svg" alt="删除" />
+                <div v-if="getItemSubtitle(item) || (item.image && item.text)" class="order-item__subtitle-row">
+                  <div v-if="getItemSubtitle(item)" class="order-item__subtitle">
+                    {{ getItemSubtitle(item) }}
+                  </div>
+                  <div
+                    v-if="item.image && item.text"
+                    class="undo-btn order-item__undo-inline"
+                    @click.stop="handleDeleteOrderItem(item)"
+                    title="撤销"
+                  >
+                    <img src="/删除.svg" alt="删除" />
+                  </div>
+                  <div
+                    v-else-if="item.image && !item.text && getItemSubtitle(item)"
+                    class="undo-btn order-item__undo-inline"
+                    @click.stop="handleDeleteImage(item.image)"
+                    title="撤销"
+                  >
+                    <img src="/删除.svg" alt="删除" />
+                  </div>
+                  <div
+                    v-else-if="item.text && !item.image && getItemSubtitle(item)"
+                    class="undo-btn order-item__undo-inline"
+                    @click.stop="handleDeleteText(item.text)"
+                    title="撤销"
+                  >
+                    <img src="/删除.svg" alt="删除" />
+                  </div>
                 </div>
                 <div
                   v-if="item.image"
@@ -125,7 +142,7 @@
                     </template>
                   </el-image>
                   <div
-                    v-if="item.image && !item.text"
+                    v-if="item.image && !item.text && !getItemSubtitle(item)"
                     class="undo-btn"
                     @click.stop="handleDeleteImage(item.image)"
                     title="撤销"
@@ -146,7 +163,7 @@
                       {{ item.text.text }}
                     </div>
                     <div
-                      v-if="item.text && !item.image"
+                      v-if="item.text && !item.image && !getItemSubtitle(item)"
                       class="undo-btn"
                       @click.stop="handleDeleteText(item.text)"
                       title="撤销"
@@ -515,7 +532,19 @@ const getGroupOrderValue = (group: TOrderGroup) => {
 }
 
 const getItemSubtitle = (item: TOrderItem) => {
-  return item.sortIndex != null ? String(item.sortIndex) : ''
+  if (item.orderNo && item.sortIndex != null) {
+    return `${item.orderNo}（${item.sortIndex}）`
+  }
+  
+  if (item.orderNo) {
+    return item.orderNo
+  }
+  
+  if (item.sortIndex != null) {
+    return String(item.sortIndex)
+  }
+  
+  return ''
 }
 
 const parseNeedRedrawIndices = (raw: any): number[] => {
@@ -700,9 +729,7 @@ const mergeGroups = (incoming: TOrderGroup[]) => {
     if (!state.groupOrder.includes(group.sortId)) {
       state.groupOrder.push(group.sortId)
     }
-    if (!state.expandedGroups.has(group.sortId)) {
-      state.expandedGroups.add(group.sortId)
-    }
+    // 默认不展开，由用户手动展开
     const existing = map.get(key)
     if (!existing) {
       map.set(key, {
@@ -841,6 +868,13 @@ const loadOrderData = async (init = false) => {
     const imageData = buildImageEntries(imageList)
     const groups = buildCombinedGroups(textData.map, imageData.map, textData.order, imageData.order)
     mergeGroups(groups)
+
+    // 默认展开所有组
+    groups.forEach((group) => {
+      if (group.sortId) {
+        state.expandedGroups.add(group.sortId)
+      }
+    })
 
     // 设置预览窗图片 - 查找第一条数据的 effectiveImgUrl
     if (init) {
@@ -1385,28 +1419,29 @@ defineExpose({
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1rem 0.75rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 
   .header-title {
-    font-size: 16px;
-    font-weight: 700;
-    background: linear-gradient(135deg, #4A90E2 0%, #7B68EE 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -0.01em;
+    font-size: 17px;
+    font-weight: 600;
+    color: #1d1d1f;
+    letter-spacing: -0.02em;
   }
 
   .refresh-btn {
-    color: #6B7A99;
+    color: #007aff;
     padding: 0.4rem;
     border-radius: 8px;
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     
     &:hover {
-      color: #4A90E2;
-      background: rgba(74, 144, 226, 0.1);
+      color: #0051d5;
+      background: rgba(0, 122, 255, 0.1);
       transform: rotate(90deg);
+    }
+    
+    &:active {
+      transform: rotate(90deg) scale(0.95);
     }
   }
 }
@@ -1425,60 +1460,39 @@ defineExpose({
   }
 
   .meta-item {
-    border: 1px solid rgba(200, 220, 255, 0.4);
-    border-radius: 14px;
+    border: none;
+    border-radius: 12px;
     padding: 0.75rem 1rem;
-    background: linear-gradient(135deg, rgba(240, 248, 255, 0.8) 0%, rgba(245, 240, 255, 0.8) 100%);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(100, 150, 255, 0.08);
-    
-    &:nth-child(1) {
-      background: linear-gradient(135deg, rgba(230, 245, 255, 0.9) 0%, rgba(240, 250, 255, 0.9) 100%);
-      border-color: rgba(100, 180, 255, 0.3);
-    }
-    
-    &:nth-child(2) {
-      background: linear-gradient(135deg, rgba(240, 250, 255, 0.9) 0%, rgba(245, 240, 255, 0.9) 100%);
-      border-color: rgba(150, 150, 255, 0.3);
-    }
-    
-    &:nth-child(3) {
-      background: linear-gradient(135deg, rgba(245, 255, 250, 0.9) 0%, rgba(240, 255, 245, 0.9) 100%);
-      border-color: rgba(100, 220, 180, 0.3);
-    }
-    
-    &:nth-child(4) {
-      background: linear-gradient(135deg, rgba(255, 250, 240, 0.9) 0%, rgba(255, 245, 230, 0.9) 100%);
-      border-color: rgba(255, 180, 100, 0.3);
-    }
+    gap: 0.35rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     
     &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 16px rgba(100, 150, 255, 0.15);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      background: rgba(255, 255, 255, 0.8);
     }
   }
 
   .meta-label {
     font-size: 11px;
-    color: #6B7A99;
+    color: #86868b;
     font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
   }
 
   .meta-value {
-    font-size: 20px;
-    font-weight: 700;
-    background: linear-gradient(135deg, #4A90E2 0%, #7B68EE 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    font-size: 22px;
+    font-weight: 600;
+    color: #1d1d1f;
     line-height: 1.2;
+    letter-spacing: -0.02em;
   }
 
   .meta-refresh {
@@ -1498,26 +1512,23 @@ defineExpose({
   overflow-y: auto;
   padding: 0 1rem 120px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(100, 150, 255, 0.3) transparent;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
 
   &::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
   }
 
   &::-webkit-scrollbar-track {
-    background: rgba(240, 245, 255, 0.3);
-    border-radius: 10px;
+    background: transparent;
+    border-radius: 3px;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, rgba(100, 150, 255, 0.4) 0%, rgba(150, 100, 255, 0.4) 100%);
-    border-radius: 10px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
     
     &:hover {
-      background: linear-gradient(135deg, rgba(100, 150, 255, 0.6) 0%, rgba(150, 100, 255, 0.6) 100%);
-      background-clip: padding-box;
+      background: rgba(0, 0, 0, 0.3);
     }
   }
 }
@@ -1525,24 +1536,29 @@ defineExpose({
 .groups-container {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
 .order-group {
-  border: 1px solid rgba(200, 220, 255, 0.4);
+  border: none;
   border-radius: 16px;
-  background: linear-gradient(135deg, rgba(250, 252, 255, 0.9) 0%, rgba(248, 250, 255, 0.9) 100%);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 4px 16px rgba(100, 150, 255, 0.1);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   overflow: hidden;
-  transition: all 0.3s ease;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
   
   &:hover {
-    box-shadow: 0 6px 24px rgba(100, 150, 255, 0.15);
-    border-color: rgba(100, 150, 255, 0.5);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
   }
-
+  
   .group-header {
     display: flex;
     align-items: center;
@@ -1550,12 +1566,16 @@ defineExpose({
     padding: 1rem 1.25rem;
     cursor: pointer;
     user-select: none;
-    background: linear-gradient(135deg, rgba(240, 248, 255, 0.7) 0%, rgba(245, 240, 255, 0.7) 100%);
-    border-bottom: 1px solid rgba(200, 220, 255, 0.3);
-    transition: all 0.2s ease;
+    background: transparent;
+    border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+    transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     
     &:hover {
-      background: linear-gradient(135deg, rgba(235, 245, 255, 0.8) 0%, rgba(240, 235, 255, 0.8) 100%);
+      background: rgba(0, 0, 0, 0.02);
+    }
+    
+    &:active {
+      background: rgba(0, 0, 0, 0.04);
     }
     
     .collapse-icon {
@@ -1577,13 +1597,15 @@ defineExpose({
     }
 
     .group-count {
-      color: #6B7A99;
-      font-size: 12px;
+      color: #86868b;
+      font-size: 13px;
       font-weight: 500;
-      padding: 0.2rem 0.5rem;
-      background: rgba(100, 150, 255, 0.1);
+      padding: 0.25rem 0.5rem;
+      background: rgba(0, 0, 0, 0.05);
       border-radius: 8px;
-      border: 1px solid rgba(100, 150, 255, 0.2);
+      border: none;
+      flex-shrink: 0;
+      white-space: nowrap;
     }
 
     .group-header__content {
@@ -1606,26 +1628,33 @@ defineExpose({
       gap: 0.75rem;
       flex-wrap: nowrap;
       min-width: 0;
+      flex: 1;
+      overflow: hidden;
     }
 
     .detail-btn {
-      color: #4A90E2;
-      font-size: 12px;
+      color: #007aff;
+      font-size: 13px;
       font-weight: 500;
       padding: 0.4rem 0.75rem;
-      margin-left: auto;
+      margin-left: 0.75rem;
       flex-shrink: 0;
-      border-radius: 10px;
-      background: rgba(74, 144, 226, 0.08);
-      border: 1px solid rgba(74, 144, 226, 0.2);
-      transition: all 0.2s ease;
+      border-radius: 8px;
+      background: rgba(0, 122, 255, 0.1);
+      border: none;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      white-space: nowrap;
       
       &:hover {
-        color: white;
-        background: linear-gradient(135deg, #4A90E2 0%, #7B68EE 100%);
-        border-color: transparent;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+        color: #ffffff;
+        background: #007aff;
+        border: none;
+        transform: none;
+        box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+      }
+      
+      &:active {
+        transform: scale(0.96);
       }
     }
 
@@ -1633,20 +1662,24 @@ defineExpose({
       display: inline-flex;
       align-items: center;
       gap: 0.4rem;
-      padding: 0.35rem 0.75rem;
-      border-radius: 12px;
-      border: 1px solid rgba(100, 220, 180, 0.4);
-      background: linear-gradient(135deg, rgba(100, 255, 200, 0.15) 0%, rgba(100, 240, 200, 0.15) 100%);
-      color: #2d9950;
+      padding: 0.3rem 0.65rem;
+      border-radius: 10px;
+      border: none;
+      background: rgba(52, 199, 89, 0.12);
+      color: #34c759;
       font-size: 12px;
-      flex-shrink: 0;
-      white-space: nowrap;
-      box-shadow: 0 2px 6px rgba(100, 220, 180, 0.1);
-      transition: all 0.2s ease;
+      font-weight: 500;
+      flex-shrink: 1;
+      min-width: 0;
+      max-width: 100%;
+      box-shadow: none;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
       
       &:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(100, 220, 180, 0.2);
+        transform: none;
+        box-shadow: none;
+        background: rgba(52, 199, 89, 0.18);
       }
     }
 
@@ -1659,33 +1692,52 @@ defineExpose({
     .group-category__value {
       font-weight: 600;
       color: #2d9950;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
     }
   }
 
   .group-content {
-    padding: 1.25rem;
+    padding: 1rem 1.25rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(250, 252, 255, 0.3) 100%);
+    background: transparent;
   }
 }
 
 .chip {
-  padding: 0.1rem 0.4rem;
-  border-radius: 999px;
-  font-size: 11px;
-  border: 1px solid @apple-border;
-  background: rgba(255, 255, 255, 0.9);
+  padding: 0.35rem 0.75rem;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
   &.chip-order {
-    border-color: rgba(0, 122, 255, 0.25);
+    background: rgba(0, 122, 255, 0.12);
     color: #007aff;
+    
+    &:hover {
+      background: rgba(0, 122, 255, 0.18);
+      box-shadow: 0 2px 6px rgba(0, 122, 255, 0.2);
+    }
   }
 
   &.chip-category {
-    border-color: rgba(52, 199, 89, 0.25);
+    background: rgba(52, 199, 89, 0.12);
     color: #34c759;
+    
+    &:hover {
+      background: rgba(52, 199, 89, 0.18);
+      box-shadow: 0 2px 6px rgba(52, 199, 89, 0.2);
+    }
   }
 }
 
@@ -1694,14 +1746,19 @@ defineExpose({
   grid-template-columns: 140px 1fr;
   gap: 0.75rem;
   padding: 1rem;
-  border: 1px solid rgba(200, 220, 255, 0.4);
-  border-radius: 14px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(250, 252, 255, 0.9) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   position: relative;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(100, 150, 255, 0.08);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  margin-bottom: 0.5rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 
   &--text-only {
     grid-template-columns: 1fr;
@@ -1722,56 +1779,98 @@ defineExpose({
   }
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(100, 150, 255, 0.15);
-    border-color: rgba(100, 150, 255, 0.5);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(0, 0, 0, 0.12);
   }
+}
+
+.order-item__subtitle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  width: 100%;
 }
 
 .order-item__subtitle {
-  grid-column: 1 / -1;
   font-size: 11px;
-  color: #6B7A99;
-  margin-bottom: 0.15rem;
+  color: #86868b;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  padding: 0.2rem 0.5rem;
-  background: rgba(100, 150, 255, 0.08);
-  border-radius: 4px;
+  letter-spacing: 0.5px;
+  padding: 0.25rem 0.5rem;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 6px;
   display: inline-block;
   width: fit-content;
   line-height: 1.3;
+  flex: 1;
+  min-width: 0;
 }
 
-.order-item__undo {
+// 统一的撤销按钮样式
+.order-item__undo,
+.undo-btn {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 8px;
+  right: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  border: 1px solid @apple-border;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  width: auto;
+  height: auto;
+  border: none;
+  background: transparent;
+  box-shadow: none;
   cursor: pointer;
   opacity: 1;
-  transition: transform 0.2s ease, background 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 2;
+  padding: 0;
 
   img {
-    width: 11px;
-    height: 11px;
+    width: 18px;
+    height: 18px;
     pointer-events: none;
+    opacity: 0.6;
+    display: block;
   }
 
   &:hover {
-    transform: translateY(-1px);
-    background: #fff;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transform: none;
+    background: transparent;
+    box-shadow: none;
+    
+    img {
+      opacity: 1;
+    }
+  }
+  
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+// 小标题行中的撤销按钮（内联样式）
+.order-item__undo-inline {
+  position: relative;
+  top: auto;
+  right: auto;
+  flex-shrink: 0;
+  width: auto;
+  height: auto;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  margin-left: auto;
+  padding: 0;
+  
+  img {
+    width: 18px;
+    height: 18px;
   }
 }
 
@@ -1781,56 +1880,88 @@ defineExpose({
   gap: 0.5rem;
 }
 
-.order-item__image,
-.order-item__text {
+.order-item__image {
   position: relative;
-  border: 1px solid rgba(200, 220, 255, 0.4);
-  border-radius: 12px;
-  padding: 0.75rem;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 252, 255, 0.95) 100%);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-items: stretch;
+  overflow: hidden;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 6px rgba(100, 150, 255, 0.06);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: none;
   flex: 1;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(100, 150, 255, 0.15);
-    border-color: rgba(100, 150, 255, 0.5);
+    transform: none;
+    box-shadow: none;
+    border-color: transparent;
+    background: transparent;
+  }
+  
+  &:active {
+    transform: none;
   }
 
-  .undo-btn {
-    position: absolute;
-    top: 4px;
-    right: 4px;
+  .image-thumb {
+    width: 100%;
+    height: 120px;
+    border-radius: 10px;
+    object-fit: cover;
+    box-shadow: none;
+    transition: none;
+  }
+  
+  &:hover .image-thumb {
+    box-shadow: none;
+    transform: none;
+  }
+
+  .image-placeholder,
+  .image-error {
+    width: 100%;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    border-radius: 999px;
-    border: 1px solid @apple-border;
-    background: rgba(255, 255, 255, 0.95);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-    cursor: pointer;
-    opacity: 1;
-    transition: transform 0.2s ease, background 0.2s ease;
-
-    &:hover {
-      transform: translateY(-1px);
-      background: #fff;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-    }
-
-    img {
-      width: 11px;
-      height: 11px;
-      pointer-events: none;
-    }
+    color: #86868b;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 10px;
+    font-size: 12px;
   }
+}
+
+.order-item__text {
+  position: relative;
+  border: 0.5px solid rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  flex: 1;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border-color: rgba(0, 0, 0, 0.12);
+    background: rgba(255, 255, 255, 0.8);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+
+  // 文字容器中的撤销按钮使用统一样式，已在上面定义
 }
 
 .order-item__text {
@@ -1847,24 +1978,28 @@ defineExpose({
   width: 44px;
   height: 44px;
   padding: 0;
-  border: 1px solid rgba(200, 220, 255, 0.4);
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 252, 255, 0.95) 100%);
+  border: 0.5px solid rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  color: #4A90E2;
+  color: #1d1d1f;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 6px rgba(100, 150, 255, 0.06);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   display: flex;
   align-items: center;
   justify-content: center;
   
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(100, 150, 255, 0.15);
-    border-color: rgba(100, 150, 255, 0.5);
-    background: linear-gradient(135deg, rgba(240, 248, 255, 0.95) 0%, rgba(245, 240, 255, 0.95) 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border-color: rgba(0, 0, 0, 0.12);
+    background: rgba(255, 255, 255, 0.8);
+  }
+  
+  &:active {
+    transform: translateY(0);
   }
   
   .add-icon {
@@ -1874,49 +2009,26 @@ defineExpose({
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #4A90E2;
+    color: #1d1d1f;
   }
 }
 
-.order-item__image {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  align-items: stretch;
-
-  .image-thumb {
-    width: 100%;
-    height: 120px;
-    border-radius: 8px;
-    object-fit: cover;
-  }
-
-  .image-placeholder,
-  .image-error {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: @apple-text-secondary;
-  }
-
-}
 
 .empty-state {
   margin-top: 4rem;
   text-align: center;
   padding: 3rem 2rem;
-  color: #9BA5B7;
+  color: #86868b;
   
   p {
     margin: 0.5rem 0;
     font-size: 14px;
+    letter-spacing: -0.01em;
     
     &:first-child {
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 600;
-      color: #6B7A99;
+      color: #1d1d1f;
       margin-bottom: 0.75rem;
     }
   }

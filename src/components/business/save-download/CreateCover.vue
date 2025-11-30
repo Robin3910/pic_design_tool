@@ -69,21 +69,76 @@ async function createCover(cb: any) {
 async function createPoster() {
   await checkFonts() // 等待字体加载完成
   const fonts = document.fonts
+  
+  // 获取原始页面元素
+  const originalPage = document.getElementById('page-design-canvas')
+  if (!originalPage) {
+    return Promise.resolve({ blob: null })
+  }
+  
+  // 收集所有图片的位置和brightness值
+  const widgets = widgetStore.getWidgets()
+  const brightnessData = new Map<string, { brightness: number; left: number; top: number; width: number; height: number }>()
+  const scale = 100 / dZoom.value
+  
+  widgets.forEach((widget: any) => {
+    if (widget.type === 'w-image' && widget.uuid && widget.brightness !== undefined && widget.brightness !== null && widget.brightness !== 1) {
+      // 获取widget在画布上的实际位置
+      const widgetEl = originalPage.querySelector(`[data-uuid="${widget.uuid}"]`) as HTMLElement
+      if (widgetEl) {
+        const rect = widgetEl.getBoundingClientRect()
+        const canvasRect = originalPage.getBoundingClientRect()
+        brightnessData.set(widget.uuid, {
+          brightness: widget.brightness,
+          left: (rect.left - canvasRect.left) * scale,
+          top: (rect.top - canvasRect.top) * scale,
+          width: rect.width * scale,
+          height: rect.height * scale,
+        })
+      }
+    }
+  })
+  
   const opts = {
     backgroundColor: null, // 关闭背景以支持透明图片生成
     useCORS: true,
-    scale: 100 / dZoom.value, // * window.devicePixelRatio
-    onclone: (document: any) => fonts.forEach((font) => document.fonts.add(font)),
+    scale: scale,
+    onclone: (clonedDoc: Document, element: HTMLElement) => {
+      // 添加字体
+      fonts.forEach((font) => clonedDoc.fonts.add(font))
+    },
   }
-  // const style = document.createElement('style')
-  // document.head.appendChild(style)
-  // style.sheet?.insertRule('body > img { display: initial; }')
+  
   return new Promise((resolve) => {
-    const clonePage = document.getElementById('page-design-canvas')?.cloneNode(true) as HTMLElement
+    const clonePage = originalPage.cloneNode(true) as HTMLElement
     if (!clonePage) return
     clonePage.setAttribute('id', 'clone-page')
     document.body.appendChild(clonePage)
     html2canvas(clonePage, opts).then((canvas) => {
+      // 如果图片有brightness设置，使用Canvas API手动应用
+      if (brightnessData.size > 0) {
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          brightnessData.forEach((data, uuid) => {
+            const { brightness, left, top, width, height } = data
+            // 获取该区域的图像数据
+            const imgData = ctx.getImageData(left, top, width, height)
+            const pixels = imgData.data
+            
+            // 应用brightness效果
+            for (let i = 0; i < pixels.length; i += 4) {
+              pixels[i] = Math.min(255, pixels[i] * brightness)     // R
+              pixels[i + 1] = Math.min(255, pixels[i + 1] * brightness) // G
+              pixels[i + 2] = Math.min(255, pixels[i + 2] * brightness) // B
+              // pixels[i + 3] 保持 alpha 不变
+            }
+            
+            // 将处理后的数据写回canvas
+            ctx.putImageData(imgData, left, top)
+          })
+        }
+      }
+      
       canvas.toBlob(async (blob) => resolve({ blob }), `image/png`)
       clonePage.remove()
     })
