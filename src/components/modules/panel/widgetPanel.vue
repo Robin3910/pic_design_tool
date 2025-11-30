@@ -278,7 +278,7 @@ defineExpose({
     position: absolute;
     left: 394px;
     pointer-events: none;
-    z-index: 99;
+    z-index: 9;
     width: 20px;
     height: 100%;
     display: flex;

@@ -370,7 +370,7 @@ defineExpose({
   bottom: 10px;
   position: absolute;
   right: 16px;
-  z-index: 1000;
+  z-index: 9;
   .zoom-control-wrap {
     display: flex;
     flex-direction: row;
@@ -435,7 +435,7 @@ defineExpose({
     top: -8px;
     transform: translateY(-100%);
     width: 100%;
-    z-index: 1000;
+    z-index: 9;
     &:after {
       bottom: -8px;
       content: '';

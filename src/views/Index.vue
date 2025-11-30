@@ -232,10 +232,8 @@ function zoomAdd() {
 }
 
 function save() {
-  // 保存功能已注释，依赖后端服务
-  // if (!optionsRef.value) return
-  // optionsRef.value.save()
-  console.log('保存功能已禁用 - 依赖后端服务')
+  // Ctrl+S 快捷键触发上传图片
+  handleSave()
 }
 
 function handleSave() {

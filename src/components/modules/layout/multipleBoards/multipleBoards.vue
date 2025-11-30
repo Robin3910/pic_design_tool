@@ -161,7 +161,7 @@ function removePoster(removeIndex: number) {
 <style lang="less" scoped>
 .artboards {
   left: 0;
-  z-index: 99;
+  z-index: 9;
   padding: 0 12px;
   font-size: 14px;
   color: #666666;
