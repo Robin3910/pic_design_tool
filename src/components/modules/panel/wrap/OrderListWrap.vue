@@ -14,7 +14,27 @@
         <i v-else class="el-icon-loading" />
       </el-button>
     </div>
-    <div style="height: 0.5rem" />
+    <div class="order-meta" v-if="groupStats.totalItems > 0">
+      <div class="meta-counts">
+        <div class="meta-item">
+          <span class="meta-label">订单</span>
+          <span class="meta-value">{{ groupStats.totalGroups }}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">素材</span>
+          <span class="meta-value">{{ groupStats.totalItems }}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">图片</span>
+          <span class="meta-value">{{ groupStats.imageCount }}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">文字</span>
+          <span class="meta-value">{{ groupStats.textCount }}</span>
+        </div>
+      </div>
+    </div>
+    <div style="height: 0.25rem" />
     <div
       ref="scrollContainerRef"
       v-infinite-scroll="load"
@@ -39,7 +59,23 @@
                   state.expandedGroups.has(group.sortId) ? 'el-icon-arrow-down' : 'el-icon-arrow-right'
                 ]"
               ></i>
-              <span class="group-title">{{ getGroupTitle(group) }}</span>
+              <div class="group-header__content">
+                <div class="group-title-row">
+                  <div v-if="group.categoryName" class="group-category-chip">
+                    <span class="group-category__label">类目</span>
+                    <span class="group-category__value">{{ group.categoryName }}</span>
+                  </div>
+                </div>
+              </div>
+              <el-button
+                text
+                size="small"
+                class="detail-btn"
+                @click.stop="handleViewDetail(group)"
+                title="查看详情"
+              >
+                查看详情
+              </el-button>
               <span class="group-count">({{ group.items.length }})</span>
             </div>
             <div v-show="state.expandedGroups.has(group.sortId)" class="group-content">
@@ -49,9 +85,21 @@
                 class="order-item"
                 :class="{
                   'order-item--text-only': item.text && !item.image,
-                  'order-item--image-only': item.image && !item.text
+                  'order-item--image-only': item.image && !item.text,
+                  'order-item--stacked': item.image && item.text
                 }"
               >
+                <div v-if="getItemSubtitle(item)" class="order-item__subtitle">
+                  {{ getItemSubtitle(item) }}
+                </div>
+                <div
+                  v-if="item.image && item.text"
+                  class="undo-btn order-item__undo"
+                  @click.stop="handleDeleteOrderItem(item)"
+                  title="撤销"
+                >
+                  <img src="/删除.svg" alt="删除" />
+                </div>
                 <div
                   v-if="item.image"
                   class="order-item__image"
@@ -76,24 +124,43 @@
                       </div>
                     </template>
                   </el-image>
-                  <div class="image-name">{{ item.image.name }}</div>
-                  <div class="undo-btn" @click.stop="handleDeleteImage(item.image)" title="撤销">
+                  <div
+                    v-if="item.image && !item.text"
+                    class="undo-btn"
+                    @click.stop="handleDeleteImage(item.image)"
+                    title="撤销"
+                  >
                     <img src="/删除.svg" alt="删除" />
                   </div>
                 </div>
                 <div
                   v-if="item.text"
-                  class="order-item__text"
-                  @click="selectText(item.text)"
-                  @mousedown="dragTextStart($event, item.text)"
+                  class="order-item__text-wrapper"
                 >
-                  <div class="text-content">
-                    {{ item.text.text }}
+                  <div
+                    class="order-item__text"
+                    @click="selectText(item.text)"
+                    @mousedown="dragTextStart($event, item.text)"
+                  >
+                    <div class="text-content">
+                      {{ item.text.text }}
+                    </div>
+                    <div
+                      v-if="item.text && !item.image"
+                      class="undo-btn"
+                      @click.stop="handleDeleteText(item.text)"
+                      title="撤销"
+                    >
+                      <img src="/删除.svg" alt="删除" />
+                    </div>
                   </div>
-                  <div class="text-name">{{ item.text.name }}</div>
-                  <div class="undo-btn" @click.stop="handleDeleteText(item.text)" title="撤销">
-                    <img src="/删除.svg" alt="删除" />
-                  </div>
+                  <button
+                    class="add-text-btn"
+                    @click.stop="handleAddCustomText"
+                    title="添加自定义文字"
+                  >
+                    <span class="add-icon">+</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -103,6 +170,186 @@
       <div v-show="state.loading" class="loading"><i class="el-icon-loading" /> 拼命加载中</div>
       <div v-show="state.loadDone && state.groups.length > 0" class="loading">全部加载完毕</div>
     </div>
+    
+    <!-- 订单详情弹窗 - 使用 Teleport 传送到 body -->
+    <Teleport to="body">
+      <el-dialog
+        v-model="state.detailVisible"
+        title="订单详情"
+        width="1400px"
+        :before-close="handleDetailClose"
+        class="order-detail-dialog"
+        align-center
+      >
+      <div v-if="state.loadingDetail" class="detail-loading">
+        <i class="el-icon-loading" /> 加载中...
+      </div>
+      <div v-else-if="state.taskDetail" class="detail-content">
+        <div class="detail-item detail-item--inline">
+          <div class="detail-inline-group">
+            <span class="detail-label">订单号：</span>
+            <span class="detail-value">{{ state.taskDetail.orderNo || state.taskDetail.order_no || '-' }}</span>
+          </div>
+          <div class="detail-inline-group">
+            <span class="detail-label">类目名称：</span>
+            <span class="detail-value">{{ state.taskDetail.categoryName || state.taskDetail.category_name || '-' }}</span>
+          </div>
+          <div class="detail-inline-group">
+            <span class="detail-label">SKU编号：</span>
+            <span class="detail-value">{{ state.taskDetail.sku || '-' }}</span>
+          </div>
+        </div>
+        <div class="detail-item detail-item--images">
+          <span class="detail-label">原始套图URL：</span>
+          <div class="detail-images">
+            <div
+              v-for="(url, index) in parseUrlList(state.taskDetail.setImageUrls || state.taskDetail.set_image_urls)"
+              :key="`original-${index}`"
+              class="detail-image-item"
+            >
+              <el-image
+                :src="url"
+                :preview-src-list="parseUrlList(state.taskDetail.setImageUrls || state.taskDetail.set_image_urls)"
+                :initial-index="index"
+                fit="contain"
+                lazy
+                loading="lazy"
+                class="detail-image"
+                preview-teleported
+              >
+                <template #placeholder>
+                  <div class="image-placeholder">
+                    <i class="el-icon-picture"></i>
+                  </div>
+                </template>
+                <template #error>
+                  <div class="image-error">
+                    <i class="el-icon-warning"></i>
+                  </div>
+                </template>
+              </el-image>
+            </div>
+            <div v-if="parseUrlList(state.taskDetail.setImageUrls || state.taskDetail.set_image_urls).length === 0" class="detail-empty">
+              暂无图片
+            </div>
+          </div>
+        </div>
+        <div class="detail-item detail-item--images">
+          <span class="detail-label">新套图URL：</span>
+          <div class="detail-images">
+            <div
+              v-for="(url, index) in parseUrlList(state.taskDetail.newSetImageUrls || state.taskDetail.new_set_image_urls)"
+              :key="`new-${index}`"
+              class="detail-image-item"
+            >
+              <el-image
+                :src="url"
+                :preview-src-list="parseUrlList(state.taskDetail.newSetImageUrls || state.taskDetail.new_set_image_urls)"
+                :initial-index="index"
+                fit="contain"
+                lazy
+                loading="lazy"
+                class="detail-image"
+                preview-teleported
+              >
+                <template #placeholder>
+                  <div class="image-placeholder">
+                    <i class="el-icon-picture"></i>
+                  </div>
+                </template>
+                <template #error>
+                  <div class="image-error">
+                    <i class="el-icon-warning"></i>
+                  </div>
+                </template>
+              </el-image>
+            </div>
+            <div v-if="parseUrlList(state.taskDetail.newSetImageUrls || state.taskDetail.new_set_image_urls).length === 0" class="detail-empty">
+              暂无图片
+            </div>
+          </div>
+        </div>
+        <div class="detail-item detail-item--images">
+          <span class="detail-label">定制图片URL：</span>
+          <div class="detail-images">
+            <div
+              v-for="(url, index) in parseUrlList(state.taskDetail.customImageUrls || state.taskDetail.custom_image_urls)"
+              :key="`custom-${index}`"
+              class="detail-image-item"
+            >
+              <el-image
+                :src="url"
+                :preview-src-list="parseUrlList(state.taskDetail.customImageUrls || state.taskDetail.custom_image_urls)"
+                :initial-index="index"
+                fit="contain"
+                lazy
+                loading="lazy"
+                class="detail-image"
+                preview-teleported
+              >
+                <template #placeholder>
+                  <div class="image-placeholder">
+                    <i class="el-icon-picture"></i>
+                  </div>
+                </template>
+                <template #error>
+                  <div class="image-error">
+                    <i class="el-icon-warning"></i>
+                  </div>
+                </template>
+              </el-image>
+            </div>
+            <div v-if="parseUrlList(state.taskDetail.customImageUrls || state.taskDetail.custom_image_urls).length === 0" class="detail-empty">
+              暂无图片
+            </div>
+          </div>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">定制文字列表：</span>
+          <div class="detail-value">
+            {{ state.taskDetail.customTextList || state.taskDetail.custom_text_list || '-' }}
+          </div>
+        </div>
+        <div class="detail-item detail-item--images">
+          <span class="detail-label">合成预览图：</span>
+          <div class="detail-images">
+            <div
+              v-if="state.taskDetail.effectiveImgUrl || state.taskDetail.effective_img_url"
+              class="detail-image-item"
+            >
+              <el-image
+                :src="state.taskDetail.effectiveImgUrl || state.taskDetail.effective_img_url"
+                :preview-src-list="[state.taskDetail.effectiveImgUrl || state.taskDetail.effective_img_url]"
+                :initial-index="0"
+                fit="contain"
+                lazy
+                loading="lazy"
+                class="detail-image"
+                preview-teleported
+              >
+                <template #placeholder>
+                  <div class="image-placeholder">
+                    <i class="el-icon-picture"></i>
+                  </div>
+                </template>
+                <template #error>
+                  <div class="image-error">
+                    <i class="el-icon-warning"></i>
+                  </div>
+                </template>
+              </el-image>
+            </div>
+            <div v-else class="detail-empty">
+              暂无图片
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="handleDetailClose">关闭</el-button>
+      </template>
+      </el-dialog>
+    </Teleport>
   </div>
 </template>
 
@@ -157,6 +404,20 @@ type TOrderGroup = {
   items: TOrderItem[]
 }
 
+type TTaskDetail = {
+  id?: number
+  orderNo?: string
+  categoryName?: string
+  setImageUrls?: string
+  sku?: string
+  newSetImageUrls?: string
+  hdImages?: string
+  customImageUrls?: string
+  customTextList?: string
+  effectiveImgUrl?: string
+  [key: string]: any
+}
+
 type TState = {
   groups: TOrderGroup[]
   groupOrder: Array<number | string>
@@ -164,6 +425,11 @@ type TState = {
   loadDone: boolean
   refreshing: boolean
   expandedGroups: Set<number | string>
+  lastUpdated: string | null
+  detailVisible: boolean
+  selectedGroup: TOrderGroup | null
+  taskDetail: TTaskDetail | null
+  loadingDetail: boolean
 }
 
 const controlStore = useControlStore()
@@ -177,6 +443,11 @@ const state = reactive<TState>({
   loadDone: false,
   refreshing: false,
   expandedGroups: new Set<number | string>(),
+  lastUpdated: null,
+  detailVisible: false,
+  selectedGroup: null,
+  taskDetail: null,
+  loadingDetail: false,
 })
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
@@ -195,6 +466,38 @@ const orderedGroups = computed(() => {
     .filter((group): group is TOrderGroup => Boolean(group))
 })
 
+const groupStats = computed(() => {
+  const totals = {
+    totalGroups: state.groups.length,
+    totalItems: 0,
+    imageCount: 0,
+    textCount: 0,
+  }
+  state.groups.forEach((group) => {
+    totals.totalItems += group.items.length
+    group.items.forEach((item) => {
+      if (item.image) {
+        totals.imageCount += 1
+      }
+      if (item.text) {
+        totals.textCount += 1
+      }
+    })
+  })
+  return totals
+})
+
+const lastUpdatedText = computed(() => {
+  if (!state.lastUpdated) {
+    return ''
+  }
+  const date = new Date(state.lastUpdated)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`
+})
+
 const toggleGroup = (sortId: number | string) => {
   if (state.expandedGroups.has(sortId)) {
     state.expandedGroups.delete(sortId)
@@ -203,18 +506,16 @@ const toggleGroup = (sortId: number | string) => {
   }
 }
 
-const getGroupTitle = (group: TOrderGroup) => {
-  const parts: string[] = []
-  if (group.orderNo) {
-    parts.push(`订单: ${group.orderNo}`)
-  }
-  if (group.categoryName) {
-    parts.push(`类目: ${group.categoryName}`)
-  }
-  if (!parts.length) {
-    parts.push(`任务ID: ${group.sortId}`)
-  }
-  return parts.join(' | ')
+const getGroupOrderLabel = (group: TOrderGroup) => {
+  return group.orderNo ? '订单号' : '任务ID'
+}
+
+const getGroupOrderValue = (group: TOrderGroup) => {
+  return group.orderNo || String(group.sortId)
+}
+
+const getItemSubtitle = (item: TOrderItem) => {
+  return item.sortIndex != null ? String(item.sortIndex) : ''
 }
 
 const parseNeedRedrawIndices = (raw: any): number[] => {
@@ -541,12 +842,35 @@ const loadOrderData = async (init = false) => {
     const groups = buildCombinedGroups(textData.map, imageData.map, textData.order, imageData.order)
     mergeGroups(groups)
 
-    const latestImage = groups.find((group) => group.items.some((item) => item.image))
-    const previewImage = latestImage?.items.find((item) => item.image)?.image?.url
-    if (previewImage) {
-      controlStore.setPreviewImageUrl(previewImage)
-    } else if (init) {
-      controlStore.setPreviewImageUrl(null)
+    // 设置预览窗图片 - 查找第一条数据的 effectiveImgUrl
+    if (init) {
+      let previewUrl: string | null = null
+      
+      // 查找第一条有 effectiveImgUrl 的数据
+      for (const group of groups) {
+        if (group.items.length > 0) {
+          const sortId = group.items[0].sortId
+          if (sortId) {
+            const taskId = typeof sortId === 'string' ? parseInt(sortId, 10) : sortId
+            if (!isNaN(taskId)) {
+              const taskData = taskRecordCache.get(taskId)
+              if (taskData) {
+                const effectiveImgUrl = (taskData as any).effectiveImgUrl ?? (taskData as any).effective_img_url
+                if (effectiveImgUrl && typeof effectiveImgUrl === 'string' && effectiveImgUrl.trim().length > 0) {
+                  previewUrl = effectiveImgUrl.trim()
+                  break
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      if (previewUrl) {
+        controlStore.setPreviewImageUrl(previewUrl)
+      } else {
+        controlStore.setPreviewImageUrl(null)
+      }
     }
 
     const noMoreText = textList.length < pageOptions.pageSize
@@ -556,6 +880,7 @@ const loadOrderData = async (init = false) => {
     } else {
       pageOptions.pageNo += 1
     }
+    state.lastUpdated = new Date().toISOString()
   } catch (error) {
     console.error('加载订单数据失败:', error)
     if (init) {
@@ -571,8 +896,58 @@ const load = () => {
   loadOrderData(false)
 }
 
-const selectText = (text: TTextData) => {
+const handleAddCustomText = () => {
   controlStore.setShowMoveable(false)
+  
+  const setting = JSON.parse(JSON.stringify(wTextSetting))
+  const lastFont = getLastSelectedFont()
+  if (lastFont) {
+    setting.fontClass = lastFont
+    setting.fontFamily = lastFont.value
+  }
+  setting.text = '自定义文字'
+  setting.fontSize = 24
+  setting.fontWeight = 'normal'
+  setting.name = '文本'
+  setting.type = 'w-text'
+  setting.sortId = ''
+  setting.sortIndex = undefined
+
+  const { width: pW, height: pH } = dPage.value
+  const textWidth = setting.text.length * setting.fontSize * 0.6
+  setting.left = pW / 2 - textWidth / 2
+  setting.top = pH / 2 - setting.fontSize / 2
+
+  widgetStore.addWidget(setting)
+}
+
+const selectText = async (text: TTextData) => {
+  controlStore.setShowMoveable(false)
+  
+  // 设置预览窗图片 - 查找对应的 effectiveImgUrl
+  if (text.sortId) {
+    const taskId = typeof text.sortId === 'string' ? parseInt(text.sortId, 10) : text.sortId
+    if (!isNaN(taskId)) {
+      let taskData = taskRecordCache.get(taskId)
+      if (!taskData) {
+        try {
+          taskData = await api.redrawTask.getRedrawTaskById(taskId)
+          if (taskData) {
+            taskRecordCache.set(taskId, taskData)
+          }
+        } catch (error) {
+          console.error('获取任务详情失败:', error)
+        }
+      }
+      if (taskData) {
+        const effectiveImgUrl = (taskData as any).effectiveImgUrl ?? (taskData as any).effective_img_url
+        if (effectiveImgUrl && typeof effectiveImgUrl === 'string' && effectiveImgUrl.trim().length > 0) {
+          controlStore.setPreviewImageUrl(effectiveImgUrl.trim())
+        }
+      }
+    }
+  }
+  
   const setting = JSON.parse(JSON.stringify(wTextSetting))
   const lastFont = getLastSelectedFont()
   if (lastFont) {
@@ -582,6 +957,8 @@ const selectText = (text: TTextData) => {
   setting.text = text.text
   setting.fontSize = text.fontSize
   setting.fontWeight = text.fontWeight
+  setting.name = '文本'
+  setting.type = 'w-text'
   setting.sortId = text.sortId ?? ''
   setting.sortIndex = text.sortIndex
 
@@ -611,6 +988,31 @@ const dragTextStart = (event: MouseEvent, text: TTextData) => {
 
 const selectLocalImage = async (image: TLocalImage) => {
   controlStore.setShowMoveable(false)
+  
+  // 设置预览窗图片 - 查找对应的 effectiveImgUrl
+  if (image.sortId) {
+    const taskId = typeof image.sortId === 'string' ? parseInt(image.sortId, 10) : image.sortId
+    if (!isNaN(taskId)) {
+      let taskData = taskRecordCache.get(taskId)
+      if (!taskData) {
+        try {
+          taskData = await api.redrawTask.getRedrawTaskById(taskId)
+          if (taskData) {
+            taskRecordCache.set(taskId, taskData)
+          }
+        } catch (error) {
+          console.error('获取任务详情失败:', error)
+        }
+      }
+      if (taskData) {
+        const effectiveImgUrl = (taskData as any).effectiveImgUrl ?? (taskData as any).effective_img_url
+        if (effectiveImgUrl && typeof effectiveImgUrl === 'string' && effectiveImgUrl.trim().length > 0) {
+          controlStore.setPreviewImageUrl(effectiveImgUrl.trim())
+        }
+      }
+    }
+  }
+  
   const setting = JSON.parse(JSON.stringify(wImageSetting))
   const imageData = {
     url: image.url,
@@ -814,6 +1216,19 @@ const handleDeleteImage = async (image: TLocalImage | null) => {
   }
 }
 
+const handleDeleteOrderItem = async (item: TOrderItem) => {
+  if (!item) {
+    return
+  }
+  if (item.image) {
+    await handleDeleteImage(item.image)
+    return
+  }
+  if (item.text) {
+    await handleDeleteText(item.text)
+  }
+}
+
 const handleRefresh = async () => {
   if (state.refreshing) {
     return
@@ -827,14 +1242,118 @@ const handleRefresh = async () => {
   state.refreshing = false
 }
 
+const parseUrlList = (urls?: string | null): string[] => {
+  if (!urls || typeof urls !== 'string') {
+    return []
+  }
+  return urls
+    .split(',')
+    .map((url) => url.trim())
+    .filter((url) => url.length > 0)
+}
+
+const parseTextList = (textList?: string | null): string[] => {
+  if (!textList || typeof textList !== 'string') {
+    return []
+  }
+  // 尝试解析JSON格式
+  if (textList.trim().startsWith('[') && textList.trim().endsWith(']')) {
+    try {
+      const parsed = JSON.parse(textList)
+      if (Array.isArray(parsed)) {
+        return parsed.filter((t) => typeof t === 'string' && t.trim().length > 0).map((t) => t.trim())
+      }
+    } catch {
+      // fall through
+    }
+  }
+  // 按逗号分隔
+  return textList
+    .split(',')
+    .map((text) => text.trim())
+    .filter((text) => text.length > 0)
+}
+
+const handleViewDetail = async (group: TOrderGroup) => {
+  state.selectedGroup = group
+  state.detailVisible = true
+  state.loadingDetail = true
+  state.taskDetail = null
+
+  try {
+    const taskId = typeof group.sortId === 'string' ? parseInt(group.sortId, 10) : group.sortId
+    if (isNaN(taskId)) {
+      ElMessage.error('任务ID格式错误')
+      state.loadingDetail = false
+      return
+    }
+
+    // 先尝试从缓存获取
+    let taskData = taskRecordCache.get(taskId)
+    if (!taskData) {
+      // 从接口获取
+      taskData = await api.redrawTask.getRedrawTaskById(taskId)
+      if (taskData) {
+        taskRecordCache.set(taskId, taskData)
+      }
+    } else {
+      // 即使有缓存，也检查数据是否完整，如果不完整则重新获取
+      const cachedOrderId = (taskData as any).orderId ?? (taskData as any).order_id
+      const cachedOrderNo = (taskData as any).orderNo ?? (taskData as any).order_no
+      if (!cachedOrderId || !cachedOrderNo) {
+        taskData = await api.redrawTask.getRedrawTaskById(taskId)
+        if (taskData) {
+          taskRecordCache.set(taskId, taskData)
+        }
+      }
+    }
+
+    if (taskData) {
+      state.taskDetail = taskData as TTaskDetail
+    } else {
+      ElMessage.error('获取任务详情失败')
+    }
+  } catch (error: any) {
+    console.error('获取任务详情失败:', error)
+    ElMessage.error(error?.message || '获取任务详情失败')
+  } finally {
+    state.loadingDetail = false
+  }
+}
+
+const handleDetailClose = () => {
+  state.detailVisible = false
+  state.selectedGroup = null
+  state.taskDetail = null
+}
+
+// 处理图片预览器遮罩层点击关闭
+const handleImageViewerMaskClick = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  // 检查是否点击的是遮罩层（不是图片本身或工具栏）
+  if (target.classList.contains('el-image-viewer__mask')) {
+    // 查找关闭按钮并触发点击
+    const closeBtn = document.querySelector('.el-image-viewer__close') as HTMLElement
+    if (closeBtn) {
+      closeBtn.click()
+      e.stopPropagation()
+    }
+  }
+}
+
 onMounted(() => {
-  loadOrderData(true)
+  // 监听图片预览器的遮罩层点击事件
+  document.addEventListener('click', handleImageViewerMaskClick, true)
+  // 自动触发刷新按钮
+  handleRefresh()
   eventBus.on('refreshPhotoList', handleRefresh)
   eventBus.on('refreshTextList', handleRefresh)
   eventBus.on('refreshOrderList', handleRefresh)
 })
 
 onBeforeUnmount(() => {
+  // 移除事件监听
+  document.removeEventListener('click', handleImageViewerMaskClick, true)
   eventBus.off('refreshPhotoList', handleRefresh)
   eventBus.off('refreshTextList', handleRefresh)
   eventBus.off('refreshOrderList', handleRefresh)
@@ -865,16 +1384,111 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 0.5rem;
+  padding: 1rem 1rem 0.75rem;
+  margin-bottom: 0.5rem;
 
   .header-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: @apple-text-primary;
+    font-size: 16px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #4A90E2 0%, #7B68EE 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.01em;
   }
 
   .refresh-btn {
-    color: @apple-text-secondary;
+    color: #6B7A99;
+    padding: 0.4rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      color: #4A90E2;
+      background: rgba(74, 144, 226, 0.1);
+      transform: rotate(90deg);
+    }
+  }
+}
+
+.order-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0 1rem;
+  margin-bottom: 0.75rem;
+
+  .meta-counts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .meta-item {
+    border: 1px solid rgba(200, 220, 255, 0.4);
+    border-radius: 14px;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, rgba(240, 248, 255, 0.8) 0%, rgba(245, 240, 255, 0.8) 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(100, 150, 255, 0.08);
+    
+    &:nth-child(1) {
+      background: linear-gradient(135deg, rgba(230, 245, 255, 0.9) 0%, rgba(240, 250, 255, 0.9) 100%);
+      border-color: rgba(100, 180, 255, 0.3);
+    }
+    
+    &:nth-child(2) {
+      background: linear-gradient(135deg, rgba(240, 250, 255, 0.9) 0%, rgba(245, 240, 255, 0.9) 100%);
+      border-color: rgba(150, 150, 255, 0.3);
+    }
+    
+    &:nth-child(3) {
+      background: linear-gradient(135deg, rgba(245, 255, 250, 0.9) 0%, rgba(240, 255, 245, 0.9) 100%);
+      border-color: rgba(100, 220, 180, 0.3);
+    }
+    
+    &:nth-child(4) {
+      background: linear-gradient(135deg, rgba(255, 250, 240, 0.9) 0%, rgba(255, 245, 230, 0.9) 100%);
+      border-color: rgba(255, 180, 100, 0.3);
+    }
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(100, 150, 255, 0.15);
+    }
+  }
+
+  .meta-label {
+    font-size: 11px;
+    color: #6B7A99;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .meta-value {
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #4A90E2 0%, #7B68EE 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.2;
+  }
+
+  .meta-refresh {
+    font-size: 11px;
+    color: #9BA5B7;
+    text-align: right;
+    padding: 0.25rem 0.5rem;
+    background: rgba(240, 245, 255, 0.5);
+    border-radius: 8px;
+    border: 1px solid rgba(200, 220, 255, 0.3);
   }
 }
 
@@ -882,46 +1496,79 @@ defineExpose({
   width: 100%;
   height: 100%;
   overflow-y: auto;
-  padding: 0 0.75rem 120px;
+  padding: 0 1rem 120px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+  scrollbar-color: rgba(100, 150, 255, 0.3) transparent;
 
   &::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
   }
 
   &::-webkit-scrollbar-track {
-    background: transparent;
+    background: rgba(240, 245, 255, 0.3);
+    border-radius: 10px;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 3px;
+    background: linear-gradient(135deg, rgba(100, 150, 255, 0.4) 0%, rgba(150, 100, 255, 0.4) 100%);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    
+    &:hover {
+      background: linear-gradient(135deg, rgba(100, 150, 255, 0.6) 0%, rgba(150, 100, 255, 0.6) 100%);
+      background-clip: padding-box;
+    }
   }
 }
 
 .groups-container {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 .order-group {
-  border: 1px solid @apple-border;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.7);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(200, 220, 255, 0.4);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(250, 252, 255, 0.9) 0%, rgba(248, 250, 255, 0.9) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(100, 150, 255, 0.1);
   overflow: hidden;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    box-shadow: 0 6px 24px rgba(100, 150, 255, 0.15);
+    border-color: rgba(100, 150, 255, 0.5);
+  }
 
   .group-header {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
     cursor: pointer;
     user-select: none;
-    background: rgba(255, 255, 255, 0.6);
-    border-bottom: 1px solid @apple-border;
+    background: linear-gradient(135deg, rgba(240, 248, 255, 0.7) 0%, rgba(245, 240, 255, 0.7) 100%);
+    border-bottom: 1px solid rgba(200, 220, 255, 0.3);
+    transition: all 0.2s ease;
+    
+    &:hover {
+      background: linear-gradient(135deg, rgba(235, 245, 255, 0.8) 0%, rgba(240, 235, 255, 0.8) 100%);
+    }
+    
+    .collapse-icon {
+      color: #6B7A99;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      flex-shrink: 0;
+      
+      &:hover {
+        color: #4A90E2;
+        transform: scale(1.1);
+      }
+    }
 
     .group-title {
       color: @apple-text-primary;
@@ -930,15 +1577,115 @@ defineExpose({
     }
 
     .group-count {
-      color: @apple-text-secondary;
+      color: #6B7A99;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 0.2rem 0.5rem;
+      background: rgba(100, 150, 255, 0.1);
+      border-radius: 8px;
+      border: 1px solid rgba(100, 150, 255, 0.2);
+    }
+
+    .group-header__content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      min-width: 0;
+    }
+
+    .group-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+    }
+
+    .group-title-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: nowrap;
+      min-width: 0;
+    }
+
+    .detail-btn {
+      color: #4A90E2;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 0.4rem 0.75rem;
+      margin-left: auto;
+      flex-shrink: 0;
+      border-radius: 10px;
+      background: rgba(74, 144, 226, 0.08);
+      border: 1px solid rgba(74, 144, 226, 0.2);
+      transition: all 0.2s ease;
+      
+      &:hover {
+        color: white;
+        background: linear-gradient(135deg, #4A90E2 0%, #7B68EE 100%);
+        border-color: transparent;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+      }
+    }
+
+    .group-category-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 12px;
+      border: 1px solid rgba(100, 220, 180, 0.4);
+      background: linear-gradient(135deg, rgba(100, 255, 200, 0.15) 0%, rgba(100, 240, 200, 0.15) 100%);
+      color: #2d9950;
+      font-size: 12px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(100, 220, 180, 0.1);
+      transition: all 0.2s ease;
+      
+      &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(100, 220, 180, 0.2);
+      }
+    }
+
+    .group-category__label {
+      font-weight: 500;
+      color: rgba(45, 153, 80, 0.7);
+      font-size: 11px;
+    }
+
+    .group-category__value {
+      font-weight: 600;
+      color: #2d9950;
     }
   }
 
   .group-content {
-    padding: 1rem;
+    padding: 1.25rem;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 1rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(250, 252, 255, 0.3) 100%);
+  }
+}
+
+.chip {
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-size: 11px;
+  border: 1px solid @apple-border;
+  background: rgba(255, 255, 255, 0.9);
+
+  &.chip-order {
+    border-color: rgba(0, 122, 255, 0.25);
+    color: #007aff;
+  }
+
+  &.chip-category {
+    border-color: rgba(52, 199, 89, 0.25);
+    color: #34c759;
   }
 }
 
@@ -946,11 +1693,15 @@ defineExpose({
   display: grid;
   grid-template-columns: 140px 1fr;
   gap: 0.75rem;
-  padding: 0.75rem;
-  border: 1px solid @apple-border;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.8);
+  padding: 1rem;
+  border: 1px solid rgba(200, 220, 255, 0.4);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(250, 252, 255, 0.9) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   position: relative;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(100, 150, 255, 0.08);
 
   &--text-only {
     grid-template-columns: 1fr;
@@ -960,37 +1711,125 @@ defineExpose({
     grid-template-columns: 1fr;
   }
 
-  &:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    border-color: rgba(0, 0, 0, 0.08);
+  &--stacked {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
   }
+
+  &--stacked .order-item__image,
+  &--stacked .order-item__text-wrapper {
+    grid-column: 1 / -1;
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(100, 150, 255, 0.15);
+    border-color: rgba(100, 150, 255, 0.5);
+  }
+}
+
+.order-item__subtitle {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: #6B7A99;
+  margin-bottom: 0.15rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 0.2rem 0.5rem;
+  background: rgba(100, 150, 255, 0.08);
+  border-radius: 4px;
+  display: inline-block;
+  width: fit-content;
+  line-height: 1.3;
+}
+
+.order-item__undo {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid @apple-border;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  opacity: 1;
+  transition: transform 0.2s ease, background 0.2s ease;
+  z-index: 2;
+
+  img {
+    width: 11px;
+    height: 11px;
+    pointer-events: none;
+  }
+
+  &:hover {
+    transform: translateY(-1px);
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  }
+}
+
+.order-item__text-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .order-item__image,
 .order-item__text {
   position: relative;
-  border: 1px solid @apple-border;
-  border-radius: 10px;
-  padding: 0.5rem;
-  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(200, 220, 255, 0.4);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 252, 255, 0.95) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(100, 150, 255, 0.06);
+  flex: 1;
 
   &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(100, 150, 255, 0.15);
+    border-color: rgba(100, 150, 255, 0.5);
   }
 
   .undo-btn {
     position: absolute;
-    top: 6px;
-    right: 6px;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-
-  &:hover .undo-btn {
+    top: 4px;
+    right: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid @apple-border;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+    cursor: pointer;
     opacity: 1;
+    transition: transform 0.2s ease, background 0.2s ease;
+
+    &:hover {
+      transform: translateY(-1px);
+      background: #fff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    img {
+      width: 11px;
+      height: 11px;
+      pointer-events: none;
+    }
   }
 }
 
@@ -1001,11 +1840,41 @@ defineExpose({
     white-space: pre-wrap;
     line-height: 1.5;
   }
+}
 
-  .text-name {
-    margin-top: 0.5rem;
-    font-size: 12px;
-    color: @apple-text-secondary;
+.add-text-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgba(200, 220, 255, 0.4);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 252, 255, 0.95) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #4A90E2;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(100, 150, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(100, 150, 255, 0.15);
+    border-color: rgba(100, 150, 255, 0.5);
+    background: linear-gradient(135deg, rgba(240, 248, 255, 0.95) 0%, rgba(245, 240, 255, 0.95) 100%);
+  }
+  
+  .add-icon {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4A90E2;
   }
 }
 
@@ -1032,23 +1901,396 @@ defineExpose({
     color: @apple-text-secondary;
   }
 
-  .image-name {
-    font-size: 12px;
-    color: @apple-text-secondary;
-    text-align: center;
-  }
 }
 
 .empty-state {
   margin-top: 4rem;
   text-align: center;
-  color: @apple-text-secondary;
+  padding: 3rem 2rem;
+  color: #9BA5B7;
+  
+  p {
+    margin: 0.5rem 0;
+    font-size: 14px;
+    
+    &:first-child {
+      font-size: 16px;
+      font-weight: 600;
+      color: #6B7A99;
+      margin-bottom: 0.75rem;
+    }
+  }
 }
 
 .loading {
   text-align: center;
   padding: 1rem;
   color: @apple-text-secondary;
+}
+
+// 订单详情弹窗样式 - 苹果风格
+:deep(.order-detail-dialog) {
+  .el-dialog {
+    border-radius: 20px;
+    width: 1400px !important;
+    max-width: 90vw;
+    max-height: 70vh;
+    margin-top: 10vh !important;
+    margin-bottom: 10vh !important;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(135deg, rgba(240, 248, 255, 0.95) 0%, rgba(245, 240, 255, 0.95) 100%);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    box-shadow: 0 25px 80px rgba(100, 120, 200, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    overflow: hidden;
+  }
+
+  .el-dialog__header {
+    padding: 1.75rem 2.5rem;
+    border-bottom: 1px solid rgba(200, 220, 255, 0.3);
+    background: linear-gradient(135deg, rgba(230, 240, 255, 0.9) 0%, rgba(240, 235, 255, 0.9) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    flex-shrink: 0;
+    border-radius: 20px 20px 0 0;
+
+    .el-dialog__title {
+      font-size: 22px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #4A90E2 0%, #7B68EE 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.02em;
+    }
+    
+    .el-dialog__headerbtn {
+      .el-dialog__close {
+        color: #6B7A99;
+        font-size: 20px;
+        transition: all 0.2s ease;
+        
+        &:hover {
+          color: #4A90E2;
+          transform: scale(1.1);
+        }
+      }
+    }
+  }
+
+  .el-dialog__body {
+    padding: 2.5rem;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    background: linear-gradient(180deg, rgba(250, 252, 255, 0.5) 0%, rgba(248, 250, 255, 0.3) 100%);
+    
+    &::-webkit-scrollbar {
+      width: 10px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background: rgba(240, 245, 255, 0.3);
+      border-radius: 10px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, rgba(100, 150, 255, 0.4) 0%, rgba(150, 100, 255, 0.4) 100%);
+      border-radius: 10px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+      
+      &:hover {
+        background: linear-gradient(135deg, rgba(100, 150, 255, 0.6) 0%, rgba(150, 100, 255, 0.6) 100%);
+        background-clip: padding-box;
+      }
+    }
+  }
+
+  .el-dialog__footer {
+    padding: 1.5rem 2.5rem;
+    border-top: 1px solid rgba(200, 220, 255, 0.3);
+    background: linear-gradient(135deg, rgba(245, 250, 255, 0.8) 0%, rgba(250, 245, 255, 0.8) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    flex-shrink: 0;
+    border-radius: 0 0 20px 20px;
+    
+    .el-button {
+      background: linear-gradient(135deg, #4A90E2 0%, #7B68EE 100%);
+      border: none;
+      color: white;
+      font-weight: 500;
+      padding: 0.75rem 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+      transition: all 0.3s ease;
+      
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(74, 144, 226, 0.4);
+      }
+      
+      &:active {
+        transform: translateY(0);
+      }
+    }
+  }
+}
+
+.detail-loading {
+  text-align: center;
+  padding: 4rem 3rem;
+  color: #6B7A99;
+  font-size: 15px;
+  font-weight: 500;
+  
+  i {
+    margin-right: 0.75rem;
+    color: #4A90E2;
+    font-size: 18px;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+}
+
+.detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-right: 0.5rem;
+  
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    
+    &:hover {
+      background: rgba(0, 0, 0, 0.3);
+    }
+  }
+}
+
+.detail-item {
+  display: flex;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid rgba(200, 220, 255, 0.4);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(100, 150, 255, 0.08);
+  transition: all 0.3s ease;
+  
+  &:nth-child(1) {
+    background: linear-gradient(135deg, rgba(230, 245, 255, 0.7) 0%, rgba(240, 250, 255, 0.7) 100%);
+    border-color: rgba(100, 180, 255, 0.3);
+  }
+  
+  &:nth-child(2) {
+    background: linear-gradient(135deg, rgba(240, 250, 255, 0.7) 0%, rgba(245, 240, 255, 0.7) 100%);
+    border-color: rgba(150, 150, 255, 0.3);
+  }
+  
+  &:nth-child(3) {
+    background: linear-gradient(135deg, rgba(245, 255, 250, 0.7) 0%, rgba(240, 255, 245, 0.7) 100%);
+    border-color: rgba(100, 220, 180, 0.3);
+  }
+  
+  &:nth-child(4) {
+    background: linear-gradient(135deg, rgba(255, 250, 240, 0.7) 0%, rgba(255, 245, 230, 0.7) 100%);
+    border-color: rgba(255, 180, 100, 0.3);
+  }
+  
+  &:nth-child(5) {
+    background: linear-gradient(135deg, rgba(250, 240, 255, 0.7) 0%, rgba(255, 235, 250, 0.7) 100%);
+    border-color: rgba(255, 150, 200, 0.3);
+  }
+  
+  &:nth-child(6) {
+    background: linear-gradient(135deg, rgba(240, 255, 250, 0.7) 0%, rgba(235, 255, 245, 0.7) 100%);
+    border-color: rgba(100, 255, 200, 0.3);
+  }
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(100, 150, 255, 0.15);
+    border-color: rgba(100, 150, 255, 0.5);
+  }
+  
+  &--images {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  &--inline {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 2rem;
+    flex-wrap: nowrap;
+    background: linear-gradient(135deg, rgba(235, 245, 255, 0.8) 0%, rgba(245, 240, 255, 0.8) 100%);
+    border-color: rgba(120, 160, 255, 0.4);
+    
+    .detail-inline-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-shrink: 0;
+      white-space: nowrap;
+      padding: 0.5rem 1rem;
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: 10px;
+      border: 1px solid rgba(200, 220, 255, 0.3);
+      
+      .detail-label {
+        font-size: 15px;
+        color: #6B7A99;
+        font-weight: 600;
+        min-width: auto !important;
+        flex-shrink: 0;
+        line-height: 1.5;
+        white-space: nowrap;
+      }
+      
+      .detail-value {
+        font-size: 15px;
+        color: #4A90E2;
+        font-weight: 600;
+        flex: 0 0 auto;
+        word-break: normal;
+        white-space: nowrap;
+      }
+    }
+  }
+  
+  .detail-label {
+    font-size: 15px;
+    color: #6B7A99;
+    font-weight: 600;
+    min-width: 140px;
+    flex-shrink: 0;
+    line-height: 1.5;
+    letter-spacing: 0.01em;
+  }
+
+  .detail-value {
+    font-size: 15px;
+    color: #2C3E50;
+    font-weight: 500;
+    flex: 1;
+    word-break: break-all;
+    line-height: 1.6;
+  }
+  
+  .detail-images {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+    width: 100%;
+    margin-top: 0.25rem;
+  }
+  
+  .detail-image-item {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border: 2px solid rgba(200, 220, 255, 0.4);
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(135deg, rgba(230, 235, 245, 0.95) 0%, rgba(235, 230, 240, 0.95) 100%);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(100, 150, 255, 0.1);
+    
+    &:hover {
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: 0 8px 24px rgba(100, 150, 255, 0.25);
+      border-color: rgba(100, 150, 255, 0.6);
+    }
+  }
+  
+  .detail-image {
+    width: 100%;
+    height: 100%;
+    
+    :deep(.el-image__inner) {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  }
+  
+  .image-placeholder,
+  .image-error {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: @apple-text-secondary;
+    background: linear-gradient(135deg, rgba(230, 235, 245, 0.95) 0%, rgba(235, 230, 240, 0.95) 100%);
+    
+    i {
+      font-size: 24px;
+    }
+  }
+  
+  .detail-text-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+    margin-top: 0.25rem;
+  }
+  
+  .detail-text-item {
+    padding: 0.75rem 1rem;
+    border: 1px solid @apple-border;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.8);
+    font-size: 15px;
+    color: @apple-text-primary;
+    line-height: 1.6;
+    word-break: break-all;
+  }
+  
+  .detail-empty {
+    color: #9BA5B7;
+    font-size: 14px;
+    font-style: italic;
+    padding: 1.5rem 0;
+    text-align: center;
+    background: rgba(240, 245, 255, 0.3);
+    border-radius: 10px;
+    border: 1px dashed rgba(150, 180, 255, 0.3);
+  }
+}
+
+// 图片预览器样式 - 点击遮罩层关闭
+:deep(.el-image-viewer__mask) {
+  cursor: pointer;
+}
+
+:deep(.el-image-viewer__wrapper) {
+  cursor: default;
+  
+  .el-image-viewer__canvas {
+    cursor: default;
+  }
 }
 </style>
 

@@ -80,7 +80,7 @@
               </div>
             </template>
           </el-image>
-          <div class="image-name">{{ image.name }}</div>
+          <div class="image-name">{{ getImageDisplayName(image) }}</div>
           <div class="undo-btn" @click.stop="handleDelete(image)" title="撤销">
             <img src="/删除.svg" alt="删除" />
           </div>
@@ -197,6 +197,10 @@ const getGroupTitle = (group: TImageGroup): string => {
     parts.push(`任务ID: ${group.sortId}`)
   }
   return parts.join(' | ')
+}
+
+const getImageDisplayName = (image: TLocalImage): string => {
+  return image.sortIndex != null ? String(image.sortIndex) : ''
 }
 
 // 切换分组展开/折叠
@@ -689,6 +693,10 @@ defineExpose({
     font-weight: 600;
     letter-spacing: -0.01em;
     color: @apple-text-primary;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
   }
   
   .group-count {

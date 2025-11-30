@@ -420,15 +420,15 @@ function alignAction(item: TIconItemSelectData) {
   
   if (sWidgets.length > 1) {
     // 多个元素：使用组合边界框作为对齐参考
-    groupStore.getCombined().then(group => {
-      sWidgets.forEach((element) => {
-        widgetStore.updateAlign({
-          align: (item.value as TUpdateAlignData['align']),
-          uuid: element.uuid,
-          group,
-        })
-      });
-    })
+  groupStore.getCombined().then(group => {
+    sWidgets.forEach((element) => {
+      widgetStore.updateAlign({
+        align: (item.value as TUpdateAlignData['align']),
+        uuid: element.uuid,
+        group,
+      })
+    });
+  })
   } else if (sWidgets.length === 1) {
     // 单个元素：直接对齐到画布
     widgetStore.updateAlign({
@@ -677,15 +677,15 @@ onBeforeUnmount(() => {
           border: 1px solid @apple-border;
           background: rgba(255, 255, 255, 0.8);
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-          
-          &:hover {
+        
+        &:hover {
             background: rgba(0, 122, 255, 0.1);
             border-color: @apple-accent;
             transform: translateY(-1px);
             box-shadow: 0 2px 8px rgba(0, 122, 255, 0.15);
           }
+          }
         }
-      }
         
       .tool-pages {
         display: flex;
@@ -733,9 +733,9 @@ onBeforeUnmount(() => {
             
             &::before {
               background: rgba(255, 255, 255, 0.6);
-            }
           }
-
+        }
+        
           &--active {
             color: @apple-text-primary;
             background: rgba(255, 255, 255, 0.95);
@@ -772,7 +772,7 @@ onBeforeUnmount(() => {
 
           &__header {
             display: flex;
-            align-items: center;
+          align-items: center;
             justify-content: space-between;
             margin-bottom: 12px;
           }
@@ -849,7 +849,7 @@ onBeforeUnmount(() => {
         }
       }
     }
-  }
+}
 
   // Element Plus 按钮样式优化
   :deep(.el-button) {

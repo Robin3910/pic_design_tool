@@ -26,6 +26,13 @@ export default [
     component: 'temp-list-wrap',
   },
   {
+    name: '订单',
+    icon: 'icon-dingdan',
+    show: false,
+    component: 'order-list-wrap',
+    iconImage: `${import.meta.env.BASE_URL}订单.svg`,
+  },
+  {
     name: '图片',
     icon: 'icon-gallery',
     show: false,
@@ -37,13 +44,6 @@ export default [
     show: false,
     style: { fontWeight: 600 },
     component: 'text-list-wrap',
-  },
-  {
-    name: '订单',
-    icon: 'icon-dingdan',
-    show: false,
-    component: 'order-list-wrap',
-    iconImage: '/订单.svg',
   },
   {
     name: '历史',

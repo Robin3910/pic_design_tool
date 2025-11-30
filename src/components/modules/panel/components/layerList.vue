@@ -24,7 +24,7 @@
           <span v-else :class="['widget-type icon', `sd-${element.type}`, element.type]"></span>
           <span :class="['widget-name', 'line-clamp-1', `${element.type}`]">{{ stripHtmlTags(element.text || element.name) }} {{ element.mask ? '(容器)' : '' }}</span>
           <div class="widget-out" :data-type="element.type" :data-uuid="element.uuid">
-            <img src="/置顶.svg" :class="['top-icon', { 'top-icon-active': element.isTop }]" @click.stop="topLayer(element)" :title="element.isTop ? '取消置顶' : '置顶'" />
+            <img :src="topIconUrl" :class="['top-icon', { 'top-icon-active': element.isTop }]" @click.stop="topLayer(element)" :title="element.isTop ? '取消置顶' : '置顶'" />
             <i :class="['delete-icon']" @click.stop="deleteLayer(element)" title="删除" />
             <i :class="['icon', element.lock ? 'sd-suoding' : 'sd-jiesuo']" @click.stop="lockLayer(element)" />
           </div>
@@ -65,6 +65,9 @@ export default defineComponent({
         chosenClass: 'choose',
       }
     })
+
+    // ensure public assets respect configured base path
+    const topIconUrl = `${import.meta.env.BASE_URL}置顶.svg`
 
     
     // const dPage = computed(() => {
@@ -175,7 +178,7 @@ export default defineComponent({
       return tmp.textContent || tmp.innerText || ''
     }
 
-    return { lockLayer, topLayer, deleteLayer, onDone, onMove, selectLayer, hoverLayer, widgets, getWidgets, getIsActive, stripHtmlTags, ...toRefs(state), dragOptions, showItem }
+    return { lockLayer, topLayer, deleteLayer, onDone, onMove, selectLayer, hoverLayer, widgets, getWidgets, getIsActive, stripHtmlTags, ...toRefs(state), dragOptions, showItem, topIconUrl }
   },
   watch: {
     data: {

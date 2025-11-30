@@ -66,7 +66,7 @@
                 <div class="text-content">
                   {{ text.text }}
                 </div>
-                <div class="text-name">{{ text.name }}</div>
+                <div class="text-name">{{ getTextDisplayName(text) }}</div>
                 <div class="undo-btn" @click.stop="handleDelete(text)" title="撤销">
                   <img src="/删除.svg" alt="删除" />
                 </div>
@@ -186,6 +186,10 @@ const getGroupTitle = (group: TTextGroup): string => {
     parts.push(`任务ID: ${group.sortId}`)
   }
   return parts.join(' | ')
+}
+
+const getTextDisplayName = (text: TTextData): string => {
+  return text.sortIndex != null ? String(text.sortIndex) : ''
 }
 
 // 切换分组展开/折叠
@@ -692,6 +696,10 @@ defineExpose({
     font-weight: 600;
     letter-spacing: -0.01em;
     color: @apple-text-primary;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
   }
   
   .group-count {

@@ -23,7 +23,7 @@ export default [
   },
   {
     key: 'zIndex',
-    imgSrc: '/置顶.svg',
+    imgSrc: `${import.meta.env.BASE_URL}置顶.svg`,
     tip: '置顶',
     value: 999,
   },
