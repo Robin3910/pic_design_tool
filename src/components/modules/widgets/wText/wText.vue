@@ -30,7 +30,7 @@
     }"
     @dblclick="(e) => dblclickText(e)"
   >
-    <div ref="editWrap" :style="{ fontFamily: `'${params.fontClass.value}'` }" class="edit-text" spellcheck="false" :contenteditable="state.editable ? 'true' : false" @input="writingText($event)" @blur="writeDone($event)" v-html="params.text"></div>
+    <div ref="editWrap" :style="{ fontFamily: `'${params.fontClass.value}'` }" class="edit-text" spellcheck="false" :contenteditable="state.editable ? 'true' : false" @input="writingText($event)" @blur="writeDone($event)" @paste="handlePaste($event)" v-html="params.text"></div>
   </div>
 </template>
 
@@ -189,6 +189,37 @@ function dblclickText(_: MouseEvent) {
       window.getSelection()?.addRange(range)
     }
   }, 100)
+}
+
+function handlePaste(e: ClipboardEvent) {
+  e.preventDefault()
+  const el = editWrap.value
+  if (!el) return
+  
+  // 获取粘贴的纯文本内容
+  const text = e.clipboardData?.getData('text/plain') || ''
+  
+  // 获取当前选中的范围
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return
+  
+  const range = selection.getRangeAt(0)
+  
+  // 删除选中的内容
+  range.deleteContents()
+  
+  // 创建文本节点并插入
+  const textNode = document.createTextNode(text)
+  range.insertNode(textNode)
+  
+  // 移动光标到插入文本的末尾
+  range.setStartAfter(textNode)
+  range.setEndAfter(textNode)
+  selection.removeAllRanges()
+  selection.addRange(range)
+  
+  // 触发 input 事件以更新文本
+  el.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
 defineExpose({
