@@ -35,4 +35,8 @@ export default [
     feat: `缩放元素`,
     info: `${ctrlKey} + 滚轮`,
   },
+  {
+    feat: `上传图片`,
+    info: `${ctrlKey} + S`,
+  },
 ]
