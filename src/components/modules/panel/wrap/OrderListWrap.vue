@@ -732,7 +732,7 @@ const mergeGroups = (incoming: TOrderGroup[]) => {
     if (!existing) {
       map.set(key, {
         ...group,
-        items: [...group.items].sort((a, b) => a.sortIndex - b.sortIndex),
+        items: [...group.items],
       })
       return
     }
@@ -753,7 +753,8 @@ const mergeGroups = (incoming: TOrderGroup[]) => {
       current.orderNo = current.orderNo || item.orderNo
       current.categoryName = current.categoryName || item.categoryName
     })
-    existing.items = Array.from(itemMap.values()).sort((a, b) => a.sortIndex - b.sortIndex)
+    // 保持原始顺序，不排序
+    existing.items = Array.from(itemMap.values())
     existing.orderNo = existing.orderNo || group.orderNo
     existing.categoryName = existing.categoryName || group.categoryName
     map.set(key, existing)
@@ -767,72 +768,130 @@ const mergeGroups = (incoming: TOrderGroup[]) => {
 const buildCombinedGroups = (
   textMap: Map<string, TTextData[]>,
   imageMap: Map<string, TLocalImage[]>,
-  textOrder: Array<number | string>,
-  imageOrder: Array<number | string>,
+  order: Array<number | string>,
 ) => {
-  const order = [...textOrder]
-  imageOrder.forEach((id) => {
-    if (!order.includes(id)) {
-      order.push(id)
-    }
-  })
   const groups: TOrderGroup[] = []
-  const allKeys = new Set([...textMap.keys(), ...imageMap.keys()])
-  allKeys.forEach((key) => {
+  const itemMap = new Map<string, TOrderItem>()
+  
+  // 按照接口返回的原始顺序处理
+  order.forEach((sortId) => {
+    const key = String(sortId)
     const textList = textMap.get(key) ?? []
     const imageList = imageMap.get(key) ?? []
-    const indexSet = new Set<number>()
+    
+    // 合并文字和图片，保持原始顺序
     textList.forEach((text) => {
-      if (typeof text.sortIndex === 'number') {
-        indexSet.add(text.sortIndex)
-      }
-    })
-    imageList.forEach((image) => {
-      if (typeof image.sortIndex === 'number') {
-        indexSet.add(image.sortIndex)
-      }
-    })
-    const sortId = textList[0]?.sortId ?? imageList[0]?.sortId ?? key
-    const orderNo = textList[0]?.orderNo ?? imageList[0]?.orderNo ?? ''
-    const categoryName = textList[0]?.categoryName ?? imageList[0]?.categoryName ?? ''
-    const items: TOrderItem[] = Array.from(indexSet)
-      .sort((a, b) => a - b)
-      .map((idx) => {
-        const text = textList.find((t) => t.sortIndex === idx)
-        const image = imageList.find((img) => img.sortIndex === idx)
-        return {
-          key: `${sortId}_${idx}`,
-          sortId: sortId ?? key,
-          sortIndex: idx,
-          orderNo,
-          categoryName,
+      if (text.sortIndex == null) return
+      const itemKey = `${text.sortId}_${text.sortIndex}`
+      const existing = itemMap.get(itemKey)
+      if (existing) {
+        existing.text = text
+        existing.orderNo = existing.orderNo || text.orderNo
+        existing.categoryName = existing.categoryName || text.categoryName
+      } else {
+        itemMap.set(itemKey, {
+          key: itemKey,
+          sortId: text.sortId ?? key,
+          sortIndex: text.sortIndex,
+          orderNo: text.orderNo,
+          categoryName: text.categoryName,
           text,
+        })
+      }
+    })
+    
+    imageList.forEach((image) => {
+      if (image.sortIndex == null) return
+      const itemKey = `${image.sortId}_${image.sortIndex}`
+      const existing = itemMap.get(itemKey)
+      if (existing) {
+        existing.image = image
+        existing.orderNo = existing.orderNo || image.orderNo
+        existing.categoryName = existing.categoryName || image.categoryName
+      } else {
+        itemMap.set(itemKey, {
+          key: itemKey,
+          sortId: image.sortId ?? key,
+          sortIndex: image.sortIndex,
+          orderNo: image.orderNo,
+          categoryName: image.categoryName,
           image,
-        }
-      })
+        })
+      }
+    })
+    
+    // 收集当前 sortId 的所有 items
+    const items: TOrderItem[] = []
+    itemMap.forEach((item) => {
+      if (String(item.sortId) === key) {
+        items.push(item)
+      }
+    })
+    
     if (items.length) {
+      const firstItem = items[0]
       groups.push({
-        sortId: sortId ?? key,
-        orderNo,
-        categoryName,
+        sortId: firstItem.sortId,
+        orderNo: firstItem.orderNo,
+        categoryName: firstItem.categoryName,
         items,
       })
+      // 从 itemMap 中移除已处理的 items
+      items.forEach((item) => itemMap.delete(item.key))
     }
   })
-  groups.sort((a, b) => {
-    const aIndex = order.findIndex((id) => String(id) === String(a.sortId))
-    const bIndex = order.findIndex((id) => String(id) === String(b.sortId))
-    if (aIndex === -1 && bIndex === -1) {
-      return 0
+  
+  // 处理不在 order 中的其他 keys（如果有）
+  const allKeys = new Set([...textMap.keys(), ...imageMap.keys()])
+  allKeys.forEach((key) => {
+    if (!order.includes(key)) {
+      const textList = textMap.get(key) ?? []
+      const imageList = imageMap.get(key) ?? []
+      const items: TOrderItem[] = []
+      
+      textList.forEach((text) => {
+        if (text.sortIndex == null) return
+        items.push({
+          key: `${text.sortId}_${text.sortIndex}`,
+          sortId: text.sortId ?? key,
+          sortIndex: text.sortIndex,
+          orderNo: text.orderNo,
+          categoryName: text.categoryName,
+          text,
+        })
+      })
+      
+      imageList.forEach((image) => {
+        if (image.sortIndex == null) return
+        const itemKey = `${image.sortId}_${image.sortIndex}`
+        const existing = items.find((item) => item.key === itemKey)
+        if (existing) {
+          existing.image = image
+        } else {
+          items.push({
+            key: itemKey,
+            sortId: image.sortId ?? key,
+            sortIndex: image.sortIndex,
+            orderNo: image.orderNo,
+            categoryName: image.categoryName,
+            image,
+          })
+        }
+      })
+      
+      if (items.length) {
+        const firstItem = items[0]
+        groups.push({
+          sortId: firstItem.sortId,
+          orderNo: firstItem.orderNo,
+          categoryName: firstItem.categoryName,
+          items,
+        })
+      }
     }
-    if (aIndex === -1) {
-      return 1
-    }
-    if (bIndex === -1) {
-      return -1
-    }
-    return aIndex - bIndex
   })
+  
+  // 不排序，保持原始顺序
   return groups
 }
 
@@ -849,22 +908,33 @@ const loadOrderData = async (init = false) => {
   }
   state.loading = true
   try {
-    const [textRes, imageRes] = await Promise.all([
-      api.redrawTask.getRedrawTaskPageWithCustomText({
-        pageNo: pageOptions.pageNo,
-        pageSize: pageOptions.pageSize,
-      }),
-      api.redrawTask.getRedrawTaskPageWithNeedRedrawIndex({
-        pageNo: pageOptions.pageNo,
-        pageSize: pageOptions.pageSize,
-      }),
-    ])
-    const textList = textRes.data?.list || []
-    const imageList = imageRes.data?.list || []
+    const res = await api.redrawTask.getRedrawTaskPageWithNeedRedrawIndex({
+      pageNo: pageOptions.pageNo,
+      pageSize: pageOptions.pageSize,
+    })
+    const list = res.data?.list || []
 
-    const textData = buildTextEntries(textList)
-    const imageData = buildImageEntries(imageList)
-    const groups = buildCombinedGroups(textData.map, imageData.map, textData.order, imageData.order)
+    // 从同一个接口的数据中同时提取图片和文字素材
+    const textData = buildTextEntries(list)
+    const imageData = buildImageEntries(list)
+    
+    // 按照接口返回的原始顺序构建 order（保持 list 中的顺序）
+    const order: Array<number | string> = []
+    const processedIds = new Set<string | number>()
+    list.forEach((item: any) => {
+      const sortId = item.id ?? item.sortId
+      if (sortId != null && !processedIds.has(sortId)) {
+        // 只有当该 sortId 有图片或文字素材时才添加到 order
+        const hasText = textData.map.has(String(sortId))
+        const hasImage = imageData.map.has(String(sortId))
+        if (hasText || hasImage) {
+          order.push(sortId)
+          processedIds.add(sortId)
+        }
+      }
+    })
+    
+    const groups = buildCombinedGroups(textData.map, imageData.map, order)
     mergeGroups(groups)
 
     // 默认展开所有组
@@ -905,9 +975,8 @@ const loadOrderData = async (init = false) => {
       }
     }
 
-    const noMoreText = textList.length < pageOptions.pageSize
-    const noMoreImage = imageList.length < pageOptions.pageSize
-    if (noMoreText && noMoreImage) {
+    // 判断是否还有更多数据
+    if (list.length < pageOptions.pageSize) {
       state.loadDone = true
     } else {
       pageOptions.pageNo += 1
