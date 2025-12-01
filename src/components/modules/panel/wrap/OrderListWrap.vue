@@ -1018,6 +1018,9 @@ const handleAddCustomText = () => {
   const textWidth = setting.text.length * setting.fontSize * 0.6
   setting.left = pW / 2 - textWidth / 2
   setting.top = pH / 2 - setting.fontSize / 2
+  // 设置初始宽度和高度，避免第一次移动时宽度突然变大
+  setting.width = Math.max(textWidth || setting.fontSize, setting.fontSize)
+  setting.height = setting.fontSize * setting.lineHeight
 
   widgetStore.addWidget(setting)
 }
@@ -1067,6 +1070,9 @@ const selectText = async (text: TTextData) => {
   const textWidth = text.text.length * text.fontSize * 0.6
   setting.left = pW / 2 - textWidth / 2
   setting.top = pH / 2 - text.fontSize / 2
+  // 设置初始宽度和高度，避免第一次移动时宽度突然变大
+  setting.width = Math.max(textWidth, text.fontSize)
+  setting.height = text.fontSize * setting.lineHeight
 
   widgetStore.addWidget(setting)
 }

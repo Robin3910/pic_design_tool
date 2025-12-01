@@ -133,8 +133,21 @@ function updateRecord() {
   if (!widget.value) return
   if (dActiveElement.value && dActiveElement.value.uuid === String(props.params.uuid)) {
     let record = dActiveElement.value.record
-    record.width = widget.value.offsetWidth
-    record.height = widget.value.offsetHeight
+    // 使用 editWrap 的宽度，如果不存在则使用 widget 的宽度
+    // 避免在 width 为 0 时获取到错误的 offsetWidth
+    const el = editWrap.value || widget.value
+    if (el) {
+      const newWidth = el.offsetWidth
+      const newHeight = el.offsetHeight
+      // 只有当宽度合理时才更新（大于 0 且小于画布宽度的 10 倍，避免获取到父容器的宽度）
+      const maxReasonableWidth = (dActiveElement.value as any).parent?.width || 10000
+      if (newWidth > 0 && newWidth < maxReasonableWidth * 10) {
+        record.width = newWidth
+      }
+      if (newHeight > 0) {
+        record.height = newHeight
+      }
+    }
     record.minWidth = props.params.fontSize
     record.minHeight = props.params.fontSize * props.params.lineHeight
     writingText()
