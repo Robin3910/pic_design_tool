@@ -111,7 +111,74 @@ export function addWidget(store: TWidgetStore, setting: TdWidgetData) {
   const widgets = store.dWidgets
   const parent = setting.parent || '-1'
   
-  // 找到同层级（相同 parent）中最后一个图层的位置
+  // 文字元素从头部开始插入，默认在上方（插入到数组末尾，在图层列表中显示在顶部）
+  if (setting.type === 'w-text') {
+    if (parent !== '-1') {
+      // 在容器内，找到容器内最后一个元素的位置，插入到其后
+      let insertIndex = widgets.length
+      for (let i = widgets.length - 1; i >= 0; i--) {
+        if (widgets[i].parent === parent) {
+          insertIndex = i + 1
+          break
+        }
+      }
+      // 如果容器内没有元素，找到容器位置后插入
+      if (insertIndex === widgets.length) {
+        for (let i = 0; i < widgets.length; i++) {
+          if (widgets[i].uuid === parent) {
+            insertIndex = i + 1
+            break
+          }
+        }
+      }
+      widgets.splice(insertIndex, 0, setting)
+    } else {
+      // 在顶层，插入到数组末尾（显示在图层列表顶部）
+      widgets.push(setting)
+    }
+    store.selectWidget({ uuid: setting.uuid })
+    canvasStore.reChangeCanvas()
+    return
+  }
+  
+  // 图片元素从底部插入（插入到数组开头，在图层列表中显示在底部）
+  if (setting.type === 'w-image') {
+    if (parent !== '-1') {
+      // 在容器内，找到容器内第一个元素的位置，插入到其前
+      let insertIndex = 0
+      for (let i = 0; i < widgets.length; i++) {
+        if (widgets[i].parent === parent) {
+          insertIndex = i
+          break
+        }
+      }
+      // 如果容器内没有元素，找到容器位置后插入
+      if (insertIndex === 0 && widgets.length > 0 && widgets[0].uuid !== parent) {
+        for (let i = 0; i < widgets.length; i++) {
+          if (widgets[i].uuid === parent) {
+            insertIndex = i + 1
+            break
+          }
+        }
+      }
+      widgets.splice(insertIndex, 0, setting)
+    } else {
+      // 在顶层，找到第一个顶层元素的位置，插入到其前
+      let insertIndex = 0
+      for (let i = 0; i < widgets.length; i++) {
+        if (widgets[i].parent === '-1') {
+          insertIndex = i
+          break
+        }
+      }
+      widgets.splice(insertIndex, 0, setting)
+    }
+    store.selectWidget({ uuid: setting.uuid })
+    canvasStore.reChangeCanvas()
+    return
+  }
+  
+  // 其他元素保持原有逻辑：找到同层级（相同 parent）中最后一个图层的位置
   // 新图层应该插入到这个位置之前，以保持已置顶的图层在最上层
   let insertIndex = widgets.length
   
