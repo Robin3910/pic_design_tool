@@ -4,6 +4,7 @@
  * @Description: 主画布
  * @LastEditors: ShawnPhang <https://m.palxp.cn>
  * @LastEditTime: 2024-12-28 14:12:33
+ 冲突代码
 -->
 <template>
   <div id="main">
