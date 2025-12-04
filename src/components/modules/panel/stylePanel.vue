@@ -39,12 +39,14 @@
             </button>
           </div>
           <div class="tool-pages__list">
-            <div v-if="activeTool" class="tool-card">
+            <transition name="tool-page-slide" mode="out-in">
+              <div v-if="activeTool" :key="activeTool.componentName" class="tool-card">
               <div class="tool-card__header">
                 <span class="tool-card__title">{{ activeTool.label }}</span>
               </div>
               <component :is="activeTool.componentName" />
             </div>
+            </transition>
           </div>
         </div>
       </div>
@@ -226,6 +228,7 @@ const styleToolList = ref<StyleToolItem[]>(
     { label: '组合样式', componentName: 'w-group-style' },
   ].filter((tool) => !hiddenToolKeys.has(tool.componentName))
 )
+// 当前激活的工具页（画布 / 文本样式 / 图片样式等）
 const activeToolKey = ref(styleToolList.value[0]?.componentName ?? '')
 const activeTool = computed(() => styleToolList.value.find((tool) => tool.componentName === activeToolKey.value))
 
@@ -443,6 +446,37 @@ function alignAction(item: TIconItemSelectData) {
     })
   }
 }
+
+// 根据当前选中的画布元素，自动切换右侧工具页：
+// - 选中画布：画布设置
+// - 选中文字：文本样式
+// - 选中图片：图片样式
+// - 选中 SVG / 二维码 / 组：对应样式页
+watch(
+  dActiveElement,
+  (val) => {
+    if (!val) return
+    const type = (val as any).type
+    if (!type) return
+
+    let targetKey = activeToolKey.value
+
+    if (type === 'page') {
+      targetKey = 'page-style'
+    } else {
+      const guessKey = `${type}-style`
+      const exists = styleToolList.value.some((tool) => tool.componentName === guessKey)
+      if (exists) {
+        targetKey = guessKey
+      }
+    }
+
+    if (targetKey !== activeToolKey.value) {
+      activeToolKey.value = targetKey
+    }
+  },
+  { immediate: true, deep: false },
+)
 function layerChange(newLayer: TdWidgetData[]) {
   widgetStore.setDWidgets(newLayer.toReversed())
   controlStore.setShowMoveable(false)
@@ -752,6 +786,36 @@ onBeforeUnmount(() => {
           display: flex;
           flex-direction: column;
           gap: 12px;
+        }
+
+        // 右侧工具页切换动画（画布设置 / 文本样式 / 图片样式）
+        // 使用左右滑动 + 轻微缩放 + 透明度过渡，营造顺滑翻页效果
+        :deep(.tool-page-slide-enter-active),
+        :deep(.tool-page-slide-leave-active) {
+          transition:
+            opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+            transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          will-change: opacity, transform;
+        }
+
+        :deep(.tool-page-slide-enter-from) {
+          opacity: 0;
+          transform: translateX(8px) scale(0.99);
+        }
+
+        :deep(.tool-page-slide-enter-to) {
+          opacity: 1;
+          transform: translateX(0) scale(1);
+        }
+
+        :deep(.tool-page-slide-leave-from) {
+          opacity: 1;
+          transform: translateX(0) scale(1);
+        }
+
+        :deep(.tool-page-slide-leave-to) {
+          opacity: 0;
+          transform: translateX(-8px) scale(0.99);
         }
 
         .tool-card {

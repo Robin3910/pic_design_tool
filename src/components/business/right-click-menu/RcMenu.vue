@@ -50,6 +50,9 @@
                   <path d="M8 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm4 3a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5.5 7a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 3a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
                   <path d="M2 13a2 2 0 1 0 4 0 2 2 0 0 0-4 0zm10.5-5.5a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM14 13a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM7.5 1a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
                 </template>
+                <template v-else-if="item.icon === 'plus'">
+                  <path d="M8 1a1 1 0 0 1 1 1v5h5a1 1 0 1 1 0 2H9v5a1 1 0 1 1-2 0V9H2a1 1 0 0 1 0-2h5V2a1 1 0 0 1 1-1z"/>
+                </template>
               </svg>
               <span class="menu-text">{{ item.text }}</span>
             </span>
@@ -72,20 +75,22 @@ import {
 import { getTarget } from '@/common/methods/target'
 import { storeToRefs } from 'pinia';
 import { useControlStore, useWidgetStore, useForceStore, useUiStore, useCanvasStore } from '@/store';
+import { wTextSetting, getLastSelectedFont } from '@/components/modules/widgets/wText/wTextSetting'
 
 const menuListData = ref<TMenuItemData>({...menu})
 const showMenuBg = ref<boolean>(false)
 const widgetMenu = ref<TWidgetItemData[]>([...widget])
 const pageMenu = ref<TWidgetItemData[]>([...page])
 
+const controlStore = useControlStore()
 const widgetStore = useWidgetStore()
 const forceStore = useForceStore()
 const uiStore = useUiStore()
 const canvasStore = useCanvasStore()
 
 const {dActiveElement, dWidgets, dCopyElement} = storeToRefs(widgetStore)
-const { dAltDown } = storeToRefs(useControlStore())
-const { dZoom } = storeToRefs(canvasStore)
+const { dAltDown } = storeToRefs(controlStore)
+const { dZoom, dPage } = storeToRefs(canvasStore)
 
 // 保存选中范围的变量
 let savedSelectionRange: Range | null = null
@@ -289,6 +294,32 @@ function showMenu(e: MouseEvent) {
 
 function closeMenu() {
   showMenuBg.value = false
+}
+
+function addCustomTextWidget() {
+  controlStore.setShowMoveable?.(false)
+  const setting = JSON.parse(JSON.stringify(wTextSetting))
+  const lastFont = getLastSelectedFont()
+  if (lastFont) {
+    setting.fontClass = lastFont
+    setting.fontFamily = lastFont.value
+  }
+  setting.text = '自定义文字'
+  setting.fontSize = 24
+  setting.fontWeight = 'normal'
+  setting.name = '文本'
+  setting.type = 'w-text'
+  setting.sortId = ''
+  setting.sortIndex = undefined
+
+  const page = dPage.value
+  const textWidth = setting.text.length * setting.fontSize * 0.6
+  setting.left = page.width / 2 - textWidth / 2
+  setting.top = page.height / 2 - setting.fontSize / 2
+  setting.width = Math.max(textWidth || setting.fontSize, setting.fontSize)
+  setting.height = setting.fontSize * setting.lineHeight
+
+  widgetStore.addWidget(setting)
 }
 
 function rotateWidget(step: number) {
@@ -526,6 +557,9 @@ function selectMenu(type: TWidgetItemData['type']) {
       break
     case 'color-text':
       colorTextSelection()
+      break
+    case 'add-custom-text':
+      addCustomTextWidget()
       break
   }
   closeMenu()

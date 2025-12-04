@@ -169,13 +169,6 @@
                       <img src="/删除.svg" alt="删除" />
                     </div>
                   </div>
-                  <button
-                    class="add-text-btn"
-                    @click.stop="handleAddCustomText"
-                    title="添加自定义文字"
-                  >
-                    <span class="add-icon">+</span>
-                  </button>
                 </div>
               </div>
             </div>
@@ -995,34 +988,6 @@ const loadOrderData = async (init = false) => {
 
 const load = () => {
   loadOrderData(false)
-}
-
-const handleAddCustomText = () => {
-  controlStore.setShowMoveable(false)
-  
-  const setting = JSON.parse(JSON.stringify(wTextSetting))
-  const lastFont = getLastSelectedFont()
-  if (lastFont) {
-    setting.fontClass = lastFont
-    setting.fontFamily = lastFont.value
-  }
-  setting.text = '自定义文字'
-  setting.fontSize = 24
-  setting.fontWeight = 'normal'
-  setting.name = '文本'
-  setting.type = 'w-text'
-  setting.sortId = ''
-  setting.sortIndex = undefined
-
-  const { width: pW, height: pH } = dPage.value
-  const textWidth = setting.text.length * setting.fontSize * 0.6
-  setting.left = pW / 2 - textWidth / 2
-  setting.top = pH / 2 - setting.fontSize / 2
-  // 设置初始宽度和高度，避免第一次移动时宽度突然变大
-  setting.width = Math.max(textWidth || setting.fontSize, setting.fontSize)
-  setting.height = setting.fontSize * setting.lineHeight
-
-  widgetStore.addWidget(setting)
 }
 
 const selectText = async (text: TTextData) => {
@@ -1947,12 +1912,6 @@ defineExpose({
   }
 }
 
-.order-item__text-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 .order-item__image {
   position: relative;
   display: flex;
@@ -2043,46 +2002,6 @@ defineExpose({
     color: @apple-text-primary;
     white-space: pre-wrap;
     line-height: 1.5;
-  }
-}
-
-.add-text-btn {
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 0.5px solid rgba(0, 0, 0, 0.1);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: #1d1d1f;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    border-color: rgba(0, 0, 0, 0.12);
-    background: rgba(255, 255, 255, 0.8);
-  }
-  
-  &:active {
-    transform: translateY(0);
-  }
-  
-  .add-icon {
-    font-size: 20px;
-    font-weight: 600;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #1d1d1f;
   }
 }
 

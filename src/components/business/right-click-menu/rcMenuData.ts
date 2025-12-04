@@ -30,6 +30,7 @@ export type TWidgetItemData = {
     | 'del'
     | 'ungroup'
     | 'color-text'
+    | 'add-custom-text'
   text?: string
   icon?: string
   shortcut?: string
@@ -84,6 +85,14 @@ export const widgetMenu: TWidgetItemData[] = [
     divider: true,
   },
   {
+    type: 'add-custom-text',
+    text: '添加自定义文字',
+    icon: 'plus',
+  },
+  {
+    divider: true,
+  },
+  {
     type: 'del',
     text: '删除',
     icon: 'delete',
@@ -97,5 +106,10 @@ export const pageMenu: TWidgetItemData[] = [
     text: '粘贴',
     icon: 'paste',
     shortcut: 'Ctrl+V',
+  },
+  {
+    type: 'add-custom-text',
+    text: '添加自定义文字',
+    icon: 'plus',
   },
 ]
