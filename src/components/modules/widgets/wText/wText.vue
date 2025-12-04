@@ -170,10 +170,21 @@ function writingText(e?: Event) {
   // TODO: 修正文字选框高度
   const el = editWrap.value || widget.value
   if (!el) return
-  widgetStore.updateWidgetData({
+  const newWidth = el.scrollWidth
+  const newHeight = el.offsetHeight
+  // 输入时同步更新宽高，尽量保持单行不自动换行（宽度随内容扩展）
+  widgetStore.updateWidgetMultiple({
     uuid: String(props.params.uuid),
-    key: 'height',
-    value: el.offsetHeight,
+    data: [
+      {
+        key: 'width',
+        value: newWidth,
+      },
+      {
+        key: 'height',
+        value: newHeight,
+      },
+    ],
   })
   forceStore.setUpdateRect()
   // store.commit('updateRect')
@@ -256,9 +267,12 @@ defineExpose({
   user-select: text;
 }
 .edit-text {
+  display: inline-block;
+  padding: 0 4px;
   outline: none;
-  word-break: break-word;
-  white-space: pre-wrap;
+  /* 默认单行显示，避免自动换行；需要多行时用户可以手动调整高度或回车 */
+  white-space: nowrap;
+  word-break: normal;
   margin: 0;
 }
 </style>
