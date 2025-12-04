@@ -18,11 +18,12 @@ import useSelecto from './Selecto'
 import { storeToRefs } from 'pinia'
 import { useCanvasStore, useControlStore, useWidgetStore, useForceStore, useHistoryStore } from '@/store'
 
+const canvasStore = useCanvasStore()
 const widgetStore = useWidgetStore()
 const controlStore = useControlStore()
 const forceStore = useForceStore()
 const historyStore = useHistoryStore()
-const { guidelines } = storeToRefs(useCanvasStore())
+const { guidelines, dPage } = storeToRefs(canvasStore)
 const { showMoveable, showRotatable, dAltDown } = storeToRefs(controlStore)
 const { dSelectWidgets, dActiveElement, activeMouseEvent, dWidgets } = storeToRefs(widgetStore)
 const { updateRect, updateSelect } = storeToRefs(forceStore)
@@ -36,7 +37,7 @@ watch(
       await nextTick()
       checkMouseEvent()
     }, 10);
-    if (!val || !val.record) {
+    if (!val || !(val as any).record) {
       return
     }
     if (!moveable) return
@@ -210,7 +211,7 @@ type TMoveableOptions = {
   elementGuidelines: [],
   verticalGuidelines: [],
   horizontalGuidelines: [],
-  snapThreshold: 4,
+  snapThreshold: number,
   isDisplaySnapDigit: boolean,
   snapGap: boolean,
   snapElement: boolean,
@@ -225,8 +226,18 @@ type TMoveableOptions = {
   triggerAblesSimultaneously: true,
 }
 
+const AUTO_CENTER_THRESHOLD = 12 // px leeway before auto-centering kicks in
+
 let moveable: Moveable | null = null
 let holdPosition: { left: number, top: number } | null = null
+let centerGuidesVisible = {
+  vertical: false,
+  horizontal: false,
+}
+const centerGuideElements: Record<'vertical' | 'horizontal', HTMLElement | null> = {
+  vertical: null,
+  horizontal: null,
+}
 let startHL: number = 0
 let startLS: number = 0
 let resetRatio: number = 0
@@ -260,13 +271,13 @@ onMounted(() => {
     elementGuidelines: [],
     verticalGuidelines: [],
     horizontalGuidelines: [],
-    snapThreshold: 4,
+    snapThreshold: 12,
     isDisplaySnapDigit: true,
-    snapGap: false,
+    snapGap: true,
     snapElement: true,
     snapVertical: true,
     snapHorizontal: true,
-    snapCenter: false,
+    snapCenter: true,
     snapDigit: 0,
 
     // snapDirections={{"top":true,"right":true,"bottom":true,"left":true}}
@@ -307,10 +318,11 @@ onMounted(() => {
     dActiveElement.value.lock && stop()
   })
   .on('drag', ({ target, transform, left, top, inputEvent }) => {
-    // target!.style.transform = transform]
-    target!.style.left = `${left}px`
-    target!.style.top = `${top}px`
-    holdPosition = { left, top }
+    const element = target as HTMLElement
+    const snapped = applyAutoCenterSnap(element, left, top)
+    element.style.left = `${snapped.left}px`
+    element.style.top = `${snapped.top}px`
+    holdPosition = { left: snapped.left, top: snapped.top }
   })
   .on('dragEnd', ({ target, isDrag, inputEvent }) => {
     // console.log('onDragEnd', inputEvent)
@@ -346,6 +358,7 @@ onMounted(() => {
 
       holdPosition = null // important
     }
+    syncCenterGuidelines(false, false, null)
   })
   // .on('keyUp', (e) => {
   //   moveable.updateRect()
@@ -629,6 +642,102 @@ onMounted(() => {
 
 })
 
+type TCenterSnapResult = {
+  left: number
+  top: number
+}
+
+function applyAutoCenterSnap(element: HTMLElement, left: number, top: number): TCenterSnapResult {
+  if (!dActiveElement.value || dActiveElement.value.type !== 'w-text') {
+    syncCenterGuidelines(false, false, null)
+    return { left, top }
+  }
+
+  const page = dPage.value
+  if (!page) {
+    syncCenterGuidelines(false, false, null)
+    return { left, top }
+  }
+
+  let snappedLeft = left
+  let snappedTop = top
+
+  const elementWidth = element.offsetWidth || dActiveElement.value.width || 0
+  const elementHeight = element.offsetHeight || dActiveElement.value.height || 0
+
+  let nearCenterX = false
+  let nearCenterY = false
+
+  if (elementWidth && page.width) {
+    const centerLeft = (page.width - elementWidth) / 2
+    if (Math.abs(left - centerLeft) <= AUTO_CENTER_THRESHOLD) {
+      snappedLeft = centerLeft
+      nearCenterX = true
+    }
+  } else if (centerGuidesVisible.vertical) {
+    syncCenterGuidelines(false, centerGuidesVisible.horizontal, null)
+  }
+
+  if (elementHeight && page.height) {
+    const centerTop = (page.height - elementHeight) / 2
+    if (Math.abs(top - centerTop) <= AUTO_CENTER_THRESHOLD) {
+      snappedTop = centerTop
+      nearCenterY = true
+    }
+  } else if (centerGuidesVisible.horizontal) {
+    syncCenterGuidelines(centerGuidesVisible.vertical, false, null)
+  }
+
+  syncCenterGuidelines(nearCenterX, nearCenterY, page)
+
+  return { left: snappedLeft, top: snappedTop }
+}
+
+function syncCenterGuidelines(
+  showVertical: boolean,
+  showHorizontal: boolean,
+  page: { width: number; height: number } | null,
+) {
+  const shouldUpdateVertical = showVertical !== centerGuidesVisible.vertical
+  const shouldUpdateHorizontal = showHorizontal !== centerGuidesVisible.horizontal
+
+  if (!shouldUpdateVertical && !shouldUpdateHorizontal) {
+    return
+  }
+
+  centerGuidesVisible = { vertical: showVertical, horizontal: showHorizontal }
+
+  const verticalGuides = showVertical && page ? [page.width / 2] : []
+  const horizontalGuides = showHorizontal && page ? [page.height / 2] : []
+
+  canvasStore.updateGuidelines({
+    verticalGuidelines: verticalGuides,
+    horizontalGuidelines: horizontalGuides,
+  })
+
+  renderCenterGuide('vertical', showVertical)
+  renderCenterGuide('horizontal', showHorizontal)
+}
+
+function renderCenterGuide(type: 'vertical' | 'horizontal', show: boolean) {
+  const pageEl = document.getElementById('out-page') as HTMLElement | null
+  if (!pageEl) {
+    if (centerGuideElements[type]) {
+      centerGuideElements[type]!.style.display = 'none'
+    }
+    return
+  }
+
+  if (!centerGuideElements[type]) {
+    const el = document.createElement('div')
+    el.className = `center-guide center-guide--${type}`
+    pageEl.appendChild(el)
+    centerGuideElements[type] = el
+  }
+
+  centerGuideElements[type]!.style.display = show ? 'block' : 'none'
+}
+
 async function created() {
   await nextTick()
   const Ele = document.getElementById('main')
@@ -654,4 +763,28 @@ function checkMouseEvent() {
 
 <style lang="less">
 @import url('./style/index.less');
+
+.center-guide {
+  position: absolute;
+  background-color: #ff4d4f;
+  pointer-events: none;
+  z-index: 200;
+  mix-blend-mode: multiply;
+}
+
+.center-guide--vertical {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  left: 50%;
+  transform: translateX(-0.5px);
+}
+
+.center-guide--horizontal {
+  left: 0;
+  right: 0;
+  height: 1px;
+  top: 50%;
+  transform: translateY(-0.5px);
+}
 </style>
