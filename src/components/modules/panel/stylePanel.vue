@@ -52,10 +52,23 @@
       </div>
     </div>
     <div class="floating-preview-toggle">
-      <div class="toggle-switch" @click="toggleFloatingPreview">
-        <span class="toggle-label">预览窗</span>
-        <div class="toggle-container" :class="{ 'toggle-active': showFloatingPreview }">
-          <div class="toggle-thumb"></div>
+      <transition name="preview-help-slide">
+        <ul v-if="previewHelpVisible" class="preview-help-list">
+          <li>双击图片：在点击位置放大 → 继续双击切换 1x / 1.6x / 2.4x</li>
+          <li>放大后按住左键拖动：可平移查看不同区域</li>
+          <li>预览窗顶部可拖动位置，右下角可调整尺寸</li>
+          <li>关闭后会记住位置和大小，下次自动恢复</li>
+        </ul>
+      </transition>
+      <div class="toggle-main">
+        <span class="toggle-label" @click="toggleFloatingPreview">预览窗</span>
+        <button class="preview-help-btn" @click="previewHelpVisible = !previewHelpVisible">
+          使用说明
+        </button>
+        <div class="toggle-switch" @click="toggleFloatingPreview">
+          <div class="toggle-container" :class="{ 'toggle-active': showFloatingPreview }">
+            <div class="toggle-thumb"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -74,13 +87,25 @@
         @click.stop="handlePreviewClick"
       >
         <div class="floating-preview__body">
-          <img 
-            v-if="previewImageUrl" 
-            :src="previewImageUrl" 
-            alt="预览图"
-            @error="handleImageError"
-            class="floating-preview__img"
-          />
+          <div
+            v-if="previewImageUrl"
+            class="floating-preview__img-wrap"
+            :class="{
+              'floating-preview__img-wrap--zoomed': previewZoom > 1,
+              'floating-preview__img-wrap--panning': imagePanState.dragging
+            }"
+            ref="previewImgWrapRef"
+            @dblclick.stop.prevent="handlePreviewDblClick"
+            @mousedown.stop="handlePreviewImgMouseDown"
+          >
+            <img 
+              :src="previewImageUrl" 
+              alt="预览图"
+              @error="handleImageError"
+              class="floating-preview__img"
+              :style="previewImgStyle"
+            />
+          </div>
           <div v-else class="preview-placeholder">
             <i class="el-icon-picture"></i>
             <p>暂无预览图</p>
@@ -127,6 +152,132 @@ const iconList = ref<AlignListData[]>(alignIconList)
 const showGroupCombined = ref(false)
 const clearButtonRef = ref<HTMLElement | null>(null)
 const floatingPreviewRef = ref<HTMLElement | null>(null)
+const previewImgWrapRef = ref<HTMLDivElement | null>(null)
+const previewHelpVisible = ref(false)
+const previewZoom = ref(1)
+const previewOffset = reactive({ x: 0, y: 0 })
+const imagePanState = reactive({
+  dragging: false,
+  startX: 0,
+  startY: 0,
+  startOffsetX: 0,
+  startOffsetY: 0,
+})
+
+const previewImgStyle = computed(() => ({
+  transform: `translate(${previewOffset.x}px, ${previewOffset.y}px) scale(${previewZoom.value})`,
+}))
+
+function resetPreviewZoom() {
+  previewZoom.value = 1
+  previewOffset.x = 0
+  previewOffset.y = 0
+}
+
+const PREVIEW_ZOOM_STEPS = [1, 1.6, 2.4]
+
+const handlePreviewDblClick = (event: MouseEvent) => {
+  const wrap = previewImgWrapRef.value
+  if (!wrap) return
+
+  const rect = wrap.getBoundingClientRect()
+  const clickX = event.clientX - rect.left
+  const clickY = event.clientY - rect.top
+
+  const nextZoom = getNextPreviewZoom()
+  if (nextZoom === 1) {
+    resetPreviewZoom()
+    return
+  }
+
+  applyPreviewZoom(nextZoom, clickX, clickY, rect)
+}
+
+watch(previewImageUrl, () => {
+  resetPreviewZoom()
+})
+
+const getNextPreviewZoom = () => {
+  const current = previewZoom.value
+  const idx = PREVIEW_ZOOM_STEPS.findIndex((step) => Math.abs(step - current) < 0.01)
+  if (idx === -1) return 1
+  const nextIdx = (idx + 1) % PREVIEW_ZOOM_STEPS.length
+  return PREVIEW_ZOOM_STEPS[nextIdx]
+}
+
+const applyPreviewZoom = (zoom: number, clickX: number, clickY: number, rect: DOMRect) => {
+  previewZoom.value = zoom
+  if (zoom === 1) {
+    resetPreviewZoom()
+    return
+  }
+  const dx = clickX - rect.width / 2
+  const dy = clickY - rect.height / 2
+  const delta = zoom - 1
+  previewOffset.x = clampPreviewPanComponent(-dx * delta, rect.width, zoom)
+  previewOffset.y = clampPreviewPanComponent(-dy * delta, rect.height, zoom)
+}
+
+const removePreviewPanListeners = () => {
+  window.removeEventListener('mousemove', handlePreviewImgMouseMove)
+  window.removeEventListener('mouseup', handlePreviewImgMouseUp)
+}
+
+const handlePreviewImgMouseDown = (event: MouseEvent) => {
+  if (previewZoom.value <= 1) return
+  const wrap = previewImgWrapRef.value
+  if (!wrap) return
+
+  event.preventDefault()
+  imagePanState.dragging = true
+  imagePanState.startX = event.clientX
+  imagePanState.startY = event.clientY
+  imagePanState.startOffsetX = previewOffset.x
+  imagePanState.startOffsetY = previewOffset.y
+
+  window.addEventListener('mousemove', handlePreviewImgMouseMove, { passive: false })
+  window.addEventListener('mouseup', handlePreviewImgMouseUp)
+}
+
+const handlePreviewImgMouseMove = (event: MouseEvent) => {
+  if (!imagePanState.dragging) return
+  event.preventDefault()
+  previewImgWrapRef.value?.classList.add('floating-preview__img-wrap--panning')
+
+  const dx = event.clientX - imagePanState.startX
+  const dy = event.clientY - imagePanState.startY
+  const nextX = imagePanState.startOffsetX + dx
+  const nextY = imagePanState.startOffsetY + dy
+  const clamped = clampPreviewPan(nextX, nextY)
+  previewOffset.x = clamped.x
+  previewOffset.y = clamped.y
+}
+
+const handlePreviewImgMouseUp = () => {
+  if (!imagePanState.dragging) return
+  imagePanState.dragging = false
+  previewImgWrapRef.value?.classList.remove('floating-preview__img-wrap--panning')
+  removePreviewPanListeners()
+}
+
+const clampPreviewPanComponent = (value: number, size: number, zoom: number) => {
+  const limit = ((zoom - 1) * size) / 2
+  if (limit <= 0) return 0
+  return Math.max(Math.min(value, limit), -limit)
+}
+
+const clampPreviewPan = (x: number, y: number) => {
+  const wrap = previewImgWrapRef.value
+  if (!wrap) return { x, y }
+  return {
+    x: clampPreviewPanComponent(x, wrap.clientWidth, previewZoom.value),
+    y: clampPreviewPanComponent(y, wrap.clientHeight, previewZoom.value),
+  }
+}
+
+onBeforeUnmount(() => {
+  removePreviewPanListeners()
+})
 
 const defaultPreviewPosition = { top: 220, left: 0 }
 const defaultPreviewSize = { width: 220, height: 180 }
@@ -854,28 +1005,31 @@ onBeforeUnmount(() => {
   
   .floating-preview-toggle {
     padding: 12px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     border-top: 1px solid @apple-border;
     background: rgba(255, 255, 255, 0.5);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     
-    .toggle-switch {
+    .toggle-main {
       display: flex;
       align-items: center;
+      gap: 12px;
       justify-content: space-between;
-      width: 100%;
+    }
+
+    .toggle-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: @apple-text-primary;
+      letter-spacing: -0.01em;
       cursor: pointer;
       user-select: none;
-      
-      .toggle-label {
-        font-size: 13px;
-        font-weight: 500;
-        color: @apple-text-primary;
-        letter-spacing: -0.01em;
-      }
+      flex: 1;
+    }
+
+    .toggle-switch {
+      cursor: pointer;
+      user-select: none;
       
       .toggle-container {
         position: relative;
@@ -912,6 +1066,31 @@ onBeforeUnmount(() => {
           opacity: 0.8;
         }
       }
+    }
+
+    .preview-help-btn {
+      border: none;
+      background: rgba(0, 0, 0, 0.05);
+      color: @apple-text-primary;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.08);
+      }
+    }
+
+    .preview-help-list {
+      list-style: disc;
+      margin: 0 0 12px 18px;
+      padding: 0;
+      color: @apple-text-secondary;
+      font-size: 12px;
+      line-height: 1.5;
     }
 }
 
@@ -1004,12 +1183,50 @@ onBeforeUnmount(() => {
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  &__img-wrap {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: zoom-in;
+  }
+
+  &__img-wrap--zoomed {
+    cursor: zoom-out;
+  }
+
+  &__img-wrap--panning {
+    cursor: grabbing;
+  }
+
   &__img {
     width: 100%;
     height: 100%;
-    display: block;
     object-fit: contain;
-    border-radius: 8px;
+    border-radius: 10px;
+    transform-origin: center;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  &__img-wrap--panning .floating-preview__img {
+    transition: none;
+  }
+// 帮助说明过渡
+.preview-help-slide-enter-active,
+.preview-help-slide-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.preview-help-slide-enter-from,
+.preview-help-slide-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+  &__img-wrap--panning .floating-preview__img {
+    transition: none;
   }
 
   .preview-placeholder {
