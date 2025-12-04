@@ -101,35 +101,6 @@
                     'order-item--stacked': item.image && item.text
                   }"
                 >
-                  <div v-if="getItemSubtitle(item) || (item.image && item.text)" class="order-item__subtitle-row">
-                    <div v-if="getItemSubtitle(item)" class="order-item__subtitle">
-                      {{ getItemSubtitle(item) }}
-                    </div>
-                    <div
-                      v-if="item.image && item.text"
-                      class="undo-btn order-item__undo-inline"
-                      @click.stop="handleDeleteOrderItem(item)"
-                      title="撤销"
-                    >
-                      <img src="/删除.svg" alt="删除" />
-                    </div>
-                    <div
-                      v-else-if="item.image && !item.text && getItemSubtitle(item)"
-                      class="undo-btn order-item__undo-inline"
-                      @click.stop="handleDeleteImage(item.image)"
-                      title="撤销"
-                    >
-                      <img src="/删除.svg" alt="删除" />
-                    </div>
-                    <div
-                      v-else-if="item.text && !item.image && getItemSubtitle(item)"
-                      class="undo-btn order-item__undo-inline"
-                      @click.stop="handleDeleteText(item.text)"
-                      title="撤销"
-                    >
-                      <img src="/删除.svg" alt="删除" />
-                    </div>
-                  </div>
                   <div
                     v-if="item.image"
                     class="order-item__image"
@@ -152,14 +123,6 @@
                         </div>
                       </template>
                     </el-image>
-                    <div
-                      v-if="item.image && !item.text && !getItemSubtitle(item)"
-                      class="undo-btn"
-                      @click.stop="handleDeleteImage(item.image)"
-                      title="撤销"
-                    >
-                      <img src="/删除.svg" alt="删除" />
-                    </div>
                   </div>
                   <div
                     v-if="item.text"
@@ -170,16 +133,8 @@
                       @click="selectText(item.text)"
                       @mousedown="dragTextStart($event, item.text)"
                     >
-                      <div class="text-content">
+                    <div class="text-content" :title="item.text.text">
                         {{ item.text.text }}
-                      </div>
-                      <div
-                        v-if="item.text && !item.image && !getItemSubtitle(item)"
-                        class="undo-btn"
-                        @click.stop="handleDeleteText(item.text)"
-                        title="撤销"
-                      >
-                        <img src="/删除.svg" alt="删除" />
                       </div>
                     </div>
                   </div>
@@ -526,30 +481,6 @@ const toggleGroup = (sortId: number | string) => {
   } else {
     state.expandedGroups.add(sortId)
   }
-}
-
-const getGroupOrderLabel = (group: TOrderGroup) => {
-  return group.orderNo ? '订单号' : '任务ID'
-}
-
-const getGroupOrderValue = (group: TOrderGroup) => {
-  return group.orderNo || String(group.sortId)
-}
-
-const getItemSubtitle = (item: TOrderItem) => {
-  if (item.orderNo && item.sortIndex != null) {
-    return `${item.orderNo}（${item.sortIndex}）`
-  }
-  
-  if (item.orderNo) {
-    return item.orderNo
-  }
-  
-  if (item.sortIndex != null) {
-    return String(item.sortIndex)
-  }
-  
-  return ''
 }
 
 const parseNeedRedrawIndices = (raw: any): number[] => {
@@ -1781,9 +1712,9 @@ defineExpose({
 
 .group-content {
   padding: 0.75rem 1rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
   background: transparent;
   overflow: hidden;
 }
@@ -1841,10 +1772,10 @@ defineExpose({
 }
 
 .order-item {
-  display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: 0.55rem;
-  padding: 0.65rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem;
   border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.55);
@@ -1911,121 +1842,35 @@ defineExpose({
 }
 
 // 统一的撤销按钮样式
-.order-item__undo,
-.undo-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: auto;
-  height: auto;
-  border: none;
-  background: transparent;
-  box-shadow: none;
-  cursor: pointer;
-  opacity: 1;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 2;
-  padding: 0;
-
-  img {
-    width: 18px;
-    height: 18px;
-    pointer-events: none;
-    opacity: 0.6;
-    display: block;
-  }
-
-  &:hover {
-    transform: none;
-    background: transparent;
-    box-shadow: none;
-    
-    img {
-      opacity: 1;
-    }
-  }
-  
-  &:active {
-    transform: scale(0.95);
-  }
-}
-
-// 小标题行中的撤销按钮（内联样式）
-.order-item__undo-inline {
-  position: relative;
-  top: auto;
-  right: auto;
-  flex-shrink: 0;
-  width: auto;
-  height: auto;
-  border: none;
-  background: transparent;
-  box-shadow: none;
-  margin-left: auto;
-  padding: 0;
-  
-  img {
-    width: 18px;
-    height: 18px;
-  }
-}
 
 .order-item__image {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  align-items: stretch;
+  border-radius: 8px;
   overflow: hidden;
-  border: none;
-  border-radius: 0;
-  padding: 0;
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: none;
-  flex: 1;
+  transition: transform 0.2s ease;
 
   &:hover {
-    transform: none;
-    box-shadow: none;
-    border-color: transparent;
-    background: transparent;
-  }
-  
-  &:active {
-    transform: none;
+    transform: translateY(-1px);
   }
 
   .image-thumb {
     width: 100%;
-    height: 96px;
-    border-radius: 9px;
+    height: 110px;
+    border-radius: 8px;
     object-fit: cover;
-    box-shadow: none;
-    transition: none;
-  }
-  
-  &:hover .image-thumb {
-    box-shadow: none;
-    transform: none;
   }
 
   .image-placeholder,
   .image-error {
     width: 100%;
-    height: 100%;
+    height: 110px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #86868b;
     background: rgba(0, 0, 0, 0.03);
-    border-radius: 10px;
+    border-radius: 8px;
     font-size: 12px;
   }
 }
@@ -2034,7 +1879,7 @@ defineExpose({
   position: relative;
   border: none;
   border-radius: 10px;
-  padding: 0.7rem 0.8rem;
+  padding: 0.45rem 0.6rem;
   background: linear-gradient(135deg, rgba(0, 122, 255, 0.12), rgba(100, 210, 255, 0.18));
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2058,8 +1903,12 @@ defineExpose({
   .text-content {
     font-size: 14px;
     color: @apple-text-primary;
-    white-space: pre-wrap;
-    line-height: 1.5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.45;
+    display: block;
+    width: 100%;
   }
 }
 
