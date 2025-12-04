@@ -66,112 +66,126 @@
                   </div>
                 </div>
               </div>
-              <el-button
-                text
-                size="small"
-                class="detail-btn"
-                @click.stop="handleViewDetail(group)"
-                title="查看详情"
-              >
-                查看详情
-              </el-button>
-              <span class="group-count">({{ group.items.length }})</span>
+              <div class="group-header__actions">
+                <el-button
+                  text
+                  size="small"
+                  class="detail-btn"
+                  @click.stop="handleViewDetail(group)"
+                  title="查看详情"
+                >
+                  详情
+                </el-button>
+              </div>
             </div>
-            <div v-show="state.expandedGroups.has(group.sortId)" class="group-content">
+            <transition
+              name="order-group-collapse"
+              @before-enter="collapseBeforeEnter"
+              @enter="collapseEnter"
+              @after-enter="collapseAfterEnter"
+              @before-leave="collapseBeforeLeave"
+              @leave="collapseLeave"
+              @after-leave="collapseAfterLeave"
+            >
               <div
-                v-for="item in group.items"
-                :key="item.key"
-                class="order-item"
-                :class="{
-                  'order-item--text-only': item.text && !item.image,
-                  'order-item--image-only': item.image && !item.text,
-                  'order-item--stacked': item.image && item.text
-                }"
+                v-show="state.expandedGroups.has(group.sortId)"
+                class="group-content"
               >
-                <div v-if="getItemSubtitle(item) || (item.image && item.text)" class="order-item__subtitle-row">
-                  <div v-if="getItemSubtitle(item)" class="order-item__subtitle">
-                    {{ getItemSubtitle(item) }}
-                  </div>
-                  <div
-                    v-if="item.image && item.text"
-                    class="undo-btn order-item__undo-inline"
-                    @click.stop="handleDeleteOrderItem(item)"
-                    title="撤销"
-                  >
-                    <img src="/删除.svg" alt="删除" />
-                  </div>
-                  <div
-                    v-else-if="item.image && !item.text && getItemSubtitle(item)"
-                    class="undo-btn order-item__undo-inline"
-                    @click.stop="handleDeleteImage(item.image)"
-                    title="撤销"
-                  >
-                    <img src="/删除.svg" alt="删除" />
-                  </div>
-                  <div
-                    v-else-if="item.text && !item.image && getItemSubtitle(item)"
-                    class="undo-btn order-item__undo-inline"
-                    @click.stop="handleDeleteText(item.text)"
-                    title="撤销"
-                  >
-                    <img src="/删除.svg" alt="删除" />
-                  </div>
-                </div>
                 <div
-                  v-if="item.image"
-                  class="order-item__image"
-                  @click="selectLocalImage(item.image)"
-                  @mousedown="dragImageStart($event, item.image)"
+                  v-for="item in group.items"
+                  :key="item.key"
+                  class="order-item"
+                  :class="{
+                    'order-item--text-only': item.text && !item.image,
+                    'order-item--image-only': item.image && !item.text,
+                    'order-item--stacked': item.image && item.text
+                  }"
                 >
-                  <el-image
-                    :src="item.image.url"
-                    fit="cover"
-                    class="image-thumb"
-                  >
-                    <template #placeholder>
-                      <div class="image-placeholder">
-                        <i class="el-icon-picture"></i>
-                      </div>
-                    </template>
-                    <template #error>
-                      <div class="image-error">
-                        <i class="el-icon-warning"></i>
-                      </div>
-                    </template>
-                  </el-image>
-                  <div
-                    v-if="item.image && !item.text && !getItemSubtitle(item)"
-                    class="undo-btn"
-                    @click.stop="handleDeleteImage(item.image)"
-                    title="撤销"
-                  >
-                    <img src="/删除.svg" alt="删除" />
-                  </div>
-                </div>
-                <div
-                  v-if="item.text"
-                  class="order-item__text-wrapper"
-                >
-                  <div
-                    class="order-item__text"
-                    @click="selectText(item.text)"
-                    @mousedown="dragTextStart($event, item.text)"
-                  >
-                    <div class="text-content">
-                      {{ item.text.text }}
+                  <div v-if="getItemSubtitle(item) || (item.image && item.text)" class="order-item__subtitle-row">
+                    <div v-if="getItemSubtitle(item)" class="order-item__subtitle">
+                      {{ getItemSubtitle(item) }}
                     </div>
                     <div
-                      v-if="item.text && !item.image && !getItemSubtitle(item)"
-                      class="undo-btn"
+                      v-if="item.image && item.text"
+                      class="undo-btn order-item__undo-inline"
+                      @click.stop="handleDeleteOrderItem(item)"
+                      title="撤销"
+                    >
+                      <img src="/删除.svg" alt="删除" />
+                    </div>
+                    <div
+                      v-else-if="item.image && !item.text && getItemSubtitle(item)"
+                      class="undo-btn order-item__undo-inline"
+                      @click.stop="handleDeleteImage(item.image)"
+                      title="撤销"
+                    >
+                      <img src="/删除.svg" alt="删除" />
+                    </div>
+                    <div
+                      v-else-if="item.text && !item.image && getItemSubtitle(item)"
+                      class="undo-btn order-item__undo-inline"
                       @click.stop="handleDeleteText(item.text)"
                       title="撤销"
                     >
                       <img src="/删除.svg" alt="删除" />
                     </div>
                   </div>
+                  <div
+                    v-if="item.image"
+                    class="order-item__image"
+                    @click="selectLocalImage(item.image)"
+                    @mousedown="dragImageStart($event, item.image)"
+                  >
+                    <el-image
+                      :src="item.image.url"
+                      fit="cover"
+                      class="image-thumb"
+                    >
+                      <template #placeholder>
+                        <div class="image-placeholder">
+                          <i class="el-icon-picture"></i>
+                        </div>
+                      </template>
+                      <template #error>
+                        <div class="image-error">
+                          <i class="el-icon-warning"></i>
+                        </div>
+                      </template>
+                    </el-image>
+                    <div
+                      v-if="item.image && !item.text && !getItemSubtitle(item)"
+                      class="undo-btn"
+                      @click.stop="handleDeleteImage(item.image)"
+                      title="撤销"
+                    >
+                      <img src="/删除.svg" alt="删除" />
+                    </div>
+                  </div>
+                  <div
+                    v-if="item.text"
+                    class="order-item__text-wrapper"
+                  >
+                    <div
+                      class="order-item__text"
+                      @click="selectText(item.text)"
+                      @mousedown="dragTextStart($event, item.text)"
+                    >
+                      <div class="text-content">
+                        {{ item.text.text }}
+                      </div>
+                      <div
+                        v-if="item.text && !item.image && !getItemSubtitle(item)"
+                        class="undo-btn"
+                        @click.stop="handleDeleteText(item.text)"
+                        title="撤销"
+                      >
+                        <img src="/删除.svg" alt="删除" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </transition>
           </div>
         </div>
       </template>
@@ -930,12 +944,29 @@ const loadOrderData = async (init = false) => {
     const groups = buildCombinedGroups(textData.map, imageData.map, order)
     mergeGroups(groups)
 
-    // 默认展开所有组
+    const newGroupIds: Array<number | string> = []
     groups.forEach((group) => {
-      if (group.sortId) {
+      if (!group.sortId) {
+        return
+      }
+      if (init) {
+        state.expandedGroups.delete(group.sortId)
+        newGroupIds.push(group.sortId)
+      } else {
         state.expandedGroups.add(group.sortId)
       }
     })
+
+    if (init && newGroupIds.length) {
+      await nextTick()
+      requestAnimationFrame(() => {
+        newGroupIds.forEach((id, index) => {
+          setTimeout(() => {
+            state.expandedGroups.add(id)
+          }, index * 20)
+        })
+      })
+    }
 
     // 设置预览窗图片 - 查找第一条数据的 effectiveImgUrl
     if (init) {
@@ -1431,6 +1462,50 @@ onBeforeUnmount(() => {
   eventBus.off('refreshOrderList', handleRefresh)
 })
 
+const collapseTransition =
+  'height 0.28s cubic-bezier(0.33, 1, 0.68, 1), opacity 0.22s ease, transform 0.28s cubic-bezier(0.33, 1, 0.68, 1)'
+
+const collapseBeforeEnter = (el: HTMLElement) => {
+  el.style.height = '0px'
+  el.style.opacity = '0'
+  el.style.transform = 'translateY(-4px)'
+}
+
+const collapseEnter = (el: HTMLElement) => {
+  el.style.transition = collapseTransition
+  requestAnimationFrame(() => {
+    el.style.height = el.scrollHeight + 'px'
+    el.style.opacity = '1'
+    el.style.transform = 'translateY(0)'
+  })
+}
+
+const collapseAfterEnter = (el: HTMLElement) => {
+  el.style.height = 'auto'
+  el.style.removeProperty('transition')
+  el.style.removeProperty('transform')
+}
+
+const collapseBeforeLeave = (el: HTMLElement) => {
+  el.style.height = el.scrollHeight + 'px'
+}
+
+const collapseLeave = (el: HTMLElement) => {
+  el.style.transition = collapseTransition
+  requestAnimationFrame(() => {
+    el.style.height = '0px'
+    el.style.opacity = '0'
+    el.style.transform = 'translateY(-4px)'
+  })
+}
+
+const collapseAfterLeave = (el: HTMLElement) => {
+  el.style.removeProperty('height')
+  el.style.removeProperty('opacity')
+  el.style.removeProperty('transform')
+  el.style.removeProperty('transition')
+}
+
 defineExpose({
   handleRefresh,
 })
@@ -1456,11 +1531,11 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1rem 0.75rem;
-  margin-bottom: 0.75rem;
+  padding: 0.8rem 0.9rem 0.4rem;
+  margin-bottom: 0.4rem;
 
   .header-title {
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 600;
     color: #1d1d1f;
     letter-spacing: -0.02em;
@@ -1487,60 +1562,52 @@ defineExpose({
 .order-meta {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 0 1rem;
-  margin-bottom: 0.75rem;
+  padding: 0 0.5rem;
+  margin-bottom: 0.5rem;
 
   .meta-counts {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.75rem;
+    gap: 0.4rem;
+    justify-content: space-between;
+    align-items: stretch;
   }
 
   .meta-item {
     border: none;
-    border-radius: 12px;
-    padding: 0.75rem 1rem;
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-radius: 999px;
+    padding: 0.35rem 0.65rem 0.3rem;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    gap: 0;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    text-align: center;
     
     &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-      background: rgba(255, 255, 255, 0.8);
+      transform: translateY(-0.5px);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      background: rgba(255, 255, 255, 0.85);
     }
   }
 
   .meta-label {
-    font-size: 11px;
-    color: #86868b;
+    font-size: 10px;
+    color: #8a8a8e;
     font-weight: 500;
+    letter-spacing: 0.2px;
     text-transform: uppercase;
-    letter-spacing: 0.3px;
   }
 
   .meta-value {
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 600;
     color: #1d1d1f;
-    line-height: 1.2;
-    letter-spacing: -0.02em;
-  }
-
-  .meta-refresh {
-    font-size: 11px;
-    color: #9BA5B7;
-    text-align: right;
-    padding: 0.25rem 0.5rem;
-    background: rgba(240, 245, 255, 0.5);
-    border-radius: 8px;
-    border: 1px solid rgba(200, 220, 255, 0.3);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
   }
 }
 
@@ -1548,7 +1615,7 @@ defineExpose({
   width: 100%;
   height: 100%;
   overflow-y: auto;
-  padding: 0 1rem 120px;
+  padding: 0 0.75rem 72px;
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
 
@@ -1574,38 +1641,42 @@ defineExpose({
 .groups-container {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .order-group {
   border: none;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
   overflow: hidden;
-  margin-bottom: 1rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 0.75rem;
+  box-shadow: 0 1px 4px rgba(15, 15, 15, 0.05);
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+  position: relative;
+  border-left: 3px solid rgba(0, 122, 255, 0.16);
   
   &:last-child {
     margin-bottom: 0;
   }
   
   &:hover {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 11px rgba(15, 15, 15, 0.08);
     transform: translateY(-1px);
   }
   
   .group-header {
     display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1rem 1.25rem;
+    align-items: stretch;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
     cursor: pointer;
     user-select: none;
     background: transparent;
-    border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
     transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     
     &:hover {
@@ -1618,7 +1689,7 @@ defineExpose({
     
     .collapse-icon {
       color: #6B7A99;
-      font-size: 14px;
+      font-size: 13px;
       transition: all 0.3s ease;
       flex-shrink: 0;
       
@@ -1632,18 +1703,6 @@ defineExpose({
       color: @apple-text-primary;
       font-weight: 600;
       flex: 1;
-    }
-
-    .group-count {
-      color: #86868b;
-      font-size: 13px;
-      font-weight: 500;
-      padding: 0.25rem 0.5rem;
-      background: rgba(0, 0, 0, 0.05);
-      border-radius: 8px;
-      border: none;
-      flex-shrink: 0;
-      white-space: nowrap;
     }
 
     .group-header__content {
@@ -1663,22 +1722,26 @@ defineExpose({
     .group-title-row {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      flex-wrap: nowrap;
+      gap: 0.65rem;
       min-width: 0;
       flex: 1;
+      flex-wrap: nowrap;
       overflow: hidden;
+    }
+
+    .group-header__actions {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
     }
 
     .detail-btn {
       color: #007aff;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
-      padding: 0.4rem 0.75rem;
-      margin-left: 0.75rem;
-      flex-shrink: 0;
-      border-radius: 8px;
-      background: rgba(0, 122, 255, 0.1);
+      padding: 0.3rem 0.6rem;
+      border-radius: 999px;
+      background: rgba(0, 122, 255, 0.08);
       border: none;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       white-space: nowrap;
@@ -1687,63 +1750,61 @@ defineExpose({
         color: #ffffff;
         background: #007aff;
         border: none;
-        transform: none;
-        box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
-      }
-      
-      &:active {
-        transform: scale(0.96);
       }
     }
 
     .group-category-chip {
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
-      padding: 0.3rem 0.65rem;
-      border-radius: 10px;
+      padding: 0.25rem 0.55rem;
+      border-radius: 999px;
       border: none;
       background: rgba(52, 199, 89, 0.12);
       color: #34c759;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 500;
       flex-shrink: 1;
       min-width: 0;
       max-width: 100%;
-      box-shadow: none;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       overflow: hidden;
-      
-      &:hover {
-        transform: none;
-        box-shadow: none;
-        background: rgba(52, 199, 89, 0.18);
-      }
-    }
-
-    .group-category__label {
-      font-weight: 500;
-      color: rgba(45, 153, 80, 0.7);
-      font-size: 11px;
     }
 
     .group-category__value {
-      font-weight: 600;
-      color: #2d9950;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       min-width: 0;
     }
-  }
 
-  .group-content {
-    padding: 1rem 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    background: transparent;
   }
+}
+
+.group-content {
+  padding: 0.75rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: transparent;
+  overflow: hidden;
+}
+
+// 折叠展开动画
+.order-group-collapse-enter-active,
+.order-group-collapse-leave-active {
+  overflow: hidden;
+  transform-origin: top;
+}
+
+.order-group-collapse-enter-from,
+.order-group-collapse-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.order-group-collapse-enter-to,
+.order-group-collapse-leave-from {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .chip {
@@ -1781,18 +1842,18 @@ defineExpose({
 
 .order-item {
   display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 0.75rem;
-  padding: 1rem;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  grid-template-columns: 110px 1fr;
+  gap: 0.55rem;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   position: relative;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-  margin-bottom: 0.5rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  margin-bottom: 0.35rem;
 
   &:last-child {
     margin-bottom: 0;
@@ -1817,10 +1878,10 @@ defineExpose({
   }
 
   &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-0.5px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     background: rgba(255, 255, 255, 0.8);
-    border-color: rgba(0, 0, 0, 0.12);
+    border-color: rgba(0, 0, 0, 0.1);
   }
 }
 
@@ -1834,7 +1895,7 @@ defineExpose({
 }
 
 .order-item__subtitle {
-  font-size: 11px;
+  font-size: 10px;
   color: #86868b;
   font-weight: 600;
   text-transform: uppercase;
@@ -1943,8 +2004,8 @@ defineExpose({
 
   .image-thumb {
     width: 100%;
-    height: 120px;
-    border-radius: 10px;
+    height: 96px;
+    border-radius: 9px;
     object-fit: cover;
     box-shadow: none;
     transition: none;
@@ -1971,22 +2032,19 @@ defineExpose({
 
 .order-item__text {
   position: relative;
-  border: 0.5px solid rgba(0, 0, 0, 0.1);
+  border: none;
   border-radius: 10px;
-  padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  padding: 0.7rem 0.8rem;
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.12), rgba(100, 210, 255, 0.18));
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
   flex: 1;
 
   &:hover {
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    border-color: rgba(0, 0, 0, 0.12);
-    background: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    background: linear-gradient(135deg, rgba(0, 122, 255, 0.18), rgba(100, 210, 255, 0.24));
   }
   
   &:active {
