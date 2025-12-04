@@ -22,6 +22,18 @@
     <slot />
     <!-- <el-button :loading="state.loading" size="large" class="primary-btn" :disabled="tempEditing" plain type="primary" @click="download">下载作品</el-button> -->
     <!-- </copyRight> -->
+    <!-- 清除缓存和刷新按钮 -->
+    <el-button 
+      class="clear-cache-btn"
+      @click="handleClearCacheAndRefresh"
+      title="清除缓存并刷新页面"
+      size="default"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 6px;">
+        <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z" fill="currentColor"/>
+      </svg>
+      <span>清除缓存</span>
+    </el-button>
     <!-- 登出按钮 -->
     <el-button 
       v-if="authStore.isLoggedIn"
@@ -83,6 +95,32 @@ const canvasImage = ref<typeof SaveImage | null>(null)
 
 // 获取用户头像 - 使用 computed 使其响应式
 const userAvatar = computed(() => authStore.user?.avatar)
+
+// 清除缓存并刷新页面
+function handleClearCacheAndRefresh() {
+  try {
+    // 清除任务记录缓存
+    taskRecordCache.clear()
+    console.log('任务记录缓存已清除')
+    
+    // 清除 localStorage 中的非关键数据
+    // 保留 token 相关数据，避免清除后需要重新登录
+    localStorage.removeItem('ui_zoom_percent')
+    localStorage.removeItem('poster_design_autosave')
+    console.log('localStorage 缓存已清除')
+    
+    // 显示提示
+    useNotification('缓存已清除', '页面即将刷新', { type: 'success' })
+    
+    // 延迟刷新，让用户看到提示
+    setTimeout(() => {
+      window.location.reload()
+    }, 500)
+  } catch (error) {
+    console.error('清除缓存失败:', error)
+    useNotification('清除缓存失败', '请重试', { type: 'error' })
+  }
+}
 
 // 登出按钮点击事件
 async function handleLogout() {
@@ -966,6 +1004,72 @@ defineExpose({
     padding: 5px 8px;
     &:hover {
       background-color: rgba(0, 0, 0, 0.5);
+    }
+  }
+  
+  .clear-cache-btn {
+    margin-left: 10px;
+    margin-right: 10px;
+    border-radius: 8px;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0;
+    padding: 0 18px;
+    height: 36px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: #ffffff;
+    font-weight: 500;
+    font-size: 13px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    visibility: visible !important;
+    opacity: 1 !important;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
+    position: relative;
+    overflow: hidden;
+    
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s;
+    }
+    
+    svg {
+      width: 14px;
+      height: 14px;
+      opacity: 0.95;
+      transition: transform 0.3s ease;
+    }
+    
+    span {
+      margin-left: 0;
+      position: relative;
+      z-index: 1;
+    }
+    
+    &:hover {
+      background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      
+      &::before {
+        left: 100%;
+      }
+      
+      svg {
+        transform: rotate(180deg);
+        opacity: 1;
+      }
+    }
+    
+    &:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
     }
   }
   
