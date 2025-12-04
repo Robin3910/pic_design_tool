@@ -76,10 +76,14 @@ async function createPoster() {
     return Promise.resolve({ blob: null })
   }
   
-// 收集所有图片的位置和brightness值，同时记录“模板图片”的区域用于裁剪
+// 收集所有图片的位置和brightness值，同时记录"模板图片"的区域用于裁剪
   const widgets = widgetStore.getWidgets()
   const brightnessData = new Map<string, { brightness: number; left: number; top: number; width: number; height: number }>()
-  const scale = 100 / dZoom.value
+  const deviceScale = window.devicePixelRatio || 3
+  // 清晰度倍数：1 = 标准，2 = 2倍清晰度，3 = 3倍清晰度（数值越大越清晰，但文件也越大，生成时间更长）
+  // 建议值：2-3 倍即可获得很好的清晰度，超过 3 倍提升不明显但会显著增加内存和生成时间
+  const qualityMultiplier = 1 // 可以修改这个值来调节清晰度倍数（1, 2, 3, 4...）
+  const captureScale = Math.max(1, (100 / dZoom.value) * deviceScale * qualityMultiplier)
 // 用于记录模板图片的整体包围盒（可能有多张模板图片）
 const templateBounds = {
   left: Number.POSITIVE_INFINITY,
@@ -88,6 +92,9 @@ const templateBounds = {
   bottom: Number.NEGATIVE_INFINITY,
 }
 let hasTemplateBounds = false
+// 只处理第一个“模板图片”用于拉伸铺满，其余模板图片保持原样
+let firstTemplateForCloneHandled = false
+let firstTemplateForPageHandled = false
   
   widgets.forEach((widget: any) => {
     if (widget.type === 'w-image' && widget.uuid) {
@@ -98,10 +105,10 @@ let hasTemplateBounds = false
       if (widgetEl) {
         const rect = widgetEl.getBoundingClientRect()
         const canvasRect = originalPage.getBoundingClientRect()
-        const left = (rect.left - canvasRect.left) * scale
-        const top = (rect.top - canvasRect.top) * scale
-        const width = rect.width * scale
-        const height = rect.height * scale
+        const left = (rect.left - canvasRect.left) * captureScale
+        const top = (rect.top - canvasRect.top) * captureScale
+        const width = rect.width * captureScale
+        const height = rect.height * captureScale
 
         // 记录需要做亮度调整的图片区域
         if (
@@ -109,8 +116,8 @@ let hasTemplateBounds = false
           widget.brightness !== null &&
           widget.brightness !== 1
         ) {
-          brightnessData.set(widget.uuid, {
-            brightness: widget.brightness,
+        brightnessData.set(widget.uuid, {
+          brightness: widget.brightness,
             left,
             top,
             width,
@@ -131,16 +138,16 @@ let hasTemplateBounds = false
   })
   
   // 计算画布的实际尺寸（考虑缩放）
-  const canvasWidth = Math.round(dPage.value.width * scale)
-  const canvasHeight = Math.round(dPage.value.height * scale)
+  const canvasWidth = Math.round(dPage.value.width * captureScale)
+  const canvasHeight = Math.round(dPage.value.height * captureScale)
 
   // 获取原始画布元素的位置信息，用于精确对齐
   const originalRect = originalPage.getBoundingClientRect()
-
+  
   const opts = {
     backgroundColor: null, // 关闭背景以支持透明图片生成
     useCORS: true,
-    scale: scale,
+    scale: captureScale,
     width: dPage.value.width, // 使用画布原始宽度（不乘以scale，html2canvas会自动处理）
     height: dPage.value.height, // 使用画布原始高度（不乘以scale，html2canvas会自动处理）
     x: 0, // 从元素左上角(0,0)开始截图
@@ -164,6 +171,35 @@ let hasTemplateBounds = false
         clonedEl.style.top = '0px'
         clonedEl.style.margin = '0'
         clonedEl.style.padding = '0'
+        
+        // 拉伸模板图片填满整个画布（仅处理第一个模板图片）
+        widgets.forEach((widget: any) => {
+          if (firstTemplateForCloneHandled) {
+            return
+          }
+          if (widget.type === 'w-image' && widget.name === '模板图片' && widget.uuid) {
+            const templateEl = clonedEl.querySelector(`[data-uuid="${widget.uuid}"]`) as HTMLElement
+            if (templateEl) {
+              // 将模板图片拉伸填满整个画布
+              templateEl.style.position = 'absolute'
+              templateEl.style.left = '0px'
+              templateEl.style.top = '0px'
+              templateEl.style.width = dPage.value.width + 'px'
+              templateEl.style.height = dPage.value.height + 'px'
+              templateEl.style.objectFit = 'fill' // 拉伸填满，不保持比例
+              templateEl.style.objectPosition = '0 0'
+              // 确保图片元素本身也填满
+              const imgEl = templateEl.querySelector('img') as HTMLImageElement
+              if (imgEl) {
+                imgEl.style.width = '100%'
+                imgEl.style.height = '100%'
+                imgEl.style.objectFit = 'fill'
+              }
+              firstTemplateForCloneHandled = true
+            }
+          }
+        })
+        
         // 确保所有子元素的位置也是相对于画布左上角
         const allChildren = clonedEl.querySelectorAll('*')
         allChildren.forEach((child) => {
@@ -173,7 +209,7 @@ let hasTemplateBounds = false
       }
     },
   }
-
+  
   return new Promise((resolve) => {
     const clonePage = originalPage.cloneNode(true) as HTMLElement
     if (!clonePage) return
@@ -193,6 +229,35 @@ let hasTemplateBounds = false
     clonePage.style.boxSizing = 'border-box'
     clonePage.style.pointerEvents = 'none' // 禁用交互，避免意外触发
     clonePage.style.zIndex = '-9999' // 确保在底层，避免遮挡
+    
+    // 拉伸模板图片填满整个画布（在克隆元素上直接处理，仅处理第一个模板图片）
+    widgets.forEach((widget: any) => {
+      if (firstTemplateForPageHandled) {
+        return
+      }
+      if (widget.type === 'w-image' && widget.name === '模板图片' && widget.uuid) {
+        const templateEl = clonePage.querySelector(`[data-uuid="${widget.uuid}"]`) as HTMLElement
+        if (templateEl) {
+          // 将模板图片拉伸填满整个画布
+          templateEl.style.position = 'absolute'
+          templateEl.style.left = '0px'
+          templateEl.style.top = '0px'
+          templateEl.style.width = dPage.value.width + 'px'
+          templateEl.style.height = dPage.value.height + 'px'
+          templateEl.style.objectFit = 'fill' // 拉伸填满，不保持比例
+          templateEl.style.objectPosition = '0 0'
+          // 确保图片元素本身也填满
+          const imgEl = templateEl.querySelector('img') as HTMLImageElement
+          if (imgEl) {
+            imgEl.style.width = '100%'
+            imgEl.style.height = '100%'
+            imgEl.style.objectFit = 'fill'
+          }
+          firstTemplateForPageHandled = true
+        }
+      }
+    })
+    
     document.body.appendChild(clonePage)
     html2canvas(clonePage, opts).then((canvas) => {
       // 如果图片有brightness设置，使用Canvas API手动应用
@@ -204,7 +269,7 @@ let hasTemplateBounds = false
             // 获取该区域的图像数据
             const imgData = ctx.getImageData(left, top, width, height)
             const pixels = imgData.data
-
+            
             // 应用brightness效果
             for (let i = 0; i < pixels.length; i += 4) {
               pixels[i] = Math.min(255, pixels[i] * brightness) // R
@@ -212,13 +277,13 @@ let hasTemplateBounds = false
               pixels[i + 2] = Math.min(255, pixels[i + 2] * brightness) // B
               // pixels[i + 3] 保持 alpha 不变
             }
-
+            
             // 将处理后的数据写回canvas
             ctx.putImageData(imgData, left, top)
           })
         }
       }
-
+      
       // 最终导出尺寸必须严格等于模板的原始尺寸（dPage.width 和 dPage.height）
       // 确保同一模板每次导出的尺寸完全一致，和模板尺寸一模一样
       // 使用 Math.floor 确保尺寸向下取整，保证同一模板每次导出尺寸完全一致
