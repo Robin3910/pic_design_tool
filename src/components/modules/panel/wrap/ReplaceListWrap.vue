@@ -53,42 +53,33 @@
           class="date-group"
         >
           <div class="date-header">{{ date }}</div>
-          <div
-            v-for="([category, catImages], catIndex) in groupByCategory(images)"
-            :key="`${date}-${category}-${catIndex}`"
-            class="category-group"
-          >
-            <div class="category-header">
-              {{ category }}
-          </div>
-            <div class="images-grid">
-              <div 
-                v-for="(image, index) in catImages" 
-                :key="`${image.url}-${index}`"
-          class="image-item readonly"
-        >
-          <el-image 
-                  :src="getImageUrlWithTimestamp(image.url)" 
-            fit="contain" 
-            lazy 
-            loading="lazy"
-            class="image-thumb"
-                  :key="`${image.url}-${state.refreshTimestamp}`"
-          >
-            <template #placeholder>
-              <div class="image-placeholder">
-                <i class="el-icon-picture"></i>
-              </div>
-            </template>
-            <template #error>
-              <div class="image-error">
-                <i class="el-icon-warning"></i>
-              </div>
-            </template>
-          </el-image>
-                <div class="undo-btn" @click.stop="handleDelete(image)" title="删除">
-            <img src="/删除.svg" alt="删除" />
-          </div>
+          <div class="images-grid">
+            <div 
+              v-for="(image, index) in images" 
+              :key="`${image.url}-${index}`"
+              class="image-item readonly"
+            >
+              <el-image 
+                :src="getImageUrlWithTimestamp(image.url)" 
+                fit="contain" 
+                lazy 
+                loading="lazy"
+                class="image-thumb"
+                :key="`${image.url}-${state.refreshTimestamp}`"
+              >
+                <template #placeholder>
+                  <div class="image-placeholder">
+                    <i class="el-icon-picture"></i>
+                  </div>
+                </template>
+                <template #error>
+                  <div class="image-error">
+                    <i class="el-icon-warning"></i>
+                  </div>
+                </template>
+              </el-image>
+              <div class="undo-btn" @click.stop="handleDelete(image)" title="删除">
+                <img src="/删除.svg" alt="删除" />
               </div>
             </div>
           </div>
@@ -201,46 +192,37 @@
             class="detail-date-group"
           >
             <div class="date-header">{{ date }}</div>
-            <div
-              v-for="([category, catImages], catIndex) in groupByCategory(images)"
-              :key="`detail-${date}-${category}-${catIndex}`"
-              class="detail-category-group"
+          <div class="detail-images-grid">
+            <div 
+              v-for="(image, index) in images" 
+              :key="`detail-${image.url}-${index}`"
+              class="detail-image-item"
+              @click="handleImageClick(image)"
             >
-              <div class="category-header">
-                {{ category }}
-              </div>
-              <div class="detail-images-grid">
-                <div 
-                  v-for="(image, index) in catImages" 
-                  :key="`detail-${image.url}-${index}`"
-                  class="detail-image-item"
-                  @click="handleImageClick(image)"
-                >
-                  <el-image 
-                    :src="getImageUrlWithTimestamp(image.url)" 
-                    fit="contain" 
-                    lazy 
-                    loading="lazy"
-                    class="detail-image-thumb"
-                    :key="`detail-${image.url}-${state.refreshTimestamp}`"
-                  >
-                    <template #placeholder>
-                      <div class="image-placeholder">
-                        <i class="el-icon-picture"></i>
-                      </div>
-                    </template>
-                    <template #error>
-                      <div class="image-error">
-                        <i class="el-icon-warning"></i>
-                      </div>
-                    </template>
-                  </el-image>
-                  <div class="detail-delete-btn" @click.stop="handleDelete(image)" title="删除">
-                    <img src="/删除.svg" alt="删除" />
+              <el-image 
+                :src="getImageUrlWithTimestamp(image.url)" 
+                fit="contain" 
+                lazy 
+                loading="lazy"
+                class="detail-image-thumb"
+                :key="`detail-${image.url}-${state.refreshTimestamp}`"
+              >
+                <template #placeholder>
+                  <div class="image-placeholder">
+                    <i class="el-icon-picture"></i>
                   </div>
-                </div>
+                </template>
+                <template #error>
+                  <div class="image-error">
+                    <i class="el-icon-warning"></i>
+                  </div>
+                </template>
+              </el-image>
+              <div class="detail-delete-btn" @click.stop="handleDelete(image)" title="删除">
+                <img src="/删除.svg" alt="删除" />
               </div>
             </div>
+          </div>
           </div>
         </div>
         <div v-show="state.detailLoading" class="loading"><i class="el-icon-loading" /> 加载中...</div>
@@ -727,26 +709,6 @@ const groupImagesByDate = (images: TLocalImage[]) => {
 const groupedLocalImages = computed(() => groupImagesByDate(state.localImages))
 const groupedDetailImages = computed(() => groupImagesByDate(state.detailImages))
 
-// 按类目分组（在同一天内部）
-const groupByCategory = (images: TLocalImage[]) => {
-  const map = new Map<string, TLocalImage[]>()
-  images.forEach((img) => {
-    const key = img.categoryName && img.categoryName.trim()
-      ? img.categoryName.trim()
-      : '未分类'
-    if (!map.has(key)) {
-      map.set(key, [])
-    }
-    map.get(key)!.push(img)
-  })
-  // 简单按类目名称排序，未分类在最后
-  return Array.from(map.entries()).sort((a, b) => {
-    if (a[0] === '未分类') return 1
-    if (b[0] === '未分类') return -1
-    return a[0].localeCompare(b[0])
-  })
-}
-
 // 详情弹窗滚动加载
 const loadDetailMore = () => {
   loadDetailImages(false)
@@ -1028,13 +990,51 @@ defineExpose({
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  position: relative;
+  padding-top: 1.5rem;
 }
 
 .date-header {
-    font-size: 13px;
-    font-weight: 600;
-    color: @apple-text-secondary;
-  padding: 0 0.25rem;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  /* 胶囊背景 */
+  background: linear-gradient(135deg, #fefefe 0%, #f2f2f7 100%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 0.25rem 0.8rem 0.25rem 2.25rem;
+  border-radius: 999px;
+  width: fit-content;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  margin-left: 0.5rem;
+  
+  &:before {
+    content: '';
+    position: absolute;
+    left: 0.75rem;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #007aff, #0040dd);
+    box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
+  }
+  
+  &:after {
+    content: '';
+    position: absolute;
+    left: 1rem;
+    top: -1rem;
+    bottom: -2rem;
+    width: 1px;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.02) 100%);
+  }
 }
 
 .category-group,
@@ -1052,11 +1052,12 @@ defineExpose({
 }
 
 .images-grid {
-  /* 同一天内按网格排布，控制每行数量，图片更大更疏松 */
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)); // 每行固定 3 张
+  /* 使用弹性布局，让每张图片的卡片尺寸尽量贴合图片本身，而不是统一网格尺寸 */
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.875rem;
   padding: 0.25rem 0;
+  align-items: flex-start;
 }
 
 .image-item {
@@ -1070,6 +1071,9 @@ defineExpose({
   border-radius: 0;
   position: relative;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* 左侧栏宽度有限，这里固定为一行两张，保证不会只剩一张一行 */
+  flex: 0 1 calc(50% - 0.5rem);
+  max-width: calc(50% - 0.5rem);
   
   &.readonly {
     cursor: default;
@@ -1090,7 +1094,7 @@ defineExpose({
 }
 
 .image-thumb {
-  /* 不限制宽度，由图片自身决定；超过容器时再收敛 */
+  /* 让图片尺寸尽量决定卡片尺寸，必要时在列内收敛 */
   width: auto;
   max-width: 100%;
   height: auto;
@@ -1465,14 +1469,25 @@ defineExpose({
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  position: relative;
+  padding-top: 1.5rem;
+}
+
+.detail-date-group .date-header {
+  margin-left: 0.25rem;
+  
+  &::after {
+    display: none;
+  }
 }
 
 .detail-images-grid {
-  display: grid;
-  /* 使用自适应列数，根据弹窗宽度动态决定每行数量，避免所有缩略图看起来过小或过密 */
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  /* 详情里也改成弹性布局，让不同尺寸的图片卡片高度/宽度随图片变化 */
+  display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
   padding: 0.25rem 0;
+  align-items: flex-start;
 }
 
 .detail-image-item {
@@ -1486,6 +1501,8 @@ defineExpose({
   border-radius: 0;
   position: relative;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex: 1 1 clamp(200px, 18vw, 320px);
+  max-width: clamp(200px, 18vw, 360px);
   cursor: pointer;
   
   &:hover {
