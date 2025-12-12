@@ -29,7 +29,7 @@ export function setTemplate(store: TWidgetStore, allWidgets: TdWidgetData[]) {
     if (!firstTemplateImageHandled && item.type === 'w-image' && item.name === '模板图片') {
       const page = canvasStore.dPage
       // 细小留白通常来自缩放取整误差，这里额外扩展 4px 作为“出血”保障
-      const bleed = 2
+      const bleed = 4
       const bleedOffset = bleed / 2
       item.left = -bleedOffset
       item.top = -bleedOffset
