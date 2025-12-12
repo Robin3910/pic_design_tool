@@ -92,6 +92,14 @@ const templateBounds = {
   bottom: Number.NEGATIVE_INFINITY,
 }
 let hasTemplateBounds = false
+let templateImageSrc: string | null = null
+function setTemplateBoundsToFull() {
+  templateBounds.left = 0
+  templateBounds.top = 0
+  templateBounds.right = dPage.value.width * captureScale
+  templateBounds.bottom = dPage.value.height * captureScale
+  hasTemplateBounds = true
+}
 // 只处理第一个“模板图片”用于拉伸铺满，其余模板图片保持原样
 let firstTemplateForCloneHandled = false
 let firstTemplateForPageHandled = false
@@ -132,6 +140,10 @@ let firstTemplateForPageHandled = false
           templateBounds.top = Math.min(templateBounds.top, top)
           templateBounds.right = Math.max(templateBounds.right, left + width)
           templateBounds.bottom = Math.max(templateBounds.bottom, top + height)
+          if (!templateImageSrc) {
+            const imgEl = widgetEl.querySelector('img') as HTMLImageElement | null
+            templateImageSrc = imgEl?.getAttribute('src') || null
+          }
         }
       }
     }
@@ -195,6 +207,7 @@ let firstTemplateForPageHandled = false
                 imgEl.style.height = '100%'
                 imgEl.style.objectFit = 'fill'
               }
+              setTemplateBoundsToFull()
               firstTemplateForCloneHandled = true
             }
           }
@@ -253,6 +266,7 @@ let firstTemplateForPageHandled = false
             imgEl.style.height = '100%'
             imgEl.style.objectFit = 'fill'
           }
+          setTemplateBoundsToFull()
           firstTemplateForPageHandled = true
         }
       }
@@ -284,14 +298,22 @@ let firstTemplateForPageHandled = false
         }
       }
       
-      // 最终导出尺寸必须严格等于模板的原始尺寸（dPage.width 和 dPage.height）
-      // 确保同一模板每次导出的尺寸完全一致，和模板尺寸一模一样
-      // 使用 Math.floor 确保尺寸向下取整，保证同一模板每次导出尺寸完全一致
-      const targetWidth = Math.floor(dPage.value.width)
-      const targetHeight = Math.floor(dPage.value.height)
+      // 如果存在模板包围盒，则按模板包围盒裁剪；否则按整张画布导出
+      const hasBounds = hasTemplateBounds && Number.isFinite(templateBounds.left) && Number.isFinite(templateBounds.top)
+      const cropLeft = hasBounds ? Math.max(0, Math.floor(templateBounds.left)) : 0
+      const cropTop = hasBounds ? Math.max(0, Math.floor(templateBounds.top)) : 0
+      const cropWidth = hasBounds
+        ? Math.max(1, Math.round(templateBounds.right - templateBounds.left))
+        : Math.max(1, Math.round(dPage.value.width * captureScale))
+      const cropHeight = hasBounds
+        ? Math.max(1, Math.round(templateBounds.bottom - templateBounds.top))
+        : Math.max(1, Math.round(dPage.value.height * captureScale))
+
+      // 目标导出尺寸与裁剪区域一致（保持形状与尺寸）
+      const targetWidth = cropWidth
+      const targetHeight = cropHeight
       
-      // 无论 html2canvas 生成的 canvas 尺寸如何，都强制创建精确等于模板尺寸的新 canvas
-      // html2canvas 可能因为 scale 参数生成更高分辨率的 canvas，需要缩放到模板尺寸
+      // 创建目标导出画布
       const exportCanvas = document.createElement('canvas')
       exportCanvas.width = targetWidth
       exportCanvas.height = targetHeight
@@ -307,19 +329,41 @@ let firstTemplateForPageHandled = false
       // 填充透明背景
       ctx2.clearRect(0, 0, targetWidth, targetHeight)
       
-      // 将 html2canvas 生成的 canvas（可能因为 scale 参数尺寸更大）缩放到模板尺寸
-      // 从原 canvas 的 (0,0) 开始，完整绘制到目标尺寸（模板尺寸）
-      // 使用 drawImage 的缩放功能，确保最终尺寸严格等于模板尺寸
+      // 将 html2canvas 生成的 canvas 按裁剪区域绘制到导出画布
       ctx2.drawImage(
         canvas,
-        0, 0, // 从原canvas的(0,0)开始
-        canvas.width, canvas.height, // 源尺寸（html2canvas 生成的完整尺寸）
-        0, 0, // 绘制到新canvas的(0,0)
-        targetWidth, targetHeight // 目标尺寸（严格等于模板尺寸）
+        cropLeft, cropTop, // 源裁剪起点
+        cropWidth, cropHeight, // 源裁剪尺寸
+        0, 0, // 目标起点
+        targetWidth, targetHeight // 目标尺寸
       )
 
-      exportCanvas.toBlob(async (blob) => resolve({ blob }), `image/png`)
-      clonePage.remove()
+      // 如果有模板图片来源且需要不规则形状，使用模板的 alpha 作为遮罩
+      const applyMask = async () => {
+        if (!templateImageSrc) return
+        try {
+          const img = await loadImage(templateImageSrc)
+          const maskCanvas = document.createElement('canvas')
+          maskCanvas.width = targetWidth
+          maskCanvas.height = targetHeight
+          const mctx = maskCanvas.getContext('2d')
+          if (!mctx) return
+          // 将模板图等比拉伸到裁剪区域大小，利用其 alpha 形成遮罩
+          mctx.clearRect(0, 0, targetWidth, targetHeight)
+          mctx.drawImage(img, 0, 0, targetWidth, targetHeight)
+          ctx2.globalCompositeOperation = 'destination-in'
+          ctx2.drawImage(maskCanvas, 0, 0)
+          ctx2.globalCompositeOperation = 'source-over'
+        } catch (e) {
+          // 忽略遮罩失败，保持矩形输出
+        }
+      }
+
+      // 应用遮罩后导出
+      applyMask().finally(() => {
+        exportCanvas.toBlob(async (blob) => resolve({ blob }), `image/png`)
+        clonePage.remove()
+      })
     })
   })
 }
@@ -335,6 +379,16 @@ async function checkFonts() {
     }
   })
   await Promise.all(fontLoaders)
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = src
+  })
 }
 
 defineExpose({
