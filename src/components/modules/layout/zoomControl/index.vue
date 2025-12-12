@@ -330,7 +330,9 @@ function calcZoom() {
   const diffWidth = presetPadding * 2 + 22
   let widthZoom = ((dScreen.value.width - diffWidth) * 100) / dPage.value.width
   let heightZoom = ((dScreen.value.height - diffHeight) * 100) / dPage.value.height
-  bestZoom.value = Math.min(widthZoom, heightZoom)
+  // 应用缩放系数，让适应屏幕时的画布尺寸小一点（0.8 = 缩小到80%）
+  const scaleFactor = 0.9
+  bestZoom.value = Math.min(widthZoom, heightZoom) * scaleFactor
   return bestZoom.value
 }
 

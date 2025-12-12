@@ -28,13 +28,21 @@ export function setTemplate(store: TWidgetStore, allWidgets: TdWidgetData[]) {
     // 导入到画布时，让第一个模板图片自动铺满整个画布，避免边缘露白
     if (!firstTemplateImageHandled && item.type === 'w-image' && item.name === '模板图片') {
       const page = canvasStore.dPage
-      // 细小留白通常来自缩放取整误差，这里额外扩展 4px 作为“出血”保障
-      const bleed = 4
+      // 不超出画布，设置为 0
+      const bleed = 0
       const bleedOffset = bleed / 2
       item.left = -bleedOffset
       item.top = -bleedOffset
       item.width = page.width + bleed
       item.height = page.height + bleed
+      // 调试：打印画布与模板尺寸
+      // eslint-disable-next-line no-console
+      console.log(
+        '[Template] canvas size',
+        { width: page.width, height: page.height },
+        'template size',
+        { width: item.width, height: item.height },
+      )
       // 同步修正记录尺寸，保持后续操作一致
       const anyItem = item as any
       anyItem.record = anyItem.record || {}
