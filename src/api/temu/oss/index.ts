@@ -5,7 +5,7 @@
  */
 
 import { templateRequest } from '@/utils/templateAxios'
-import type { AxiosRequestConfig } from 'axios'
+import { AxiosRequestConfig } from 'axios'
 
 // API响应格式
 interface ApiResponse<T = any> {
@@ -113,6 +113,134 @@ export const OssApi = {
       }
       
       throw new Error('上传失败，请稍后重试')
+    }
+  },
+
+  /**
+   * 上传字体文件到OSS
+   * 对应接口：POST /temu/oss/upload-font
+   * @param file 字体文件，支持 ttf、otf、woff、woff2 格式
+   * @param fontName 自定义字体名称（可选，不含后缀），不传则使用原始文件名去掉扩展名
+   * @returns 返回字体文件的 OSS URL 字符串
+   */
+  uploadFont: async (file: File, fontName?: string): Promise<string> => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    // 处理字体名：如果未提供，从文件对象中提取并去掉扩展名
+    let finalFontName = fontName
+    if (!finalFontName) {
+      const originalName = file.name || 'font'
+      const lastDotIndex = originalName.lastIndexOf('.')
+      finalFontName =
+        lastDotIndex > 0
+          ? originalName.substring(0, lastDotIndex)
+          : originalName || `font-${Date.now()}`
+    }
+    formData.append('fontName', finalFontName)
+
+    // 请求配置：multipart/form-data + 较长超时时间
+    const config: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 60000,
+    }
+
+    try {
+      console.log('开始上传字体:', { fontName: finalFontName, fileName: file.name, fileSize: file.size })
+
+      // 使用 templateRequest，自动带上 token
+      const response = await templateRequest.post<ApiResponse<string>>(
+        '/temu/oss/upload-font',
+        formData,
+        config,
+      )
+
+      console.log('字体上传响应:', response)
+
+      // templateRequest 返回的是完整的 AxiosResponse，响应数据在 response.data 中
+      // 注意：即使 HTTP 状态码是 200，后端可能返回 { code: 401, msg: '账号未登录' }
+      // 此时需要检查 response.data.code
+      const respData = response.data
+
+      // 先检查业务 code，确保不是 401 等错误码
+      if (respData && typeof respData === 'object' && 'code' in respData) {
+        if (respData.code !== 0) {
+          // 业务 code 不为 0，抛出错误
+          console.error('字体上传业务错误:', respData)
+          throw new Error(respData.msg || '字体上传失败')
+        }
+      }
+
+      // 业务 code 为 0，继续处理数据
+      const data = respData
+
+      // 兼容多种返回格式：
+      // 1) { code: 0, data: 'url', msg: '成功' } - 标准格式
+      // 2) 直接返回字符串 'url'
+      // 3) { code: 0, data: { ossUrl: 'url', ... } }
+
+      // 直接字符串
+      if (typeof data === 'string' && data.startsWith('http')) {
+        return data
+      }
+
+      // 对象格式
+      if (data && typeof data === 'object') {
+        // data 是字符串 URL
+        if (typeof data === 'string') {
+          return data
+        }
+
+        // data 是对象，提取 URL
+        const url = (data as any).data
+        if (typeof url === 'string' && url.startsWith('http')) {
+          console.log('字体上传成功，URL:', url)
+          return url
+        }
+
+        // data 是嵌套对象 { ossUrl: 'url' }
+        if (typeof url === 'object') {
+          const ossUrl = (url as any).ossUrl || (url as any).url
+          if (ossUrl) {
+            console.log('字体上传成功，URL:', ossUrl)
+            return ossUrl
+          }
+        }
+      }
+
+      // 理论上 code === 0 就会直接返回，不会到这里
+      // 如果真的走到这里，说明返回格式异常
+      console.error('字体上传响应格式异常:', data)
+      throw new Error('字体上传响应格式异常')
+    } catch (error: any) {
+      console.error('字体上传失败:', error)
+
+      // 尽量把后端的 msg 暴露出来
+      if (error.response && error.response.data) {
+        console.error('响应状态:', error.response.status)
+        console.error('响应数据:', error.response.data)
+        const respMsg = error.response.data.msg || error.response.data.message
+        if (respMsg) {
+          throw new Error(respMsg)
+        }
+      }
+
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('请求超时，请检查网络连接')
+      }
+
+      if (error.message === 'Network Error') {
+        throw new Error('网络错误，请检查网络连接')
+      }
+
+      // 如果错误已经有消息，直接抛出
+      if (error.message) {
+        throw error
+      }
+
+      throw new Error('字体上传失败，请稍后重试')
     }
   },
 

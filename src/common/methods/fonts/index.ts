@@ -49,20 +49,29 @@ function transformFontResource(resource: TemuFontResourceDO): TFontItemData {
 export const useFontStore = {
   list: fontList,
 
-  async init() {
+  async init(forceRefresh: boolean = false) {
     this.list = []
-    // 版本不匹配时清除本地缓存
-    if (localStorage.getItem('FONTS_VERSION') !== nowVersion) {
+    
+    // 强制刷新时跳过本地缓存，直接从后端获取
+    if (!forceRefresh) {
+      // 版本不匹配时清除本地缓存
+      if (localStorage.getItem('FONTS_VERSION') !== nowVersion) {
+        localStorage.removeItem('FONTS')
+      }
+
+      // 尝试从本地缓存读取
+      const localFonts: TFontItemData[] = localStorage.getItem('FONTS')
+        ? JSON.parse(localStorage.getItem('FONTS') || '')
+        : []
+
+      if (localFonts.length > 0) {
+        this.list.push(...localFonts)
+        // 非强制刷新时，如果本地有缓存，直接返回，不请求后端
+        return
+      }
+    } else {
+      // 强制刷新时清除本地缓存
       localStorage.removeItem('FONTS')
-    }
-
-    // 尝试从本地缓存读取
-    const localFonts: TFontItemData[] = localStorage.getItem('FONTS')
-      ? JSON.parse(localStorage.getItem('FONTS') || '')
-      : []
-
-    if (localFonts.length > 0) {
-      this.list.push(...localFonts)
     }
 
     // 从后端获取字体资源

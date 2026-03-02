@@ -19,6 +19,7 @@
           inputWidth="100%"
           :readonly="true"
           @finish="(font) => finish('fontClass', font)"
+          @open="onFontSelectOpen"
         />
         <value-select
           class="font-size-select"
@@ -28,6 +29,14 @@
           :data="state.fontSizeList"
           inputWidth="80px"
           @finish="(value) => finish('fontSize', value)"
+        />
+        <el-button class="import-font-btn" size="small" @click="onClickImportFont">导入字体</el-button>
+        <input
+          ref="fontFileInputRef"
+          type="file"
+          accept=".ttf,.otf,.woff,.woff2"
+          style="display: none"
+          @change="onFontFileChange"
         />
       </div>
 
@@ -65,7 +74,7 @@
 <script lang="ts" setup>
 // 文本组件样式
 const NAME = 'w-text-style'
-import { defineComponent, reactive, toRefs, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { defineComponent, reactive, toRefs, computed, watch, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { styleIconList1, styleIconList2, alignIconList, TStyleIconData, TStyleIconData2 } from '@/assets/data/TextIconsData'
 import layerIconList from '@/assets/data/LayerIconList'
@@ -80,6 +89,8 @@ import usePageFontsFilter from './pageFontsFilter'
 import { wTextSetting, TwTextData } from './wTextSetting'
 import { storeToRefs } from 'pinia'
 import { useControlStore, useForceStore, useWidgetStore } from '@/store'
+import { OssApi } from '@/api/temu/oss'
+import { ElMessage } from 'element-plus'
 import { TUpdateWidgetPayload } from '@/store/design/widget/actions/widget'
 import { TUpdateAlignData } from '@/store/design/widget/actions/align'
 
@@ -135,6 +146,9 @@ const state = reactive<TState>({
 const dActiveElement = computed(() => widgetStore.dActiveElement)
 // const dMoving = computed(() => store.getters.dMoving)
 const { dMoving } = storeToRefs(useControlStore())
+
+const fontFileInputRef = ref<HTMLInputElement | null>(null)
+const isUploadingFont = ref(false)
 
 // const isDraw = computed(() => route.name === 'Draw')
 
@@ -217,8 +231,122 @@ function changeValue() {
   }
 }
 
+function onClickImportFont() {
+  if (isUploadingFont.value) {
+    return
+  }
+  if (fontFileInputRef.value) {
+    fontFileInputRef.value.click()
+  }
+}
+
+async function onFontFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files && input.files[0]
+
+  // 允许选择同一个文件多次
+  if (input) {
+    input.value = ''
+  }
+
+  if (!file) {
+    return
+  }
+
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  const allowExts = ['ttf', 'otf', 'woff', 'woff2']
+  if (!ext || !allowExts.includes(ext)) {
+    ElMessage.error('只支持 ttf、otf、woff、woff2 格式的字体文件')
+    return
+  }
+
+  // 30MB 限制
+  const maxSize = 30 * 1024 * 1024
+  if (file.size > maxSize) {
+    ElMessage.error('文件大小不能超过 30MB')
+    return
+  }
+
+  // 去掉扩展名作为字体名
+  const lastDotIndex = file.name.lastIndexOf('.')
+  const fontName = lastDotIndex > 0 ? file.name.substring(0, lastDotIndex) : file.name
+
+  try {
+    isUploadingFont.value = true
+    // 调用 OSS 上传字体接口
+    const ossUrl = await OssApi.uploadFont(file, fontName)
+
+    // 构造下拉选项和字体设置对象
+    const newId = Date.now()
+    const newFontOption: TFontItem = {
+      id: newId,
+      oid: '',
+      value: fontName,
+      alias: fontName,
+      preview: '',
+      url: ossUrl,
+    }
+
+    // 追加到当前字体列表
+    state.fontClassList = [...state.fontClassList, newFontOption]
+
+    // 设置到当前文本组件的字体并触发更新
+    const fontForText: TwTextData['fontClass'] = {
+      id: newId,
+      alias: fontName,
+      value: fontName,
+      url: ossUrl,
+    }
+    state.innerElement.fontClass = fontForText
+    finish('fontClass', fontForText)
+
+    ElMessage.success('字体导入成功')
+  } catch (error: any) {
+    console.error('字体上传失败:', error)
+    ElMessage.error(error?.message || '字体上传失败，请稍后重试')
+  } finally {
+    isUploadingFont.value = false
+  }
+}
+
 
 let fontInitialized = false
+
+// 刷新字体列表（从服务器获取最新数据）
+async function refreshFonts() {
+  // 强制重新初始化字体，确保获取最新数据
+  await useFontStore.init(true)
+  
+  const localFonts = useFontStore.list
+  const uniqueFonts: TFontItem[] = []
+  const seen = new Set<number | string>()
+
+  function appendFont(item?: Partial<TFontItem>) {
+    if (!item || item.id === undefined) {
+      return
+    }
+    if (seen.has(item.id)) {
+      return
+    }
+    seen.add(item.id)
+    uniqueFonts.push(item as TFontItem)
+  }
+
+  const pageFonts = usePageFontsFilter()
+  pageFonts.forEach((font) => appendFont(font))
+
+  for (const font of localFonts) {
+    const { id, oid, value, url, alias, preview } = font
+    appendFont({ id, oid, value, url, alias, preview })
+  }
+
+  state.fontClassList = uniqueFonts
+}
+
+// 下拉框打开时刷新字体列表
+async function onFontSelectOpen() {
+  await refreshFonts()
+}
 
 async function loadFonts() {
   // 确保字体已初始化
@@ -858,15 +986,16 @@ defineExpose({
   margin-bottom: 12px;
 }
 .font-setting-row {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: flex-end;
-  justify-content: flex-start;
+  justify-content: space-between;
 }
 .font-setting-row :deep(.font-name-select.value-select) {
-  flex: 1 1 70%;
+  flex: 1 1 auto;
   min-width: 0;
   width: auto;
+  max-width: calc(100% - 96px);
 }
 .font-setting-row :deep(.font-name-select .input-wrap) {
   width: 100%;
@@ -877,6 +1006,17 @@ defineExpose({
 }
 .font-setting-row :deep(.font-size-select .input-wrap) {
   width: 100%;
+}
+.import-font-btn {
+  flex: 0 0 100%;
+  display: flex;
+  justify-content: center;
+  white-space: nowrap;
+  margin-top: 4px;
+}
+.import-font-btn span {
+  display: flex;
+  align-items: center;
 }
 .setting-list {
   display: flex;

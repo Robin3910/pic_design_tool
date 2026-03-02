@@ -10,7 +10,7 @@
     <p v-if="label" class="input-label">
       {{ label }}
     </p>
-    <el-popover placement="bottom-end" trigger="click" width="auto">
+    <el-popover placement="bottom-end" trigger="click" width="auto" @show="handleShow">
       <!-- 单列表 -->
       <ul v-if="data && Array.isArray(data)" class="list-ul">
         <li
@@ -77,6 +77,7 @@ type TProps = {
 type TEmits = {
   (event:'update:modelValue', data: Record<string, any> | string | number): void
   (event: 'finish', data: Record<string, any> | string | number): void
+  (event: 'open'): void
 }
 
 type TState = {
@@ -178,6 +179,10 @@ function down() {
     value = 0
   }
   emit('update:modelValue', value)
+}
+
+function handleShow() {
+  emit('open')
 }
 </script>
 
