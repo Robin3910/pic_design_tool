@@ -54,7 +54,6 @@ import { reactive, toRefs, ref, computed } from 'vue'
 import dayjs from 'dayjs'
 import { taskRecordCache } from '@/utils/taskRecordCache'
 import { useRoute, useRouter } from 'vue-router'
-import _dl from '@/common/methods/download'
 import useNotification from '@/common/methods/notification'
 import SaveImage from '@/components/business/save-download/CreateCover.vue'
 import { useFontStore } from '@/common/methods/fonts'
@@ -213,57 +212,13 @@ async function download() {
   state.loading = true
   emit('update:modelValue', true)
   emit('change', { downloadPercent: 1, downloadText: '保存数据中,请稍候..' })
-  const currentRecord = pageStore.dCurrentPage
-  const backEndCapture: boolean = checkDownloadPoster(dLayouts.value[currentRecord])
   const fileName = `${dayjs().format('YYYYMMDD_HHmmss')}.png`
-  if (!backEndCapture) {
-    // 无特殊条件命中则直接从前端出图
-    const { blob } = await canvasImage.value?.createPoster()
-    downloadBlob(blob, fileName)
-    emit('change', { downloadPercent: 100, downloadText: '作品下载成功' })
-    state.loading = false
-  }
-  // await save(true) // 注释掉保存功能调用 - 依赖后端服务
-  const { id, tempid } = route.query
-  if (!id && !tempid) {
-    emit('change', { downloadPercent: 0, downloadText: '请稍候..' })
-    useNotification('保存失败', '可能暂不支持的功能，先选择模板后操作', { type: 'error' })
-    state.loading = false
-    return
-  }
-  if (backEndCapture) {
-    // 从服务端生成图片
-    const { width, height } = dPage.value
-    emit('update:modelValue', true)
-    emit('change', { downloadPercent: 1, downloadText: '正在处理数据...' })
-    let timerCount = 0
-    const animation = setInterval(() => {
-      if (props.modelValue && timerCount < 75) {
-        timerCount += RandomNumber(1, 10)
-        emit('change', { downloadPercent: 1 + timerCount, downloadText: '正在合成图片' })
-      } else {
-        clearInterval(animation)
-      }
-    }, 800)
-    await _dl.downloadImg(
-      api.home.download({ id, tempid, width, height, index: pageStore.dCurrentPage }) + '&r=' + Math.random(),
-      (progress: number, xhr: any) => {
-        if (props.modelValue) {
-          clearInterval(animation)
-          progress >= timerCount && emit('change', { downloadPercent: Number(progress.toFixed(0)), downloadText: '图片生成中' })
-        } else {
-          xhr.abort()
-          state.loading = false
-        }
-      },
-      fileName,
-    )
-    emit('change', { downloadPercent: 100, downloadText: '作品下载成功', downloadMsg: '' })
-    state.loading = false
-  }
-}
-function RandomNumber(min: number, max: number) {
-  return Math.ceil(Math.random() * (max - min)) + min
+
+  // 直接从前端出图
+  const { blob } = await canvasImage.value?.createPoster()
+  downloadBlob(blob, fileName)
+  emit('change', { downloadPercent: 100, downloadText: '作品下载成功' })
+  state.loading = false
 }
 
 async function load(cb: () => void) {
@@ -391,18 +346,6 @@ function jump2Edit() {
   userStore.managerEdit(true)
 }
 
-function checkDownloadPoster({ layers }: any) {
-  let backEndCapture = false
-  for (let i = 0; i < layers.length; i++) {
-    const { type, mask } = layers[i]
-    if ((type === 'w-image' && mask) || type === 'w-svg' || type === 'w-qrcode') {
-      backEndCapture = true
-      break
-    }
-  }
-  return backEndCapture
-}
-
 // 保存到OSS - 上传成品到阿里云
 async function save() {
   if (state.loading === true) {
@@ -412,16 +355,15 @@ async function save() {
   state.loading = true
   emit('update:modelValue', true)
   emit('change', { downloadPercent: 1, downloadText: '正在生成图片,请稍候..' })
-  
+
   try {
     const currentRecord = pageStore.dCurrentPage
-    const backEndCapture: boolean = checkDownloadPoster(dLayouts.value[currentRecord])
-    
+
     // 收集画板上所有图片素材的widget（包含sortId的，排除模板素材）
     // 成品只会有两张图片：模板图片和目标图片，过滤后只剩目标图片
     console.log('[命名过程] 开始生成文件名...')
     const currentLayout = dLayouts.value[currentRecord]
-    const imageWidgets = currentLayout?.layers?.filter((widget: any) => 
+    const imageWidgets = currentLayout?.layers?.filter((widget: any) =>
       widget.type === 'w-image' && widget.sortId && widget.name !== '模板图片'
     ) || []
     console.log('[命名过程] 过滤后的图片widgets数量:', imageWidgets.length, imageWidgets)
@@ -619,50 +561,16 @@ async function save() {
     const defaultFileName = `${state.title || '未命名作品'}.png`
     const fileName = customFileName ? `${customFileName}.png` : defaultFileName
     console.log('[命名过程] 最终使用的文件名:', fileName, customFileName ? '(自定义)' : '(默认)')
-    
-    let blob: Blob
-    
-    if (!backEndCapture) {
-      // 无特殊条件命中则直接从前端出图
-      emit('change', { downloadPercent: 10, downloadText: '正在生成图片...' })
-      const result = await canvasImage.value?.createPoster()
-      if (!result || !result.blob) {
-        throw new Error('图片生成失败')
-      }
-      blob = result.blob
-      // 做图完成，立即更新进度条显示完成状态
-      emit('change', { downloadPercent: 75, downloadText: '做图完成' })
-    } else {
-      // 从服务端生成图片
-      const { id, tempid } = route.query
-      if (!id && !tempid) {
-        throw new Error('请先选择模板或作品')
-      }
-      
-      const { width, height } = dPage.value
-      emit('change', { downloadPercent: 1, downloadText: '正在处理数据...' })
-      let timerCount = 0
-      const animation = setInterval(() => {
-        if (props.modelValue && timerCount < 75) {
-          timerCount += RandomNumber(1, 10)
-          emit('change', { downloadPercent: 1 + timerCount, downloadText: '正在合成图片' })
-        } else {
-          clearInterval(animation)
-        }
-      }, 800)
-      
-      // 从后端获取图片blob
-      const imageUrl = api.home.download({ id, tempid, width, height, index: pageStore.dCurrentPage }) + '&r=' + Math.random()
-      const response = await fetch(imageUrl)
-      if (!response.ok) {
-        clearInterval(animation)
-        throw new Error('图片生成失败')
-      }
-      clearInterval(animation)
-      blob = await response.blob()
-      // 做图完成，立即更新进度条显示完成状态
-      emit('change', { downloadPercent: 75, downloadText: '做图完成' })
+
+    // 直接从前端出图
+    emit('change', { downloadPercent: 10, downloadText: '正在生成图片...' })
+    const result = await canvasImage.value?.createPoster()
+    if (!result || !result.blob) {
+      throw new Error('图片生成失败')
     }
+    const blob = result.blob
+    // 做图完成，立即更新进度条显示完成状态
+    emit('change', { downloadPercent: 75, downloadText: '做图完成' })
     
     // 等待进度条更新后再开始上传（使用 setTimeout 确保进度条有时间更新）
     await new Promise(resolve => setTimeout(resolve, 100))

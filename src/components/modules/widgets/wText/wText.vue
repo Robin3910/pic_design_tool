@@ -95,23 +95,54 @@ watch(
     if (state.loading) {
       return
     }
-    let font = nval.fontClass
-    const isDone = font.value === state.loadFontDone
+    const font = nval.fontClass
 
-    if (font.url && !isDone) {
-      if (font.id && isDraw.value) {
-        state.loading = false
-      }
-      if (fontMinWithDraw) {
-        return
-      }
-      state.loading = !isDraw.value
-      const loadFont = new window.FontFace(font.value, `url(${font.url})`)
-      await loadFont.load()
-      document.fonts.add(loadFont)
+    // 无有效字体信息时，直接结束 loading
+    if (!font || !font.value) {
+      state.loading = false
+      return
+    }
+
+    // 已经加载过当前字体，避免重复加载
+    if (font.value === state.loadFontDone) {
+      state.loading = false
+      return
+    }
+
+    // 没有可用的字体 URL，只记录已处理，使用系统回退字体
+    if (!font.url) {
       state.loadFontDone = font.value
       state.loading = false
-    } else {
+      return
+    }
+
+    // 如果开启了服务端字体压缩，则前端不再单独加载（当前配置默认关闭）
+    if (fontMinWithDraw) {
+      state.loading = false
+      return
+    }
+
+    // 画布编辑页不需要转圈提示，只在出图/预览页显示 loading
+    state.loading = !isDraw.value
+
+    // 防御：浏览器不支持 FontFace 时直接结束
+    if (!(window as any).FontFace) {
+      console.warn('当前环境不支持 FontFace，跳过字体预加载:', font.value)
+      state.loadFontDone = font.value
+      state.loading = false
+      return
+    }
+
+    try {
+      const loadFont = new (window as any).FontFace(font.value, `url(${font.url})`)
+      await loadFont.load()
+      ;(document as any).fonts.add(loadFont)
+      state.loadFontDone = font.value
+    } catch (e) {
+      console.error('字体加载失败:', font.value, font.url, e)
+      // 即使失败也标记为已处理，避免无限重试导致一直转圈
+      state.loadFontDone = font.value
+    } finally {
       state.loading = false
     }
   },

@@ -14,6 +14,25 @@ interface ApiResponse<T = any> {
   msg?: string
 }
 
+// 通用分页结果
+interface PageResult<T> {
+  list: T[]
+  total: number
+}
+
+// 字体资源对象（对应 TemuFontResourceDO）
+export interface TemuFontResourceDO {
+  id: number
+  fontName: string
+  ossUrl: string
+  tenantId: number
+  createTime: string
+  updateTime: string
+  creator: string
+  updater: string
+  deleted: boolean
+}
+
 /**
  * OSS API
  */
@@ -95,7 +114,68 @@ export const OssApi = {
       
       throw new Error('上传失败，请稍后重试')
     }
-  }
+  },
+
+  /**
+   * 根据字体资源ID获取字体资源详情
+   * 对应接口：GET /temu/oss/font/{id}
+   */
+  getFontResourceById: async (id: number): Promise<TemuFontResourceDO> => {
+    try {
+      const response = await templateRequest.get<ApiResponse<TemuFontResourceDO>>(
+        `/temu/oss/font/${id}`,
+      )
+
+      if (response && typeof response === 'object' && 'data' in response) {
+        if (response.code === 0 && response.data) {
+          return response.data
+        }
+        throw new Error(response.msg || '获取字体资源失败')
+      }
+
+      throw new Error('响应格式错误')
+    } catch (error: any) {
+      console.error('获取字体资源失败:', error)
+      if (error.message) {
+        throw error
+      }
+      if (error.response && error.response.data && error.response.data.msg) {
+        throw new Error(error.response.data.msg)
+      }
+      throw new Error('获取字体资源失败，请稍后重试')
+    }
+  },
+
+  /**
+   * 分页获取字体资源列表
+   * 对应接口：GET /temu/oss/font/page
+   */
+  getFontResourcePage: async (params: { pageNo?: number; pageSize?: number } = {}): Promise<PageResult<TemuFontResourceDO>> => {
+    try {
+      const response = await templateRequest.get<ApiResponse<PageResult<TemuFontResourceDO>>>(
+        '/temu/oss/font/page',
+        { params },
+      )
+
+      if (response && typeof response === 'object' && 'data' in response) {
+        if (response.code === 0 && response.data) {
+          return response.data
+        }
+        throw new Error(response.msg || '获取字体资源列表失败')
+      }
+
+      throw new Error('响应格式错误')
+    } catch (error: any) {
+      console.error('获取字体资源列表失败:', error)
+      if (error.message) {
+        throw error
+      }
+      if (error.response && error.response.data && error.response.data.msg) {
+        throw new Error(error.response.data.msg)
+      }
+      throw new Error('获取字体资源列表失败，请稍后重试')
+    }
+  },
 }
 
 // 导出默认对象

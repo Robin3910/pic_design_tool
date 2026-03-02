@@ -5,177 +5,113 @@
  * @LastEditors: ShawnPhang <https://m.palxp.cn>
  * @LastEditTime: 2024-08-12 10:33:36
  */
-// import { isSupportFontFamily, blob2Base64 } from './utils'
-import { TGetFontItemData, getFonts } from '@/api/material'
+import { OssApi, type TemuFontResourceDO } from '@/api/temu/oss'
 
-const nowVersion = '2' // 当前字体文件版本更新，将刷新前端缓存
+const nowVersion = '4' // 当前字体文件版本更新，将刷新前端缓存
 
 /** 字体item类型 */
-export type TFontItemData = { url: string } & Omit<TGetFontItemData, 'woff'>
+export type TFontItemData = {
+  id: number
+  oid: string
+  value: string
+  alias: string
+  preview: string
+  url: string
+  lang: string
+}
 
 const fontList: TFontItemData[] = []
-// const download: any = {}
+
+/**
+ * 将后端字体资源转换为前端字体item格式
+ */
+function transformFontResource(resource: TemuFontResourceDO): TFontItemData {
+  // 从 fontName 中提取字体别名（去掉扩展名）
+  const fontName = resource.fontName || ''
+  const dotIndex = fontName.lastIndexOf('.')
+  const alias = dotIndex > 0 ? fontName.substring(0, dotIndex) : fontName
+
+  // 根据字体名判断语言类型（简单判断：包含中文则为中文）
+  const isChinese = /[\u4e00-\u9fa5]/.test(alias)
+  const lang = isChinese ? 'zh' : 'en'
+
+  return {
+    id: resource.id,
+    oid: String(resource.id),
+    value: alias, // 使用别名作为字体标识
+    alias: alias,
+    preview: '', // 后端接口没有返回预览图
+    url: resource.ossUrl, // OSS 链接作为字体文件 URL
+    lang: lang,
+  }
+}
+
 export const useFontStore = {
   list: fontList,
-  // download,
+
   async init() {
     this.list = []
-    localStorage.getItem('FONTS_VERSION') !== nowVersion && localStorage.removeItem('FONTS')
-    const localFonts: TFontItemData[] = localStorage.getItem('FONTS') ? JSON.parse(localStorage.getItem('FONTS') || '') : []
+    // 版本不匹配时清除本地缓存
+    if (localStorage.getItem('FONTS_VERSION') !== nowVersion) {
+      localStorage.removeItem('FONTS')
+    }
+
+    // 尝试从本地缓存读取
+    const localFonts: TFontItemData[] = localStorage.getItem('FONTS')
+      ? JSON.parse(localStorage.getItem('FONTS') || '')
+      : []
+
     if (localFonts.length > 0) {
       this.list.push(...localFonts)
     }
 
-    // 默认字体列表
-    const defaultFonts = [
-      {
-        id: 0,
-        alias: 'Acardia Regular',
-        preview: '',
-        ttf: null,
-        woff: '',
-        value: 'Acardia Regular',
-        font_family: '',
-        size: 0,
-        lang: 'en',
-        woff_size: 0,
-      },
-      {
-        id: 544,
-        alias: '阿里巴巴数黑体',
-        preview: '',
-        ttf: null,
-        woff: '',
-        value: '阿里巴巴数黑体',
-        font_family: '',
-        size: 0,
-        lang: 'zh',
-        woff_size: 0,
-      },
-      {
-        id: 543,
-        alias: '站酷快乐体',
-        preview: '',
-        ttf: null,
-        woff: 'https://lib.baomitu.com/fonts/zcool-kuaile/zcool-kuaile-regular.woff2',
-        value: 'zcool-kuaile-regular',
-        font_family: '',
-        size: 0,
-        lang: 'zh',
-        woff_size: 0,
-      },
-      {
-        id: 546,
-        alias: 'Dancing Script',
-        preview: '',
-        ttf: null,
-        woff: '',
-        value: 'Dancing Script',
-        font_family: '',
-        size: 0,
-        lang: 'en',
-        woff_size: 0,
-      },
-    ]
+    // 从后端获取字体资源
+    try {
+      // 获取第一页，每页 100 条（最大建议值）
+      const pageResult = await OssApi.getFontResourcePage({ pageNo: 1, pageSize: 100 })
 
-    if (this.list.length === 0) {
-      // 如果列表为空，添加所有默认字体
-      this.list.unshift(
-        ...defaultFonts.map((x) => {
-          const { id, alias, value, preview, woff, lang } = x
-          return { id, oid: '0', value, preview, alias, url: woff, lang }
-        }),
-      )
-      localStorage.setItem('FONTS', JSON.stringify(this.list))
-      localStorage.setItem('FONTS_VERSION', nowVersion)
-    } else {
-      // 如果列表不为空，检查并添加缺失的默认字体
-      let hasNewDefaultFont = false
-      for (const defaultFont of defaultFonts) {
-        const hasFont = this.list.some((f) => f.value === defaultFont.value)
-        if (!hasFont) {
-          const { id, alias, value, preview, woff, lang } = defaultFont
-          this.list.unshift({ id, oid: '0', value, preview, alias, url: woff, lang })
-          hasNewDefaultFont = true
-        }
+      if (pageResult && pageResult.list && pageResult.list.length > 0) {
+        // 将后端返回的字体资源转换为前端格式
+        const remoteFonts = pageResult.list
+          .filter((r) => !r.deleted) // 过滤已删除的
+          .map(transformFontResource)
+
+        this.list = remoteFonts
+      } else {
+        // 后端没有返回数据，字体列表为空
+        this.list = []
       }
-      // 如果有新增的默认字体，更新 localStorage
-      if (hasNewDefaultFont) {
-        localStorage.setItem('FONTS', JSON.stringify(this.list))
-      }
+    } catch (error) {
+      console.error('获取字体资源失败:', error)
+      // 接口失败时字体列表为空
+      this.list = []
     }
-    // store.dispatch('setFonts', this.list)
+
+    // 保存到本地缓存
+    localStorage.setItem('FONTS', JSON.stringify(this.list))
+    localStorage.setItem('FONTS_VERSION', nowVersion)
+  },
+
+  /**
+   * 根据ID获取字体资源详情
+   */
+  async getFontById(id: number): Promise<TFontItemData | null> {
+    // 先检查本地缓存
+    const localFont = this.list.find((f) => f.id === id)
+    if (localFont) {
+      return localFont
+    }
+
+    // 本地缓存没有，从后端获取
+    try {
+      const resource = await OssApi.getFontResourceById(id)
+      if (resource && !resource.deleted) {
+        return transformFontResource(resource)
+      }
+      return null
+    } catch (error) {
+      console.error('获取字体资源详情失败:', error)
+      return null
+    }
   },
 }
-
-// export const useFontStore = () => {
-//   return {
-//     list: fontList,
-//     download,
-//     async init() {
-//       this.list = []
-//       const localFonts: any = localStorage.getItem('FONTS') ? JSON.parse(localStorage.getItem('FONTS') || '') : []
-//       if (localFonts.length > 0) {
-//         this.list.push(...localFonts)
-//       }
-
-//       if (this.list.length === 0) {
-//         const res = await getFonts({ pageSize: 400 })
-//         this.list.unshift(
-//           ...res.map((x: any) => {
-//             const { content, id, name, preview } = x
-//             return { id, name, preview: preview.url, alias: content.alias, family: content.family, lang: content.lang, ttf: content.ttf, url: content.woff }
-//           }),
-//         )
-//         localStorage.setItem('FONTS', JSON.stringify(this.list))
-//       }
-//       console.log(this.list)
-//     },
-//     getList() {
-//       return fontList
-//     },
-//   }
-// }
-
-// export const useFontStore = () => {
-//   return {
-//     list: fontList,
-//     download,
-//     async init() {
-//       this.list = []
-//       const localFonts: any = localStorage.getItem('FONTS') ? JSON.parse(localStorage.getItem('FONTS') || '') : []
-//       if (localFonts.length > 0) {
-//         this.list.push(...localFonts)
-//       }
-
-//       if (this.list.length === 0) {
-//         for (let i = 1; i < 99; i += 1) {
-//           const res = await getFonts(i)
-//           this.list.unshift(
-//             ...res.map((x: any) => {
-//               const { content, id, name, preview } = x
-//               return { id, name, preview: preview.url, alias: content.alias, family: content.family, lang: content.lang, ttf: content.ttf, url: content.woff }
-//             }),
-//           )
-//           if (res.length < 100) break
-//         }
-//         localStorage.setItem('FONTS', JSON.stringify(this.list))
-//       }
-//     },
-//     async addFont2Style(name: string, url: string) {
-//       // if (this.download[name]) return;
-//       if (isSupportFontFamily(name)) return
-
-//       const response = await fetch(url, { headers: { responseType: 'blob' } })
-//       const blob = await response.blob()
-//       const ff = new FontFace(name, `url(${URL.createObjectURL(blob)})`)
-//       const f = await ff.load()
-//       ;(document.fonts as FontFaceSet).add(f)
-
-//       const b64 = await blob2Base64(blob)
-//       // 使用 base64 是为了方便将 DOM 生成图片
-//       this.download[name] = b64
-//       // document.head.appendChild(generateFontStyle(name, b64));
-//     },
-//   }
-// }

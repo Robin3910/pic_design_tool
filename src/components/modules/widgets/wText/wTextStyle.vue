@@ -218,7 +218,15 @@ function changeValue() {
 }
 
 
-function loadFonts() {
+let fontInitialized = false
+
+async function loadFonts() {
+  // 确保字体已初始化
+  if (!fontInitialized) {
+    await useFontStore.init()
+    fontInitialized = true
+  }
+
   const localFonts = useFontStore.list
   const uniqueFonts: TFontItem[] = []
   const seen = new Set<number | string>()
