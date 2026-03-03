@@ -1,19 +1,28 @@
+/// <reference types="vite/client" />
 /*
  * @Author: ShawnPhang
  * @Date: 2024-04-05 07:31:45
- * @Description:  
+ * @Description:
  * @LastEditors: ShawnPhang <https://m.palxp.cn>
  * @LastEditTime: 2024-08-12 05:30:15
  */
-// const prefix = import.meta.env
-const prefix = process.env
+interface ImportMetaEnv {
+  readonly DEV: boolean
+  readonly PROD: boolean
+  readonly MODE: string
+  readonly BASE_URL: string
+  readonly VITE_APP_TITLE?: string
+}
 
-const isDev = prefix.NODE_ENV === 'development'
+const prefix = import.meta.env as ImportMetaEnv
+
+const isDev = prefix.DEV
+const baseUrl = import.meta.env.BASE_URL || (isDev ? '/' : '/design/')
 import { version } from '../package.json'
 
 export default {
   isDev,
-  BASE_URL: isDev ? '/' : '/design/',
+  BASE_URL: baseUrl,
   VERSION: version,
   APP_NAME: '禹链设计器',
   COPYRIGHT: 'ShawnPhang - Design.pPalxp.cn',

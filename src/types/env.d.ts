@@ -23,7 +23,7 @@ interface ImportMeta {
       on(event: string, cb: (...args: any[]) => void): void
     }
   
-    // readonly env: ImportMetaEnv
+    readonly env: ImportMetaEnv
     
   
     glob(pattern: string, { eager: boolean }): Record<

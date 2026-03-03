@@ -16,7 +16,7 @@ const resolve = (...data: string[]) => path.resolve(__dirname, ...data)
 // https://vitejs.dev/config/
 
 export default defineConfig({
-  base: '/design/',
+  // base: '/design/', // 开发环境默认 '/'，生产环境通过环境变量控制
   plugins: [
     vue(),
     viteCompression({
@@ -53,9 +53,6 @@ export default defineConfig({
         },
       },
     },
-  },
-  define: {
-    'process.env': process.env,
   },
   server: {
     hmr: { overlay: false },
