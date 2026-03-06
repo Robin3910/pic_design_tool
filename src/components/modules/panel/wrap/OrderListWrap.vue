@@ -287,6 +287,41 @@
             {{ state.taskDetail.customTextList || state.taskDetail.custom_text_list || '-' }}
           </div>
         </div>
+        <!-- 字体与颜色信息 -->
+        <div class="detail-item detail-item--inline detail-item--font">
+          <div class="detail-inline-group">
+            <span class="detail-label">字体名称：</span>
+            <span v-if="state.loadingFontInfo" class="detail-value detail-value--muted">加载中...</span>
+            <span v-else-if="state.fontInfo?.fontName" class="detail-value">{{ state.fontInfo.fontName }}</span>
+            <span v-else class="detail-value detail-value--muted">-</span>
+          </div>
+          <div class="detail-inline-group">
+            <span class="detail-label">字体文件：</span>
+            <span v-if="state.loadingFontInfo" class="detail-value detail-value--muted">加载中...</span>
+            <a
+              v-else-if="state.fontInfo?.ossUrl"
+              :href="state.fontInfo.ossUrl"
+              target="_blank"
+              class="detail-value detail-value--link"
+            >{{ state.fontInfo.ossUrl }}</a>
+            <span v-else class="detail-value detail-value--muted">-</span>
+          </div>
+        </div>
+        <div class="detail-item detail-item--font">
+          <span class="detail-label">定制文字颜色：</span>
+          <div v-if="state.loadingFontInfo" class="detail-value detail-value--muted">加载中...</div>
+          <div v-else-if="state.fontInfo?.customTextColorList" class="detail-color-list">
+            <span
+              v-for="(color, index) in (() => { try { return JSON.parse(state.fontInfo.customTextColorList) } catch { return [] } })()"
+              :key="index"
+              class="detail-color-item"
+            >
+              <span class="detail-color-swatch" :style="{ backgroundColor: color }" />
+              <span class="detail-color-value">{{ color }}</span>
+            </span>
+          </div>
+          <div v-else class="detail-value detail-value--muted">-</div>
+        </div>
         <div class="detail-item detail-item--images">
           <span class="detail-label">合成预览图：</span>
           <div class="detail-images">
@@ -342,6 +377,7 @@ import api from '@/api'
 import eventBus from '@/utils/plugins/eventBus'
 import { ElMessage } from 'element-plus'
 import { taskRecordCache } from '@/utils/taskRecordCache'
+import { getFontInfoByOrderId, type FontInfoByOrderIdVO } from '@/api/temu'
 
 type TTextData = {
   name: string
@@ -383,6 +419,7 @@ type TOrderGroup = {
 
 type TTaskDetail = {
   id?: number
+  orderId?: number
   orderNo?: string
   categoryName?: string
   setImageUrls?: string
@@ -407,6 +444,8 @@ type TState = {
   selectedGroup: TOrderGroup | null
   taskDetail: TTaskDetail | null
   loadingDetail: boolean
+  fontInfo: FontInfoByOrderIdVO | null
+  loadingFontInfo: boolean
 }
 
 const controlStore = useControlStore()
@@ -425,6 +464,8 @@ const state = reactive<TState>({
   selectedGroup: null,
   taskDetail: null,
   loadingDetail: false,
+  fontInfo: null,
+  loadingFontInfo: false,
 })
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
@@ -955,7 +996,9 @@ const load = () => {
 const selectText = async (text: TTextData) => {
   controlStore.setShowMoveable(false)
   
-  // 设置预览窗图片 - 查找对应的 effectiveImgUrl
+  let orderId: number | null = null
+
+  // 获取任务数据（effectiveImgUrl 预览 + orderId）
   if (text.sortId) {
     const taskId = typeof text.sortId === 'string' ? parseInt(text.sortId, 10) : text.sortId
     if (!isNaN(taskId)) {
@@ -975,16 +1018,75 @@ const selectText = async (text: TTextData) => {
         if (effectiveImgUrl && typeof effectiveImgUrl === 'string' && effectiveImgUrl.trim().length > 0) {
           controlStore.setPreviewImageUrl(effectiveImgUrl.trim())
         }
+        const rawOrderId = (taskData as any).orderId ?? (taskData as any).order_id
+        if (rawOrderId) {
+          orderId = typeof rawOrderId === 'string' ? parseInt(rawOrderId, 10) : rawOrderId
+        }
       }
     }
   }
-  
+
   const setting = JSON.parse(JSON.stringify(wTextSetting))
-  const lastFont = getLastSelectedFont()
-  if (lastFont) {
-    setting.fontClass = lastFont
-    setting.fontFamily = lastFont.value
+
+  // 优先使用订单字体信息，否则回退到上次选择的字体
+  if (orderId) {
+    try {
+      const fontInfo = await getFontInfoByOrderId(orderId)
+      if (fontInfo?.fontName && fontInfo?.ossUrl) {
+        setting.fontClass = {
+          alias: fontInfo.fontName,
+          id: fontInfo.fontId,
+          value: fontInfo.fontName,
+          url: fontInfo.ossUrl,
+        }
+        setting.fontFamily = fontInfo.fontName
+      }
+      // 应用第一个定制颜色
+      const colorRaw = fontInfo?.customTextColorList
+      if (colorRaw != null && colorRaw !== '') {
+        let firstColor: string | null = null
+        // 1. 直接是 hex 颜色值
+        if (/^#[0-9a-fA-F]{6,8}$/.test(colorRaw.trim())) {
+          firstColor = colorRaw.trim()
+        } else {
+          // 2. 尝试 JSON 数组格式
+          try {
+            const parsed = JSON.parse(colorRaw)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              firstColor = parsed[0]
+            } else if (typeof parsed === 'string') {
+              firstColor = parsed
+            }
+          } catch {
+            // 3. 逗号分隔格式
+            const parts = colorRaw.split(',').map((c: string) => c.trim()).filter(Boolean)
+            if (parts.length > 0) firstColor = parts[0]
+          }
+        }
+        if (firstColor) {
+          // 统一补全为 8 位 hex（#RRGGBBAA）
+          if (/^#[0-9a-fA-F]{6}$/.test(firstColor)) {
+            firstColor = firstColor + 'ff'
+          }
+          setting.color = firstColor
+        }
+      }
+    } catch (error) {
+      console.error('获取字体信息失败，使用默认字体:', error)
+      const lastFont = getLastSelectedFont()
+      if (lastFont) {
+        setting.fontClass = lastFont
+        setting.fontFamily = lastFont.value
+      }
+    }
+  } else {
+    const lastFont = getLastSelectedFont()
+    if (lastFont) {
+      setting.fontClass = lastFont
+      setting.fontFamily = lastFont.value
+    }
   }
+
   setting.text = text.text
   setting.fontSize = text.fontSize
   setting.fontWeight = text.fontWeight
@@ -997,7 +1099,6 @@ const selectText = async (text: TTextData) => {
   const textWidth = text.text.length * text.fontSize * 0.6
   setting.left = pW / 2 - textWidth / 2
   setting.top = pH / 2 - text.fontSize / 2
-  // 设置初始宽度和高度，避免第一次移动时宽度突然变大
   setting.width = Math.max(textWidth, text.fontSize)
   setting.height = text.fontSize * setting.lineHeight
 
@@ -1313,6 +1414,8 @@ const handleViewDetail = async (group: TOrderGroup) => {
   state.detailVisible = true
   state.loadingDetail = true
   state.taskDetail = null
+  state.fontInfo = null
+  state.loadingFontInfo = false
 
   try {
     const taskId = typeof group.sortId === 'string' ? parseInt(group.sortId, 10) : group.sortId
@@ -1325,13 +1428,11 @@ const handleViewDetail = async (group: TOrderGroup) => {
     // 先尝试从缓存获取
     let taskData = taskRecordCache.get(taskId)
     if (!taskData) {
-      // 从接口获取
       taskData = await api.redrawTask.getRedrawTaskById(taskId)
       if (taskData) {
         taskRecordCache.set(taskId, taskData)
       }
     } else {
-      // 即使有缓存，也检查数据是否完整，如果不完整则重新获取
       const cachedOrderId = (taskData as any).orderId ?? (taskData as any).order_id
       const cachedOrderNo = (taskData as any).orderNo ?? (taskData as any).order_no
       if (!cachedOrderId || !cachedOrderNo) {
@@ -1344,6 +1445,22 @@ const handleViewDetail = async (group: TOrderGroup) => {
 
     if (taskData) {
       state.taskDetail = taskData as TTaskDetail
+
+      // 获取到 orderId 后，并发请求字体信息
+      const orderId = (taskData as any).orderId ?? (taskData as any).order_id
+      if (orderId) {
+        state.loadingFontInfo = true
+        getFontInfoByOrderId(orderId)
+          .then((fontInfo) => {
+            state.fontInfo = fontInfo
+          })
+          .catch((err) => {
+            console.error('获取字体信息失败:', err)
+          })
+          .finally(() => {
+            state.loadingFontInfo = false
+          })
+      }
     } else {
       ElMessage.error('获取任务详情失败')
     }
@@ -1359,6 +1476,8 @@ const handleDetailClose = () => {
   state.detailVisible = false
   state.selectedGroup = null
   state.taskDetail = null
+  state.fontInfo = null
+  state.loadingFontInfo = false
 }
 
 // 处理图片预览器遮罩层点击关闭
@@ -2205,8 +2324,61 @@ defineExpose({
     flex: 1;
     word-break: break-all;
     line-height: 1.6;
+
+    &--muted {
+      color: #aaa;
+      font-style: italic;
+    }
+
+    &--link {
+      color: #4A90E2;
+      text-decoration: none;
+      word-break: break-all;
+      &:hover { text-decoration: underline; }
+    }
   }
-  
+
+  .detail-item--font {
+    background: linear-gradient(135deg, rgba(240, 245, 255, 0.9) 0%, rgba(245, 240, 255, 0.9) 100%);
+    border: 1px solid rgba(100, 150, 255, 0.2);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+  }
+
+  .detail-color-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  .detail-color-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.6rem;
+    background: rgba(255,255,255,0.8);
+    border: 1px solid rgba(200, 220, 255, 0.5);
+    border-radius: 20px;
+    font-size: 13px;
+  }
+
+  .detail-color-swatch {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(0,0,0,0.15);
+    flex-shrink: 0;
+  }
+
+  .detail-color-value {
+    font-size: 13px;
+    color: #2C3E50;
+    font-weight: 500;
+    font-family: monospace;
+  }
+
   .detail-images {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));

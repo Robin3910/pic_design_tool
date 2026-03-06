@@ -4,7 +4,52 @@
  * @Description: Temu相关API接口
  */
 
+import { templateRequest } from '@/utils/templateAxios'
 import { OssApi } from './temu/oss'
+
+// API响应格式
+interface ApiResponse<T = any> {
+  code: number
+  data: T
+  msg?: string
+}
+
+// 根据订单ID获取字体信息响应
+export interface FontInfoByOrderIdVO {
+  fontId: number
+  fontName: string
+  ossUrl: string
+  templateId: number
+  sku: string
+  shopId: number
+  categoryId: number
+  categoryName: string
+  customTextColorList: string
+}
+
+/**
+ * 根据订单ID获取字体信息
+ * GET /temu/category-sku/get-font-info-by-order-id
+ */
+export const getFontInfoByOrderId = async (orderId: number): Promise<FontInfoByOrderIdVO | null> => {
+  try {
+    const response = await templateRequest.get<ApiResponse<FontInfoByOrderIdVO>>(
+      '/temu/category-sku/get-font-info-by-order-id',
+      { params: { orderId } },
+    )
+    if (response && typeof response === 'object' && 'code' in response) {
+      if (response.code === 0) {
+        return response.data ?? null
+      }
+      throw new Error(response.msg || '获取字体信息失败')
+    }
+    throw new Error('响应格式错误')
+  } catch (error: any) {
+    console.error('获取字体信息失败:', error)
+    if (error.message) throw error
+    throw new Error('获取字体信息失败，请稍后重试')
+  }
+}
 
 /**
  * 上传图片到阿里云OSS
@@ -141,6 +186,7 @@ export { OssApi } from './temu/oss'
 
 export default {
   uploadToOSS,
+  getFontInfoByOrderId,
   OssApi
 }
 
