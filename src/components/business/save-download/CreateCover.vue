@@ -156,7 +156,11 @@ let firstTemplateForPageHandled = false
     scrollY: 0, // 不滚动
     onclone: (clonedDoc: Document) => {
       // 添加字体
-      fonts.forEach((font) => clonedDoc.fonts.add(font))
+      console.log('[onclone] fonts 数量:', fonts.size)
+      fonts.forEach((font) => {
+        console.log('[onclone] 添加字体:', font.family)
+        clonedDoc.fonts.add(font)
+      })
       // 在克隆的文档中，重置画布的 transform 和所有可能影响位置的样式
       const clonedCanvas = clonedDoc.getElementById('clone-page') || clonedDoc.getElementById('page-design-canvas')
       if (clonedCanvas) {
@@ -327,14 +331,31 @@ let firstTemplateForPageHandled = false
 // 检查字体是否加载完成
 async function checkFonts() {
   const widgets = widgetStore.getWidgets()
+  console.log('[checkFonts] 检查字体加载, widgets 数量:', widgets.length)
+  // 打印所有文本组件的 fontClass
+  widgets.forEach((item: any) => {
+    if (item.type === 'w-text' && item.fontClass) {
+      console.log('[checkFonts] 文本组件:', item.uuid, 'fontClass:', JSON.stringify(item.fontClass))
+    }
+  })
   const fontLoaders: Promise<void>[] = []
   widgets.forEach((item: any) => {
     if (item.fontClass && item.fontClass.value) {
+      console.log('[checkFonts] 等待字体:', item.fontClass.value, 'url:', item.fontClass.url)
       const loader = new FontFaceObserver(item.fontClass.value)
       fontLoaders.push(loader.load(null, 120000)) // 延长超时让检测不会丢失字体
     }
   })
-  await Promise.all(fontLoaders)
+  if (fontLoaders.length === 0) {
+    console.log('[checkFonts] 没有字体需要加载')
+    return
+  }
+  try {
+    await Promise.all(fontLoaders)
+    console.log('[checkFonts] 所有字体加载完成')
+  } catch (e) {
+    console.error('[checkFonts] 字体加载失败:', e)
+  }
 }
 
 defineExpose({

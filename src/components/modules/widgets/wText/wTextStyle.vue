@@ -145,7 +145,8 @@ const state = reactive<TState>({
 })
 const dActiveElement = computed(() => widgetStore.dActiveElement)
 // const dMoving = computed(() => store.getters.dMoving)
-const { dMoving } = storeToRefs(useControlStore())
+const controlStore = useControlStore()
+const { dMoving } = storeToRefs(controlStore)
 
 const fontFileInputRef = ref<HTMLInputElement | null>(null)
 const isUploadingFont = ref(false)
@@ -166,6 +167,17 @@ watch(
     changeValue()
   },
   { deep: true },
+)
+
+// 记录已自动应用过第一订单字体信息的元素 uuid，同一元素只应用一次，避免覆盖用户手动修改
+let lastAutoAppliedUuid: string | number | null = null
+
+// 订单刷新后字体信息更新时，重置记录，让下次选中元素时重新应用
+watch(
+  () => controlStore.firstOrderFontInfo,
+  () => {
+    lastAutoAppliedUuid = null
+  },
 )
 
 let timer: boolean | null = null
@@ -189,7 +201,7 @@ onUnmounted(() => {
   }
 })
 
-function change() {
+async function change() {
   if (timer) {
     return
   }
@@ -206,6 +218,91 @@ function change() {
   }
   state.innerElement = JSON.parse(JSON.stringify(activeElement))
   changeStyleIconList()
+  // 仅在第一次选中该元素时自动应用，避免用户手动改字体/颜色后被覆盖
+  const uuid = activeElement.uuid || ''
+  if (uuid !== lastAutoAppliedUuid) {
+    lastAutoAppliedUuid = uuid
+    await applyFirstOrderFontInfo(uuid) // 等待字体加载完成
+  }
+}
+
+/** 去掉字体名的文件扩展名，用于 font-family */
+function getFontFamilyName(fontName: string): string {
+  // 去掉 .ttf, .otf, .woff, .woff2 等扩展名
+  return fontName.replace(/\.(ttf|otf|woff|woff2|eot|svg)$/i, '')
+}
+
+/** 解析 customTextColorList 取第一个颜色，统一为 8 位 hex */
+function parseFirstOrderColor(colorRaw: string | null | undefined): string | null {
+  if (!colorRaw) return null
+  let firstColor: string | null = null
+  if (/^#[0-9a-fA-F]{6,8}$/.test(colorRaw.trim())) {
+    firstColor = colorRaw.trim()
+  } else {
+    try {
+      const parsed = JSON.parse(colorRaw)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        firstColor = parsed[0]
+      } else if (typeof parsed === 'string') {
+        firstColor = parsed
+      }
+    } catch {
+      const parts = colorRaw.split(',').map((c: string) => c.trim()).filter(Boolean)
+      if (parts.length > 0) firstColor = parts[0]
+    }
+  }
+  if (firstColor && /^#[0-9a-fA-F]{6}$/.test(firstColor)) {
+    firstColor = firstColor + 'ff'
+  }
+  return firstColor
+}
+
+/** 将第一个订单的字体和颜色自动应用到当前选中的文本元素 */
+async function applyFirstOrderFontInfo(uuid: string) {
+  const fontInfo = controlStore.firstOrderFontInfo
+  console.log('[applyFirstOrderFontInfo] 被调用', { uuid, fontInfo })
+  if (!fontInfo || !uuid) return
+
+  state.tag = true // 阻止 changeValue 触发冗余的 store 更新
+
+  if (fontInfo.fontName && fontInfo.ossUrl) {
+    // 去掉扩展名，用于 font-family
+    const fontFamily = getFontFamilyName(fontInfo.fontName)
+    const fontClass = {
+      alias: fontFamily,
+      id: fontInfo.fontId,
+      value: fontFamily,
+      url: fontInfo.ossUrl,
+    }
+    state.innerElement.fontClass = fontClass
+    state.innerElement.fontFamily = fontFamily
+    widgetStore.updateWidgetData({ uuid, key: 'fontClass', value: fontClass })
+    widgetStore.updateWidgetData({ uuid, key: 'fontFamily', value: fontFamily })
+
+    // 直接将字体加载到 document.fonts，避免被 wText.vue 的 loading 锁跳过
+    // （wText.vue 在加载 addWidget 时的原始字体期间 state.loading=true，会忽略后续变更）
+    console.log('[applyFirstOrderFontInfo] 准备加载字体:', fontFamily, 'url:', fontInfo.ossUrl)
+    if ((window as any).FontFace) {
+      try {
+        const fontFace = new (window as any).FontFace(fontFamily, `url(${fontInfo.ossUrl})`)
+        console.log('[applyFirstOrderFontInfo] FontFace 已创建，准备 load')
+        await fontFace.load()
+        console.log('[applyFirstOrderFontInfo] FontFace load 成功，准备添加到 document.fonts')
+        ;(document as any).fonts.add(fontFace)
+        console.log('[applyFirstOrderFontInfo] 字体已添加到 document.fonts')
+      } catch (e) {
+        console.error('[applyFirstOrderFontInfo] 预加载订单字体失败:', fontInfo.fontName, e)
+      }
+    } else {
+      console.warn('[applyFirstOrderFontInfo] 当前环境不支持 FontFace')
+    }
+  }
+
+  const color = parseFirstOrderColor(fontInfo.customTextColorList)
+  if (color) {
+    state.innerElement.color = color
+    widgetStore.updateWidgetData({ uuid, key: 'color', value: color })
+  }
 }
 
 function changeValue() {

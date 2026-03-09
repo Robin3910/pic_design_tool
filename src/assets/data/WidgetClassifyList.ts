@@ -32,19 +32,21 @@ export default [
     component: 'order-list-wrap',
     iconImage: `${import.meta.env.BASE_URL}订单.svg`,
   },
-  {
-    name: '图片',
-    icon: 'icon-gallery',
-    show: false,
-    component: 'photo-list-wrap',
-  },
-  {
-    name: '文字',
-    icon: 'icon-wenzi',
-    show: false,
-    style: { fontWeight: 600 },
-    component: 'text-list-wrap',
-  },
+// 图片功能暂时隐藏
+// {
+//   name: '图片',
+//   icon: 'icon-gallery',
+//   show: false,
+//   component: 'photo-list-wrap',
+// },
+// 文字功能暂时隐藏
+// {
+//   name: '文字',
+//   icon: 'icon-wenzi',
+//   show: false,
+//   style: { fontWeight: 600 },
+//   component: 'text-list-wrap',
+// },
   {
     name: '历史',
     icon: 'icon-refresh',

@@ -69,8 +69,8 @@ const state = reactive({
 // 动态组件的 ref
 const currentComponentRef = ref<any>(null)
 
-// 需要自动刷新的页面索引：模板(0)、订单(1)、图片(2)、文字(3)、替换(4)
-const AUTO_REFRESH_INDEXES = [0, 1, 2, 3, 4]
+// 需要自动刷新的页面索引：模板(0)、订单(1)、历史(2)
+const AUTO_REFRESH_INDEXES = [0, 1, 2]
 
 const clickClassify = (index: number) => {
   state.activeWidgetClassify = index

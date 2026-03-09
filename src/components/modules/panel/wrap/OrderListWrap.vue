@@ -969,6 +969,25 @@ const loadOrderData = async (init = false) => {
       } else {
         controlStore.setPreviewImageUrl(null)
       }
+
+      // 异步获取第一个订单的字体/颜色信息，供文本样式面板自动应用
+      ;(async () => {
+        try {
+          const firstGroup = groups[0]
+          if (!firstGroup) return
+          const taskId = typeof firstGroup.sortId === 'string' ? parseInt(firstGroup.sortId, 10) : (firstGroup.sortId as number)
+          if (isNaN(taskId)) return
+          const taskData = taskRecordCache.get(taskId)
+          if (!taskData) return
+          const rawOrderId = (taskData as any).orderId ?? (taskData as any).order_id
+          if (!rawOrderId) return
+          const orderId = typeof rawOrderId === 'string' ? parseInt(rawOrderId, 10) : rawOrderId
+          const fontInfo = await getFontInfoByOrderId(orderId)
+          controlStore.setFirstOrderFontInfo(fontInfo)
+        } catch (e) {
+          console.error('获取第一个订单字体信息失败:', e)
+        }
+      })()
     }
 
     // 判断是否还有更多数据
@@ -995,6 +1014,25 @@ const load = () => {
 
 const selectText = async (text: TTextData) => {
   controlStore.setShowMoveable(false)
+
+  // 确保 firstOrderFontInfo 已加载完成（如果还未加载，阻塞等待）
+  if (!controlStore.firstOrderFontInfo && text.sortId) {
+    const taskId = typeof text.sortId === 'string' ? parseInt(text.sortId, 10) : text.sortId
+    if (!isNaN(taskId)) {
+      const taskData = taskRecordCache.get(taskId) || await api.redrawTask.getRedrawTaskById(taskId).catch(() => null)
+      if (taskData) {
+        taskRecordCache.set(taskId, taskData)
+        const rawOrderId = (taskData as any).orderId ?? (taskData as any).order_id
+        if (rawOrderId) {
+          const orderId = typeof rawOrderId === 'string' ? parseInt(rawOrderId, 10) : rawOrderId
+          const fontInfo = await getFontInfoByOrderId(orderId).catch(() => null)
+          if (fontInfo) {
+            controlStore.setFirstOrderFontInfo(fontInfo)
+          }
+        }
+      }
+    }
+  }
   
   let orderId: number | null = null
 
@@ -1028,63 +1066,10 @@ const selectText = async (text: TTextData) => {
 
   const setting = JSON.parse(JSON.stringify(wTextSetting))
 
-  // 优先使用订单字体信息，否则回退到上次选择的字体
-  if (orderId) {
-    try {
-      const fontInfo = await getFontInfoByOrderId(orderId)
-      if (fontInfo?.fontName && fontInfo?.ossUrl) {
-        setting.fontClass = {
-          alias: fontInfo.fontName,
-          id: fontInfo.fontId,
-          value: fontInfo.fontName,
-          url: fontInfo.ossUrl,
-        }
-        setting.fontFamily = fontInfo.fontName
-      }
-      // 应用第一个定制颜色
-      const colorRaw = fontInfo?.customTextColorList
-      if (colorRaw != null && colorRaw !== '') {
-        let firstColor: string | null = null
-        // 1. 直接是 hex 颜色值
-        if (/^#[0-9a-fA-F]{6,8}$/.test(colorRaw.trim())) {
-          firstColor = colorRaw.trim()
-        } else {
-          // 2. 尝试 JSON 数组格式
-          try {
-            const parsed = JSON.parse(colorRaw)
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              firstColor = parsed[0]
-            } else if (typeof parsed === 'string') {
-              firstColor = parsed
-            }
-          } catch {
-            // 3. 逗号分隔格式
-            const parts = colorRaw.split(',').map((c: string) => c.trim()).filter(Boolean)
-            if (parts.length > 0) firstColor = parts[0]
-          }
-        }
-        if (firstColor) {
-          // 统一补全为 8 位 hex（#RRGGBBAA）
-          if (/^#[0-9a-fA-F]{6}$/.test(firstColor)) {
-            firstColor = firstColor + 'ff'
-          }
-          setting.color = firstColor
-        }
-      }
-    } catch (error) {
-      console.error('获取字体信息失败，使用默认字体:', error)
-      const lastFont = getLastSelectedFont()
-      if (lastFont) {
-        setting.fontClass = lastFont
-        setting.fontFamily = lastFont.value
-      }
-    }
-  } else {
-    const lastFont = getLastSelectedFont()
-    if (lastFont) {
-      setting.fontClass = lastFont
-      setting.fontFamily = lastFont.value
-    }
+  const lastFont = getLastSelectedFont()
+  if (lastFont) {
+    setting.fontClass = lastFont
+    setting.fontFamily = lastFont.value
   }
 
   setting.text = text.text

@@ -9,6 +9,7 @@
 
 import { useHistoryStore } from "@/store";
 import { Store, defineStore } from "pinia";
+import type { FontInfoByOrderIdVO } from "@/api/temu";
 
 type TControlState = {
   /** 是否正在移动组件 */
@@ -31,6 +32,8 @@ type TControlState = {
   dCropUuid: string
   /** 合成预览图 URL */
   previewImageUrl: string | null
+  /** 第一个订单的字体/颜色信息，供文本样式面板自动应用 */
+  firstOrderFontInfo: FontInfoByOrderIdVO | null
 }
 
 type TControlAction = {
@@ -50,6 +53,8 @@ type TControlAction = {
   setSpaceDown: (uuid: boolean) => void // 设置是否按下空格键
   /** 设置预览图 URL */
   setPreviewImageUrl: (url: string | null) => void
+  /** 设置第一个订单的字体/颜色信息 */
+  setFirstOrderFontInfo: (info: FontInfoByOrderIdVO | null) => void
 }
 
 /** 全局控制配置 */
@@ -65,6 +70,7 @@ const ControlStore =  defineStore<"controlStore", TControlState, {}, TControlAct
     dCropUuid: '-1', // 正在编辑or裁剪的组件id
     dSpaceDown: false, // 记录是否按下空格键
     previewImageUrl: null, // 合成预览图 URL
+    firstOrderFontInfo: null,
   }),
   getters: {},
   actions: {
@@ -121,7 +127,11 @@ const ControlStore =  defineStore<"controlStore", TControlState, {}, TControlAct
     /** 设置预览图 URL */
     setPreviewImageUrl(url: string | null) {
       this.previewImageUrl = url
-    }
+    },
+    /** 设置第一个订单的字体/颜色信息 */
+    setFirstOrderFontInfo(info: FontInfoByOrderIdVO | null) {
+      this.firstOrderFontInfo = info
+    },
   }
 })
 
