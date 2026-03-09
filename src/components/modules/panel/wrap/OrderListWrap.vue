@@ -312,7 +312,10 @@
           <div v-if="state.loadingFontInfo" class="detail-value detail-value--muted">加载中...</div>
           <div v-else-if="state.fontInfo?.customTextColorList" class="detail-color-list">
             <span
-              v-for="(color, index) in (() => { try { return JSON.parse(state.fontInfo.customTextColorList) } catch { return [] } })()"
+              v-for="(color, index) in (() => { 
+                const val = state.fontInfo.customTextColorList
+                try { return JSON.parse(val) } catch { return val && val.startsWith('#') ? [val] : [] }
+              })()"
               :key="index"
               class="detail-color-item"
             >
