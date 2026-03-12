@@ -62,7 +62,8 @@ const state = reactive({
     ...item,
     iconComponent: item.iconComponent ? iconComponents[item.iconComponent] : null,
   })),
-  activeWidgetClassify: 0,
+  // 默认展示“订单”面板（0=模板，1=订单）
+  activeWidgetClassify: 1,
   active: true,
 })
 

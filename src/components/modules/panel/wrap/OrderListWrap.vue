@@ -1035,6 +1035,79 @@ const loadOrderData = async (init = false) => {
                   widgetStore.setTemplate(adjustedWidgets)
                 }
                 console.log('自动应用模板成功:', templateData.title || templateData.id)
+
+                // 如果 templateId === 17，自动放入第一个文字到画布
+                if (fontInfo.templateId === 17) {
+                  await nextTick()
+                  // 等待模板应用完成
+                  setTimeout(async () => {
+                    // 获取第一个订单的第一个文字
+                    const firstOrderGroup = groups[0]
+                    if (!firstOrderGroup) return
+                    const firstTextItem = firstOrderGroup.items?.find(item => item.text)
+                    if (!firstTextItem?.text) return
+                    const textData = firstTextItem.text
+
+                    // 创建文字组件并添加到画布
+                    const setting = JSON.parse(JSON.stringify(wTextSetting))
+                    const lastFont = getLastSelectedFont()
+                    if (lastFont) {
+                      setting.fontClass = lastFont
+                      setting.fontFamily = lastFont.value
+                    }
+                    setting.text = textData.text
+                    setting.fontWeight = textData.fontWeight
+                    setting.name = '文本'
+                    setting.type = 'w-text'
+                    setting.sortId = textData.sortId ?? ''
+                    setting.sortIndex = textData.sortIndex
+
+                    // 文字自适应画布大小，尽量占满但不溢出
+                    const { width: pW, height: pH } = dPage.value
+                    const padding = 20 // 左右边距
+                    const availableWidth = pW - padding * 2
+                    const availableHeight = pH - padding * 2
+
+                    // 根据画布宽度和文字长度计算合适的字体大小
+                    const textLength = textData.text.length
+                    // 初始估算：假设每个字符占 0.6 倍字体宽度
+                    let fontSize = Math.floor(availableWidth / (textLength * 0.6))
+                    // 限制字体大小范围
+                    fontSize = Math.max(12, Math.min(fontSize, 200))
+                    setting.fontSize = fontSize
+
+                    // 计算文字实际宽度和高度
+                    const textWidth = textLength * fontSize * 0.6
+                    const textHeight = fontSize * setting.lineHeight
+
+                    // 如果高度超出画布，按高度重新计算
+                    if (textHeight > availableHeight) {
+                      fontSize = Math.floor(availableHeight / setting.lineHeight)
+                      fontSize = Math.max(12, fontSize)
+                      setting.fontSize = fontSize
+                    }
+
+                    // 水平居中：元素宽度为文字实际宽度，元素居中放置
+                    const finalTextWidth = textLength * fontSize * 0.6
+                    setting.left = (pW - finalTextWidth) / 2
+                    setting.width = finalTextWidth
+                    // 垂直居中
+                    const finalTextHeight = fontSize * setting.lineHeight
+                    setting.top = (pH - finalTextHeight) / 2
+                    setting.height = finalTextHeight
+
+                    // 添加文字后，用与按钮一致的逻辑做水平/垂直居中（alignAction）
+                    widgetStore.addWidget(setting)
+                    // 等待文字渲染完成，record.width/height 更新后再居中
+                    setTimeout(() => {
+                      if (setting.uuid) {
+                        widgetStore.updateAlign({ align: 'ch', uuid: setting.uuid })
+                        widgetStore.updateAlign({ align: 'cv', uuid: setting.uuid })
+                      }
+                    }, 300)
+                    console.log('自动放入第一个文字:', textData.text, '字体大小:', fontSize)
+                  }, 100)
+                }
               }
             } catch (templateError) {
               console.error('自动应用模板失败:', templateError)
