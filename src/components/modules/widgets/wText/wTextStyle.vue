@@ -298,7 +298,10 @@ async function applyFirstOrderFontInfo(uuid: string) {
     }
   }
 
-  const color = parseFirstOrderColor(fontInfo.customTextColorList)
+  // templateId === 3 时不使用接口返回的颜色，保持默认黑色
+  const skipColor = fontInfo.templateId === 3
+
+  const color = skipColor ? null : parseFirstOrderColor(fontInfo.customTextColorList)
   if (color) {
     state.innerElement.color = color
     widgetStore.updateWidgetData({ uuid, key: 'color', value: color })
