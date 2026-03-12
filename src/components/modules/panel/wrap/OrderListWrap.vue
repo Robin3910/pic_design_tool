@@ -372,7 +372,7 @@
 import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import RefreshIcon from '@/components/common/Icon/RefreshIcon.vue'
-import { useControlStore, useCanvasStore, useWidgetStore } from '@/store'
+import { useControlStore, useCanvasStore, useWidgetStore, useTemplateStore } from '@/store'
 import { wTextSetting, getLastSelectedFont } from '../../widgets/wText/wTextSetting'
 import wImageSetting from '../../widgets/wImage/wImageSetting'
 import setItem2Data from '@/common/methods/DesignFeatures/setImage'
@@ -381,6 +381,7 @@ import eventBus from '@/utils/plugins/eventBus'
 import { ElMessage } from 'element-plus'
 import { taskRecordCache } from '@/utils/taskRecordCache'
 import { getFontInfoByOrderId, type FontInfoByOrderIdVO } from '@/api/temu'
+import { getTemplateById, type Template } from '@/api/template'
 
 type TTextData = {
   name: string
@@ -453,7 +454,9 @@ type TState = {
 
 const controlStore = useControlStore()
 const widgetStore = useWidgetStore()
-const { dPage } = storeToRefs(useCanvasStore())
+const templateStore = useTemplateStore()
+const canvasStore = useCanvasStore()
+const { dPage } = storeToRefs(canvasStore)
 
 const state = reactive<TState>({
   groups: [],
@@ -987,6 +990,56 @@ const loadOrderData = async (init = false) => {
           const orderId = typeof rawOrderId === 'string' ? parseInt(rawOrderId, 10) : rawOrderId
           const fontInfo = await getFontInfoByOrderId(orderId)
           controlStore.setFirstOrderFontInfo(fontInfo)
+
+          // 如果有 templateId，自动应用模板
+          if (fontInfo?.templateId) {
+            try {
+              const response = await getTemplateById(String(fontInfo.templateId))
+              if (response.code === 0 && response.data) {
+                const templateData = response.data
+                const templateResult = JSON.parse(templateData.data || '{}')
+
+                // 应用模板前先清空当前图层，避免旧图层残留叠加
+                widgetStore.setDWidgets([])
+
+                // 获取边距值
+                const marginLeft = templateData.marginLeft || 0
+                const marginTop = templateData.marginTop || 0
+
+                // 调整组件位置的辅助函数
+                const adjustWidgetsPosition = (widgets: any[]) => {
+                  if (!widgets || !Array.isArray(widgets)) return widgets
+                  return widgets.map((widget: any) => {
+                    if (widget.layers && Array.isArray(widget.layers)) {
+                      widget.layers = adjustWidgetsPosition(widget.layers)
+                    }
+                    if (typeof widget.left === 'number') {
+                      widget.left = widget.left + marginLeft
+                    }
+                    if (typeof widget.top === 'number') {
+                      widget.top = widget.top + marginTop
+                    }
+                    return widget
+                  })
+                }
+
+                if (Array.isArray(templateResult)) {
+                  const { global, layers } = templateResult[0]
+                  canvasStore.setDPage(global)
+                  const adjustedLayers = adjustWidgetsPosition(layers)
+                  widgetStore.setTemplate(adjustedLayers)
+                } else {
+                  const { page, widgets } = templateResult
+                  canvasStore.setDPage(page)
+                  const adjustedWidgets = adjustWidgetsPosition(widgets)
+                  widgetStore.setTemplate(adjustedWidgets)
+                }
+                console.log('自动应用模板成功:', templateData.title || templateData.id)
+              }
+            } catch (templateError) {
+              console.error('自动应用模板失败:', templateError)
+            }
+          }
         } catch (e) {
           console.error('获取第一个订单字体信息失败:', e)
         }
