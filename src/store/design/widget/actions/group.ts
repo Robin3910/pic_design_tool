@@ -24,8 +24,14 @@ export function addGroup(store: TWidgetStore, group: TdWidgetData[]) {
   group.forEach((item) => {
     !item.isContainer && parent && (item.parent = parent.uuid) // 重设父id
     item.text && (item.text = decodeURIComponent(item.text))
+  })
+  let isFirstImage = true
+  group.forEach((item) => {
     // 从模板添加的图片命名为"模板图片"
-    applyTemplateImageDefaults(item)
+    applyTemplateImageDefaults(item, isFirstImage)
+    if (item.type === 'w-image') {
+      isFirstImage = false
+    }
     store.dWidgets.push(item)
   })
   // 选中组件

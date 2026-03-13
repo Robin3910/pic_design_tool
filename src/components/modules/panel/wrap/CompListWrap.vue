@@ -257,17 +257,21 @@ const selectItem = async (item: any) => {
     })
   
   if (parent.isContainer) {
+    let isFirstImage = true
     group.forEach((element: any) => {
       element.left += (pW - parent.width) / 2
       element.top += (pH - parent.height) / 2
-      applyTemplateImageDefaults(element)
+      applyTemplateImageDefaults(element, isFirstImage)
+      if (element.type === 'w-image') {
+        isFirstImage = false
+      }
     })
     widgetStore.addGroup(group)
   } else {
     group.text && (group.text = decodeURIComponent(group.text))
     group.left = pW / 2 - group.fontSize * (group.text.length / 2)
     group.top = pH / 2 - group.fontSize / 2
-    applyTemplateImageDefaults(group)
+    applyTemplateImageDefaults(group, true)
     widgetStore.addWidget(group)
   }
 }

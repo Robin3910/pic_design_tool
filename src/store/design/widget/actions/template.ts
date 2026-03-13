@@ -20,11 +20,15 @@ export function setTemplate(store: TWidgetStore, allWidgets: TdWidgetData[]) {
   const widgetStore = useWidgetStore()
   // 仅对第一个“模板图片”做画布铺满校正，避免画布露边
   let firstTemplateImageHandled = false
+  let isFirstImage = true
   allWidgets.forEach((item) => {
     Number(item.uuid) < 0 && (item.uuid = nanoid()) // 重设id
     item.text && (item.text = decodeURIComponent(item.text))
     // 从模板加载的图片命名为"模板图片"
-    applyTemplateImageDefaults(item)
+    applyTemplateImageDefaults(item, isFirstImage)
+    if (item.type === 'w-image') {
+      isFirstImage = false
+    }
     // 导入到画布时，让第一个模板图片自动铺满整个画布，避免边缘露白
     if (!firstTemplateImageHandled && item.type === 'w-image' && item.name === '模板图片') {
       const page = canvasStore.dPage
