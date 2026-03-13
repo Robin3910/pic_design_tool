@@ -43,8 +43,8 @@
           </div>
         </div>
         <HeaderOptions ref="optionsRef" v-model="state.isContinue" @change="optionsChange">
-          <el-button ref="saveButtonRef" size="large" class="primary-btn primary-btn--save" @click="handleSave">上传图片</el-button>
-          <el-button ref="ref4" size="large" class="primary-btn primary-btn--download" @click="dealWith('download')">{{ $t('header.download') }}</el-button>
+          <el-button ref="saveButtonRef" size="large" class="primary-btn primary-btn--save" @click="handleSave">上传/替换效果图</el-button>
+          <!-- <el-button ref="ref4" size="large" class="primary-btn primary-btn--download" @click="dealWith('download')">{{ $t('header.download') }}</el-button> -->
         </HeaderOptions>
       </div>
     </div>

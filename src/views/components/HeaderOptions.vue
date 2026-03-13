@@ -23,6 +23,7 @@
     <!-- <el-button :loading="state.loading" size="large" class="primary-btn" :disabled="tempEditing" plain type="primary" @click="download">下载作品</el-button> -->
     <!-- </copyRight> -->
     <!-- 清除缓存和刷新按钮 -->
+    <!--
     <el-button 
       class="clear-cache-btn"
       @click="handleClearCacheAndRefresh"
@@ -34,6 +35,7 @@
       </svg>
       <span>清除缓存</span>
     </el-button>
+    -->
     <!-- 登出按钮 -->
     <el-button 
       v-if="authStore.isLoggedIn"

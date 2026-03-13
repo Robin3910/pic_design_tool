@@ -19,7 +19,7 @@
           @click="selectItem(listItem)"
         >
           <img v-if="listItem.preview" class="preview" :src="listItem.preview" alt="preview" />
-          <span v-else>{{ (typeof listItem === 'object' ? listItem.alias : listItem) + suffix }}</span>
+          <span v-else :style="(typeof listItem === 'object' && listItem.value) ? { fontFamily: `'${listItem.value}'` } : {}">{{ (typeof listItem === 'object' ? listItem.alias : listItem) + suffix }}</span>
         </li>
       </ul>
       <!-- tab分类列表 -->
@@ -281,16 +281,18 @@ function handleShow() {
   }
 }
 .list-ul {
-  max-height: 240px;
+  max-height: 500px;
   overflow-y: auto;
+  width: 100%;
+  min-width: 150px;
   li {
     display: flex;
     align-items: center;
     color: #000000;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 16px;
     overflow: hidden;
-    padding: 5px;
+    padding: 8px 12px;
     text-overflow: ellipsis;
     white-space: nowrap;
     &:hover {
@@ -307,6 +309,7 @@ function handleShow() {
 }
 
 .tabs-wrap {
-  width: 210px;
+  width: 100%;
+  min-width: 150px;
 }
 </style>

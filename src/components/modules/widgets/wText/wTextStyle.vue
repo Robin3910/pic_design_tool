@@ -10,17 +10,21 @@
         </div>
       </el-collapse-item>
       <!-- <el-collapse-item title="样式设置" name="2"> -->
+      <!-- 字体选择单独一行 -->
       <div class="line-layout style-item font-setting-row">
         <value-select
           class="font-name-select"
           v-model="state.innerElement.fontClass"
-          label="文字"
+          label="字体"
           :data="state.fontClassList"
           inputWidth="100%"
           :readonly="true"
           @finish="(font) => finish('fontClass', font)"
           @open="onFontSelectOpen"
         />
+      </div>
+      <!-- 字号和导入字体按钮单独一行 -->
+      <div class="line-layout style-item font-size-row">
         <value-select
           class="font-size-select"
           v-model="state.innerElement.fontSize"
@@ -30,7 +34,9 @@
           inputWidth="80px"
           @finish="(value) => finish('fontSize', value)"
         />
-        <el-button class="import-font-btn" size="small" @click="onClickImportFont">导入字体</el-button>
+        <el-button class="import-font-btn" size="small" @click="onClickImportFont">
+          <i class="el-icon-upload2" style="margin-right: 4px"></i>导入字体
+        </el-button>
         <input
           ref="fontFileInputRef"
           type="file"
@@ -41,7 +47,8 @@
       </div>
 
       <icon-item-select class="style-item" :data="state.styleIconList1" @finish="textStyleAction" />
-      <icon-item-select class="style-item" :data="state.styleIconList2" @finish="textStyleAction" />
+      <!-- 文本对齐图标栏已隐藏 -->
+      <!-- <icon-item-select class="style-item" :data="state.styleIconList2" @finish="textStyleAction" /> -->
 
       <!-- <div style="flex-wrap: nowrap" class="line-layout style-item">
         <value-select v-model="innerElement.lineHeight" label="行距" suffix="倍" :data="lineHeightList" @finish="(value) => finish('lineHeight', value)" />
@@ -416,7 +423,7 @@ let fontInitialized = false
 async function refreshFonts() {
   // 强制重新初始化字体，确保获取最新数据
   await useFontStore.init(true)
-  
+
   const localFonts = useFontStore.list
   const uniqueFonts: TFontItem[] = []
   const seen = new Set<number | string>()
@@ -432,20 +439,41 @@ async function refreshFonts() {
     uniqueFonts.push(item as TFontItem)
   }
 
-  const pageFonts = usePageFontsFilter()
-  pageFonts.forEach((font) => appendFont(font))
-
+  // 先加载系统字体（保持接口返回的原始顺序）
   for (const font of localFonts) {
     const { id, oid, value, url, alias, preview } = font
     appendFont({ id, oid, value, url, alias, preview })
   }
 
+  // 再追加页面字体（不重复，保持接口顺序）
+  const pageFonts = usePageFontsFilter()
+  pageFonts.forEach((font) => appendFont(font))
+
   state.fontClassList = uniqueFonts
 }
 
-// 下拉框打开时刷新字体列表
+// 预加载字体到浏览器
+async function preloadFont(font: TFontItem) {
+  if (!font.value || !font.url) return
+  try {
+    const loadFont = new FontFace(font.value, `url(${font.url})`)
+    await loadFont.load()
+    document.fonts.add(loadFont)
+  } catch (e) {
+    console.warn('字体预加载失败:', font.value, e)
+  }
+}
+
+// 下拉框打开时刷新字体列表并预加载
 async function onFontSelectOpen() {
   await refreshFonts()
+  // 预加载所有字体以确保下拉列表中能正确显示字体效果
+  const fonts = state.fontClassList
+  for (const font of fonts) {
+    if (font.value && font.url) {
+      await preloadFont(font)
+    }
+  }
 }
 
 async function loadFonts() {
@@ -470,13 +498,15 @@ async function loadFonts() {
     uniqueFonts.push(item as TFontItem)
   }
 
-  const pageFonts = usePageFontsFilter()
-  pageFonts.forEach((font) => appendFont(font))
-
+  // 先加载系统字体（保持接口返回的原始顺序）
   for (const font of localFonts) {
     const { id, oid, value, url, alias, preview } = font
     appendFont({ id, oid, value, url, alias, preview })
   }
+
+  // 再追加页面字体（不重复，保持接口顺序）
+  const pageFonts = usePageFontsFilter()
+  pageFonts.forEach((font) => appendFont(font))
 
   state.fontClassList = uniqueFonts
 }
@@ -1094,25 +1124,58 @@ defineExpose({
 .font-setting-row :deep(.font-name-select.value-select) {
   flex: 1 1 auto;
   min-width: 0;
-  width: auto;
-  max-width: calc(100% - 96px);
+  width: 100%;
 }
 .font-setting-row :deep(.font-name-select .input-wrap) {
   width: 100%;
 }
-.font-setting-row :deep(.font-size-select.value-select) {
+// 字号行样式：与 value-select 的 input-wrap 高度 40px 一致
+.font-size-row {
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+  justify-content: flex-start;
+}
+.font-size-row :deep(.font-size-select.value-select) {
   flex: 0 0 80px;
   width: 80px;
 }
-.font-setting-row :deep(.font-size-select .input-wrap) {
+.font-size-row :deep(.font-size-select .input-wrap) {
   width: 100%;
+  height: 40px;
+}
+.font-size-row .import-font-btn {
+  flex: 1 1 auto;
+  min-width: 100px;
+  margin-top: 0;
+  height: 40px !important;
+  padding: 0 16px;
+  border-radius: 6px;
 }
 .import-font-btn {
   flex: 0 0 100%;
   display: flex;
   justify-content: center;
+  align-items: center;
   white-space: nowrap;
   margin-top: 4px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: #fff;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+  height: 40px;
+  border-radius: 6px;
+}
+.import-font-btn:hover {
+  background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.6);
+  transform: translateY(-1px);
+}
+.import-font-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
 }
 .import-font-btn span {
   display: flex;
