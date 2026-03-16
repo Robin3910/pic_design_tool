@@ -10,7 +10,7 @@
     <p v-if="label" class="input-label">
       {{ label }}
     </p>
-    <el-popover placement="bottom-end" trigger="click" width="auto" @show="handleShow">
+    <el-popover placement="bottom-end" trigger="click" width="auto" :show-after="0" :hide-after="0" @show="handleShow">
       <!-- 单列表 -->
       <ul v-if="data && Array.isArray(data)" class="list-ul">
         <li
@@ -291,8 +291,10 @@ function handleShow() {
     color: #000000;
     cursor: pointer;
     font-size: 16px;
+    height: 40px;
+    line-height: 40px;
     overflow: hidden;
-    padding: 8px 12px;
+    padding: 0 12px;
     text-overflow: ellipsis;
     white-space: nowrap;
     &:hover {

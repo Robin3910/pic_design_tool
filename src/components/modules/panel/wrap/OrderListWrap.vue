@@ -1062,39 +1062,33 @@ const loadOrderData = async (init = false) => {
                     setting.sortId = textData.sortId ?? ''
                     setting.sortIndex = textData.sortIndex
 
-                    // 文字自适应画布大小，尽量占满但不溢出
+                    // 文字固定300大小，超出限制时自动缩小
                     const { width: pW, height: pH } = dPage.value
-                    const padding = 20 // 左右边距
-                    const availableWidth = pW - padding * 2
-                    const availableHeight = pH - padding * 2
-
-                    // 根据画布宽度和文字长度计算合适的字体大小
-                    const textLength = textData.text.length
-                    // 初始估算：假设每个字符占 0.6 倍字体宽度
-                    let fontSize = Math.floor(availableWidth / (textLength * 0.6))
-                    // 限制字体大小范围
-                    fontSize = Math.max(12, Math.min(fontSize, 200))
-                    setting.fontSize = fontSize
 
                     // 计算文字实际宽度和高度
-                    const textWidth = textLength * fontSize * 0.6
-                    const textHeight = fontSize * setting.lineHeight
+                    const textLength = textData.text.length
 
-                    // 如果高度超出画布，按高度重新计算
-                    if (textHeight > availableHeight) {
-                      fontSize = Math.floor(availableHeight / setting.lineHeight)
-                      fontSize = Math.max(12, fontSize)
-                      setting.fontSize = fontSize
-                    }
+                    // 文字宽不能超过1170，高不能超过588，尽量放大到限制值
+                    const maxTextWidth = 1170
+                    const maxTextHeight = 530
+
+                    // 根据限制值反推最大字体大小
+                    const maxFontSizeByWidth = maxTextWidth / (textLength * 0.6)
+                    const maxFontSizeByHeight = maxTextHeight / setting.lineHeight
+                    const finalFontSize = Math.min(maxFontSizeByWidth, maxFontSizeByHeight)
+
+                    setting.fontSize = finalFontSize
+
+                    // 根据计算出的字体大小计算文字尺寸
+                    const scaledTextWidth = textLength * finalFontSize * 0.6
+                    const scaledTextHeight = finalFontSize * setting.lineHeight
 
                     // 水平居中：元素宽度为文字实际宽度，元素居中放置
-                    const finalTextWidth = textLength * fontSize * 0.6
-                    setting.left = (pW - finalTextWidth) / 2
-                    setting.width = finalTextWidth
+                    setting.left = (pW - scaledTextWidth) / 2
+                    setting.width = scaledTextWidth
                     // 垂直居中
-                    const finalTextHeight = fontSize * setting.lineHeight
-                    setting.top = (pH - finalTextHeight) / 2
-                    setting.height = finalTextHeight
+                    setting.top = (pH - scaledTextHeight) / 2
+                    setting.height = scaledTextHeight
 
                     // 添加文字后，用与按钮一致的逻辑做水平/垂直居中（alignAction）
                     widgetStore.addWidget(setting)
@@ -1105,7 +1099,91 @@ const loadOrderData = async (init = false) => {
                         widgetStore.updateAlign({ align: 'cv', uuid: setting.uuid })
                       }
                     }, 300)
-                    console.log('自动放入第一个文字:', textData.text, '字体大小:', fontSize)
+                    console.log('自动放入第一个文字:', textData.text, '字体大小:', finalFontSize)
+                  }, 100)
+                }
+
+                // 如果 templateId === 19，自动放入第一个图片和第一个文字到画布
+                if (fontInfo.templateId === 19) {
+                  await nextTick()
+                  setTimeout(async () => {
+                    const firstOrderGroup = groups[0]
+                    if (!firstOrderGroup) return
+                    const firstImageItem = firstOrderGroup.items?.find(item => item.image)
+                    const firstTextItem = firstOrderGroup.items?.find(item => item.text)
+
+                    const { width: pW, height: pH } = dPage.value
+
+                    // 先放入图片，图片在左侧
+                    if (firstImageItem?.image) {
+                      const imageData = firstImageItem.image
+                      const imgSetting = JSON.parse(JSON.stringify(wImageSetting))
+                      const img = await setItem2Data({
+                        url: imageData.url,
+                        thumb: imageData.thumb || imageData.url,
+                        name: imageData.name,
+                        width: 0,
+                        height: 0,
+                      })
+                      // 图片最长边不超过300，等比缩放，宽度不超过300，高度不超过200
+                      const maxImageSize = 300
+                      const maxImageHeight = 200
+                      const imgScale = Math.min(maxImageSize / img.width, maxImageHeight / img.height, 1)
+                      imgSetting.width = img.width * imgScale
+                      imgSetting.height = img.height * imgScale
+                      imgSetting.imgUrl = imageData.url
+                      imgSetting.name = '素材图片'
+                      if (imageData.sortId) {
+                        imgSetting.sortId = imageData.sortId
+                      }
+                      if (imageData.sortIndex !== undefined) {
+                        imgSetting.sortIndex = imageData.sortIndex
+                      }
+                      // 图片放在左侧，距离左边框25px
+                      imgSetting.left = 25
+                      imgSetting.top = (pH - imgSetting.height) / 2
+                      widgetStore.addWidget(imgSetting)
+                      console.log('自动放入第一个图片:', imageData.name)
+                    }
+
+                    // 再放入文字，文字在右侧
+                    if (firstTextItem?.text) {
+                      const textData = firstTextItem.text
+                      const textSetting = JSON.parse(JSON.stringify(wTextSetting))
+                      const lastFont = getLastSelectedFont()
+                      if (lastFont) {
+                        textSetting.fontClass = lastFont
+                        textSetting.fontFamily = lastFont.value
+                      }
+                      textSetting.text = textData.text
+                      textSetting.fontWeight = textData.fontWeight
+                      textSetting.name = '文本'
+                      textSetting.type = 'w-text'
+                      textSetting.sortId = textData.sortId ?? ''
+                      textSetting.sortIndex = textData.sortIndex
+
+                      // 文字固定100大小
+                      const fontSize = 100
+                      textSetting.fontSize = fontSize
+
+                      const textLength = textData.text.length
+                      const textWidth = textLength * fontSize * 0.6
+                      const textHeight = fontSize * textSetting.lineHeight
+
+                      // 文字放在右侧，更靠近右边框
+                      textSetting.left = pW - textWidth
+                      textSetting.width = textWidth
+                      textSetting.top = (pH - textHeight) / 2
+                      textSetting.height = textHeight
+
+                      widgetStore.addWidget(textSetting)
+                      setTimeout(() => {
+                        if (textSetting.uuid) {
+                          widgetStore.updateAlign({ align: 'cv', uuid: textSetting.uuid })
+                        }
+                      }, 300)
+                      console.log('自动放入第一个文字:', textData.text, '字体大小:', fontSize)
+                    }
                   }, 100)
                 }
               }
