@@ -10,27 +10,38 @@
     <p v-if="label" class="input-label">
       {{ label }}
     </p>
-    <el-popover placement="bottom-end" trigger="click" width="auto" :show-after="0" :hide-after="0" @show="handleShow">
+    <el-popover placement="bottom" trigger="click" width="auto" :show-after="0" :hide-after="0" :fallback-placements="['bottom']" :flip="false" @show="handleShow">
+      <!-- 搜索框 -->
+      <div v-if="showSearch" class="search-box">
+        <input
+          v-model="state.searchText"
+          class="search-input"
+          placeholder="搜索字体..."
+          @input="handleSearch"
+        />
+      </div>
       <!-- 单列表 -->
       <ul v-if="data && Array.isArray(data)" class="list-ul">
         <li
-          v-for="listItem in data" :key="typeof listItem === 'object' ? listItem.alias : listItem"
+          v-for="listItem in filteredData" :key="typeof listItem === 'object' ? listItem.alias : listItem"
           :class="{ active: listItem == state.innerValue }"
           @click="selectItem(listItem)"
         >
           <img v-if="listItem.preview" class="preview" :src="listItem.preview" alt="preview" />
           <span v-else :style="(typeof listItem === 'object' && listItem.value) ? { fontFamily: `'${listItem.value}'` } : {}">{{ (typeof listItem === 'object' ? listItem.alias : listItem) + suffix }}</span>
         </li>
+        <li v-if="filteredData.length === 0" class="no-result">无匹配结果</li>
       </ul>
       <!-- tab分类列表 -->
       <div v-else class="tabs-wrap">
         <el-tabs v-model="state.activeTab">
           <el-tab-pane v-for="(val, key, i) in data" :key="'tab' + i" :label="key" :name="key">
             <ul class="list-ul">
-              <li v-for="listItem in data[key]" :key="typeof listItem === 'object' ? listItem.alias : listItem" :class="{ active: listItem == state.innerValue }" @click="selectItem(listItem)">
+              <li v-for="listItem in getFilteredTabData(key)" :key="typeof listItem === 'object' ? listItem.alias : listItem" :class="{ active: listItem == state.innerValue }" @click="selectItem(listItem)">
                 <img v-if="listItem.preview" class="preview" :src="listItem.preview" alt="preview" />
                 <span v-else :style="{ fontFamily: `'${listItem.value}'` }">{{ (typeof listItem === 'object' ? listItem.alias : listItem) + suffix }}</span>
               </li>
+              <li v-if="getFilteredTabData(key).length === 0" class="no-result">无匹配结果</li>
             </ul>
           </el-tab-pane>
         </el-tabs>
@@ -72,6 +83,7 @@ type TProps = {
   inputWidth?: string
   readonly?: boolean
   step?: number
+  showSearch?: boolean
 }
 
 type TEmits = {
@@ -87,6 +99,7 @@ type TState = {
   innerValue: string
   innerPreview: string
   activeTab: string
+  searchText: string
 }
 
 const props = withDefaults(defineProps<TProps>(), {
@@ -107,12 +120,39 @@ const state = reactive<TState>({
   innerValue: '',
   innerPreview: '',
   activeTab: '中文',
+  searchText: '',
 })
 const selectRef = ref<HTMLElement | null>(null)
 
 const showValue = computed(() => {
   return state.innerValue
 })
+
+const filteredData = computed(() => {
+  if (!state.searchText || !props.data || !Array.isArray(props.data)) {
+    return props.data || []
+  }
+  const searchLower = state.searchText.toLowerCase()
+  return (props.data as any[]).filter(item => {
+    const text = typeof item === 'object' ? (item.alias || '').toLowerCase() : String(item).toLowerCase()
+    return text.includes(searchLower)
+  })
+})
+
+function getFilteredTabData(key: string) {
+  const tabData = (props.data as Record<string, any>)[key]
+  if (!tabData || !Array.isArray(tabData)) return []
+  if (!state.searchText) return tabData
+  const searchLower = state.searchText.toLowerCase()
+  return tabData.filter((item: any) => {
+    const text = typeof item === 'object' ? (item.alias || '').toLowerCase() : String(item).toLowerCase()
+    return text.includes(searchLower)
+  })
+}
+
+function handleSearch() {
+  // 搜索功能由 computed 属性自动处理
+}
 
 watch(
   () => props.modelValue,
@@ -307,6 +347,29 @@ function handleShow() {
   .preview {
     // transform: scaleY(-1);
     height: 1.6em;
+  }
+  .no-result {
+    color: #999;
+    font-size: 14px;
+    text-align: center;
+    padding: 20px 0;
+  }
+}
+
+.search-box {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  .search-input {
+    width: 100%;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    outline: none;
+    &:focus {
+      border-color: #3b74f1;
+    }
   }
 }
 

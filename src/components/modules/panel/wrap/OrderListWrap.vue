@@ -1069,7 +1069,7 @@ const loadOrderData = async (init = false) => {
                     const textLength = textData.text.length
 
                     // 文字宽不能超过1170，高不能超过588，尽量放大到限制值
-                    const maxTextWidth = 1100
+                    const maxTextWidth = 1120
                     const maxTextHeight = 530
 
                     // 根据限制值反推最大字体大小

@@ -19,6 +19,7 @@
           :data="state.fontClassList"
           inputWidth="100%"
           :readonly="true"
+          :show-search="true"
           @finish="(font) => finish('fontClass', font)"
           @open="onFontSelectOpen"
         />
