@@ -321,20 +321,20 @@ function handleShow() {
   }
 }
 .list-ul {
-  max-height: 500px;
+  max-height: 280px;
   overflow-y: auto;
   width: 100%;
-  min-width: 150px;
+  min-width: 120px;
   li {
     display: flex;
     align-items: center;
     color: #000000;
     cursor: pointer;
-    font-size: 16px;
-    height: 40px;
-    line-height: 40px;
+    font-size: 14px;
+    height: 32px;
+    line-height: 32px;
     overflow: hidden;
-    padding: 0 12px;
+    padding: 0 10px;
     text-overflow: ellipsis;
     white-space: nowrap;
     &:hover {
