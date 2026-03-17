@@ -369,10 +369,23 @@ function scaleImage(direction: 'in' | 'out') {
   }
   const nextWidth = Math.max(MIN_SIZE, Math.round(currentWidth * multiplier))
   const nextHeight = Math.max(MIN_SIZE, Math.round(currentHeight * multiplier))
+
+  // 计算偏移量，使元素从中心缩放
+  const widthDiff = nextWidth - currentWidth
+  const heightDiff = nextHeight - currentHeight
+
+  const currentLeft = Number(state.innerElement.left) || 0
+  const currentTop = Number(state.innerElement.top) || 0
+
   state.innerElement.width = nextWidth
   state.innerElement.height = nextHeight
+  state.innerElement.left = currentLeft - widthDiff / 2
+  state.innerElement.top = currentTop - heightDiff / 2
+
   finish('width', nextWidth)
   finish('height', nextHeight)
+  finish('left', state.innerElement.left)
+  finish('top', state.innerElement.top)
   forceStore.setUpdateRect()
 }
 

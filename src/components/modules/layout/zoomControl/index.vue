@@ -249,18 +249,24 @@ const MIN_SIZE = 10 // 最小尺寸
 
 function mousewheelZoomElement(down: boolean, isImage: boolean, isText: boolean) {
   if (!dActiveElement.value) return
-  
+
   if (isImage) {
     // 缩放图片
     const multiplier = down ? 1 - SCALE_RATIO : 1 + SCALE_RATIO
     const currentWidth = Number(dActiveElement.value.width) || 0
     const currentHeight = Number(dActiveElement.value.height) || 0
-    
+
     if (!currentWidth || !currentHeight) return
-    
+
     const nextWidth = Math.max(MIN_SIZE, Math.round(currentWidth * multiplier))
     const nextHeight = Math.max(MIN_SIZE, Math.round(currentHeight * multiplier))
-    
+
+    // 计算偏移量，使元素从中心缩放
+    const widthDiff = nextWidth - currentWidth
+    const heightDiff = nextHeight - currentHeight
+    const currentLeft = Number(dActiveElement.value.left) || 0
+    const currentTop = Number(dActiveElement.value.top) || 0
+
     widgetStore.updateWidgetData({
       uuid: dActiveElement.value.uuid || '',
       key: 'width',
@@ -271,6 +277,16 @@ function mousewheelZoomElement(down: boolean, isImage: boolean, isText: boolean)
       key: 'height',
       value: nextHeight,
     })
+    widgetStore.updateWidgetData({
+      uuid: dActiveElement.value.uuid || '',
+      key: 'left',
+      value: currentLeft - widthDiff / 2,
+    })
+    widgetStore.updateWidgetData({
+      uuid: dActiveElement.value.uuid || '',
+      key: 'top',
+      value: currentTop - heightDiff / 2,
+    })
     forceStore.setUpdateRect()
   } else if (isText) {
     // 缩放文字
@@ -278,19 +294,25 @@ function mousewheelZoomElement(down: boolean, isImage: boolean, isText: boolean)
     const currentFontSize = Number(dActiveElement.value.fontSize) || 0
     const currentWidth = Number(dActiveElement.value.width) || 0
     const currentHeight = Number(dActiveElement.value.height) || 0
-    
+
     if (!currentFontSize) return
-    
+
     const nextFontSize = Math.max(MIN_SIZE, Math.round(currentFontSize * multiplier))
     const nextWidth = currentWidth ? Math.max(MIN_SIZE, Math.round(currentWidth * multiplier)) : currentWidth
     const nextHeight = currentHeight ? Math.max(MIN_SIZE, Math.round(currentHeight * multiplier)) : currentHeight
-    
+
+    // 计算偏移量，使元素从中心缩放
+    const widthDiff = nextWidth && currentWidth ? nextWidth - currentWidth : 0
+    const heightDiff = nextHeight && currentHeight ? nextHeight - currentHeight : 0
+    const currentLeft = Number(dActiveElement.value.left) || 0
+    const currentTop = Number(dActiveElement.value.top) || 0
+
     widgetStore.updateWidgetData({
       uuid: dActiveElement.value.uuid || '',
       key: 'fontSize',
       value: nextFontSize,
     })
-    
+
     if (nextWidth) {
       widgetStore.updateWidgetData({
         uuid: dActiveElement.value.uuid || '',
@@ -298,7 +320,7 @@ function mousewheelZoomElement(down: boolean, isImage: boolean, isText: boolean)
         value: nextWidth,
       })
     }
-    
+
     if (nextHeight) {
       widgetStore.updateWidgetData({
         uuid: dActiveElement.value.uuid || '',
@@ -306,7 +328,21 @@ function mousewheelZoomElement(down: boolean, isImage: boolean, isText: boolean)
         value: nextHeight,
       })
     }
-    
+
+    // 调整位置使文字从中心缩放
+    if (widthDiff !== 0 || heightDiff !== 0) {
+      widgetStore.updateWidgetData({
+        uuid: dActiveElement.value.uuid || '',
+        key: 'left',
+        value: currentLeft - widthDiff / 2,
+      })
+      widgetStore.updateWidgetData({
+        uuid: dActiveElement.value.uuid || '',
+        key: 'top',
+        value: currentTop - heightDiff / 2,
+      })
+    }
+
     forceStore.setUpdateRect()
   }
 }
