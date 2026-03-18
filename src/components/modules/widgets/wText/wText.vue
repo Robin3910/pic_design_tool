@@ -134,7 +134,10 @@ watch(
     }
 
     try {
-      const loadFont = new (window as any).FontFace(font.value, `url(${font.url})`)
+      // 用引号包裹 URL，这是 CSS 规范推荐的做法
+      // 同时对括号进行转义，防止 CSS 解析失败
+      const escapedUrl = font.url.replace(/[()]/g, c => '\\' + c)
+      const loadFont = new (window as any).FontFace(font.value, `url("${escapedUrl}")`)
       await loadFont.load()
       ;(document as any).fonts.add(loadFont)
       state.loadFontDone = font.value

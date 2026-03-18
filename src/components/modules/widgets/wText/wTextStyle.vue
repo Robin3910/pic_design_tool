@@ -42,6 +42,7 @@
           ref="fontFileInputRef"
           type="file"
           accept=".ttf,.otf,.woff,.woff2"
+          multiple
           style="display: none"
           @change="onFontFileChange"
         />
@@ -292,7 +293,9 @@ async function applyFirstOrderFontInfo(uuid: string) {
     console.log('[applyFirstOrderFontInfo] 准备加载字体:', fontFamily, 'url:', fontInfo.ossUrl)
     if ((window as any).FontFace) {
       try {
-        const fontFace = new (window as any).FontFace(fontFamily, `url(${fontInfo.ossUrl})`)
+        // 用引号包裹 URL，并对括号进行转义，防止 CSS 解析失败
+        const escapedUrl = fontInfo.ossUrl.replace(/[()]/g, c => '\\' + c)
+        const fontFace = new (window as any).FontFace(fontFamily, `url("${escapedUrl}")`)
         console.log('[applyFirstOrderFontInfo] FontFace 已创建，准备 load')
         await fontFace.load()
         console.log('[applyFirstOrderFontInfo] FontFace load 成功，准备添加到 document.fonts')
@@ -343,72 +346,127 @@ function onClickImportFont() {
   if (isUploadingFont.value) {
     return
   }
-  if (fontFileInputRef.value) {
-    fontFileInputRef.value.click()
+  console.log('点击了导入字体按钮')
+  const inputEl = fontFileInputRef.value
+  if (!inputEl) {
+    console.error('字体文件输入框未找到')
+    ElMessage.error('导入功能初始化失败，请刷新页面重试')
+    return
+  }
+  // 创建新的 input 元素以确保可以触发点击
+  const newInput = document.createElement('input')
+  newInput.type = 'file'
+  newInput.accept = '.ttf,.otf,.woff,.woff2'
+  newInput.multiple = true
+  newInput.style.display = 'none'
+  document.body.appendChild(newInput)
+
+  newInput.onchange = (e) => {
+    console.log('文件选择 change 事件触发', e)
+    // 触发原有处理函数
+    onFontFileChange(e as Event)
+    // 清理
+    document.body.removeChild(newInput)
+  }
+
+  newInput.onerror = () => {
+    console.error('文件选择器创建失败')
+    ElMessage.error('文件选择器创建失败')
+    document.body.removeChild(newInput)
+  }
+
+  try {
+    newInput.click()
+  } catch (err) {
+    console.error('点击文件选择器失败:', err)
+    ElMessage.error('无法打开文件选择器')
+    document.body.removeChild(newInput)
   }
 }
 
 async function onFontFileChange(event: Event) {
+  console.log('onFontFileChange 被调用', event)
   const input = event.target as HTMLInputElement
-  const file = input.files && input.files[0]
+  const files = input.files
+  console.log('files 原始值:', files)
 
-  // 允许选择同一个文件多次
+  // FileList 是实时对象，需要先转为数组保存，否则清空 input.value 后 files 会丢失
+  const fileArray = files ? Array.from(files) : []
+  console.log('fileArray:', fileArray)
+
+  // 先保存 files 引用，再清空 input
+  if (fileArray.length === 0) {
+    console.log('没有选择文件')
+    return
+  }
+
+  // 允许选择同一个文件多次 - 但要在获取 files 之后
   if (input) {
     input.value = ''
   }
 
-  if (!file) {
-    return
-  }
-
-  const ext = file.name.split('.').pop()?.toLowerCase()
+  console.log('选择了文件:', fileArray.length, '个文件')
   const allowExts = ['ttf', 'otf', 'woff', 'woff2']
-  if (!ext || !allowExts.includes(ext)) {
-    ElMessage.error('只支持 ttf、otf、woff、woff2 格式的字体文件')
-    return
-  }
-
-  // 30MB 限制
   const maxSize = 30 * 1024 * 1024
-  if (file.size > maxSize) {
-    ElMessage.error('文件大小不能超过 30MB')
-    return
+
+  // 验证所有文件
+  for (const file of fileArray) {
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    if (!ext || !allowExts.includes(ext)) {
+      ElMessage.error(`文件 "${file.name}" 格式不支持，只支持 ttf、otf、woff、woff2 格式`)
+      return
+    }
+    if (file.size > maxSize) {
+      ElMessage.error(`文件 "${file.name}" 大小不能超过 30MB`)
+      return
+    }
   }
 
-  // 去掉扩展名作为字体名
-  const lastDotIndex = file.name.lastIndexOf('.')
-  const fontName = lastDotIndex > 0 ? file.name.substring(0, lastDotIndex) : file.name
+  const newFonts: TFontItem[] = []
 
   try {
     isUploadingFont.value = true
-    // 调用 OSS 上传字体接口
-    const ossUrl = await OssApi.uploadFont(file, fontName)
+    ElMessage.info(`正在导入 ${fileArray.length} 个字体文件...`)
 
-    // 构造下拉选项和字体设置对象
-    const newId = Date.now()
-    const newFontOption: TFontItem = {
-      id: newId,
-      oid: '',
-      value: fontName,
-      alias: fontName,
-      preview: '',
-      url: ossUrl,
+    for (const file of fileArray) {
+      console.log('准备上传字体:', file.name, file.size)
+      // 去掉扩展名作为字体名
+      const lastDotIndex = file.name.lastIndexOf('.')
+      const fontName = lastDotIndex > 0 ? file.name.substring(0, lastDotIndex) : file.name
+
+      // 调用 OSS 上传字体接口
+      const ossUrl = await OssApi.uploadFont(file, fontName)
+
+      // 构造下拉选项和字体设置对象
+      const newId = Date.now() + Math.random()
+      const newFontOption: TFontItem = {
+        id: newId,
+        oid: '',
+        value: fontName,
+        alias: fontName,
+        preview: '',
+        url: ossUrl,
+      }
+      newFonts.push(newFontOption)
     }
 
     // 追加到当前字体列表
-    state.fontClassList = [...state.fontClassList, newFontOption]
+    state.fontClassList = [...state.fontClassList, ...newFonts]
 
-    // 设置到当前文本组件的字体并触发更新
-    const fontForText: TwTextData['fontClass'] = {
-      id: newId,
-      alias: fontName,
-      value: fontName,
-      url: ossUrl,
+    // 设置第一个导入的字体到当前文本组件
+    if (newFonts.length > 0) {
+      const firstFont = newFonts[0]
+      const fontForText: TwTextData['fontClass'] = {
+        id: firstFont.id,
+        alias: firstFont.alias,
+        value: firstFont.value,
+        url: firstFont.url,
+      }
+      state.innerElement.fontClass = fontForText
+      finish('fontClass', fontForText)
     }
-    state.innerElement.fontClass = fontForText
-    finish('fontClass', fontForText)
 
-    ElMessage.success('字体导入成功')
+    ElMessage.success(`成功导入 ${newFonts.length} 个字体`)
   } catch (error: any) {
     console.error('字体上传失败:', error)
     ElMessage.error(error?.message || '字体上传失败，请稍后重试')
@@ -457,7 +515,9 @@ async function refreshFonts() {
 async function preloadFont(font: TFontItem) {
   if (!font.value || !font.url) return
   try {
-    const loadFont = new FontFace(font.value, `url(${font.url})`)
+    // 用引号包裹 URL，并对括号进行转义，防止 CSS 解析失败
+    const escapedUrl = font.url.replace(/[()]/g, c => '\\' + c)
+    const loadFont = new FontFace(font.value, `url("${escapedUrl}")`)
     await loadFont.load()
     document.fonts.add(loadFont)
   } catch (e) {
