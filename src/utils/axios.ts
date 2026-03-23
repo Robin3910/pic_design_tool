@@ -8,10 +8,9 @@
 import axios, { AxiosRequestConfig, AxiosResponse, AxiosStatic } from 'axios'
 import app_config, { LocalStorageKey } from '@/config'
 import { useBaseStore, useUserStore } from '@/store/index';
+import { handle401Error, getCurrentToken } from './tokenRefreshManager';
 
 axios.defaults.timeout = 30000
-// axios.defaults.headers.authorization = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MTAwMDEsImV4cCI6MTc4ODU3NDc1MDU4NX0.L_t6DFD48Dm6rUPfgIgOWJkz18En1m_-hhMHcpbxliY';
-const defaultToken = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MTAwMDEsImV4cCI6MTc4ODU3NDc1MDU4NX0.L_t6DFD48Dm6rUPfgIgOWJkz18En1m_-hhMHcpbxliY';
 // const version = app_config.VERSION;
 // 主后端服务已移除
 const baseUrl = ''
@@ -51,6 +50,12 @@ axios.interceptors.response.use((res: AxiosResponse<any>) => {
       // store.commit('changeOnline', false)
     }
 
+    // 401 错误交给 tokenRefreshManager 处理（自动刷新 token 并重试）
+    if (res.data.code === 401 && res.config) {
+      // authAxios 拦截器返回 response.data，所以 handle401Error resolve 的值已经是数据体
+      return handle401Error(res.config as any, axios)
+    }
+
     if (res.data.result && res.data.code === 200) {
       return Promise.resolve(res.data.result)
     } else if (res.data.data && res.data.stat == 1) {
@@ -88,9 +93,11 @@ const fetch = <T = any> (
     // store.commit('loading', '加载中..');
   }
 
-  const token = defaultToken//localStorage.getItem(LocalStorageKey.tokenKey)
+  const token = getCurrentToken()
   const headerObject: Record<string, any> = {}
-  token && (headerObject.Authorization = token)
+  if (token) {
+    headerObject.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`
+  }
   
   if (type === 'get') {
     return axios.get(url, {

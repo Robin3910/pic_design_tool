@@ -6,7 +6,6 @@
  */
 
 import axios from 'axios'
-import { ElMessageBox } from 'element-plus'
 import app_config, { LocalStorageKey } from '@/config'
 import { useAuthStore } from '@/store'
 
@@ -47,8 +46,13 @@ let isRefreshing = false
 const isRelogin = { show: false }
 // 是否已经检测到无refreshToken（避免重复尝试）
 let hasNoRefreshToken = false
-// 主动刷新定时器
+// 主动刷新阈值（毫秒），Token 在此时间窗口内即将过期时主动刷新，默认 15 分钟
+let refreshThreshold = 15 * 60 * 1000
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
+// 强制刷新定时器（每25分钟无条件刷新一次）
+let forcedRefreshTimer: ReturnType<typeof setInterval> | null = null
+// 上次强制刷新的时间戳（用于检测后台期间是否漏刷）
+let lastForcedRefreshTime: number = 0
 // 页面可见性变化监听器
 let visibilityChangeHandler: (() => void) | null = null
 // 窗口焦点变化监听器
@@ -62,6 +66,16 @@ function stopAutoRefreshInternal(): void {
     clearInterval(autoRefreshTimer)
     autoRefreshTimer = null
     console.log('Token主动刷新机制已停止')
+  }
+}
+
+// 停止强制刷新定时器（提前声明，供clearTokens使用）
+function stopForcedRefreshTimerInternal(): void {
+  if (forcedRefreshTimer) {
+    clearInterval(forcedRefreshTimer)
+    forcedRefreshTimer = null
+    lastForcedRefreshTime = 0
+    console.log('Token强制刷新定时器已停止')
   }
 }
 
@@ -86,6 +100,8 @@ function clearTokens() {
   localStorage.removeItem(LocalStorageKey.expiresTimeKey)
   // 停止主动刷新定时器
   stopAutoRefreshInternal()
+  // 停止强制刷新定时器
+  stopForcedRefreshTimerInternal()
   // 停止页面可见性监听
   stopVisibilityListeners()
   // 重置无refreshToken标志
@@ -113,6 +129,10 @@ function saveTokens(accessToken: string, refreshToken: string, expiresTime?: str
   localStorage.setItem(LocalStorageKey.refreshTokenKey, refreshToken)
   if (expiresTime) {
     localStorage.setItem(LocalStorageKey.expiresTimeKey, expiresTime)
+  } else {
+    // 兜底：后端未返回过期时间时，设为 2 小时后的时间戳
+    const fallbackMs = 2 * 60 * 60 * 1000
+    localStorage.setItem(LocalStorageKey.expiresTimeKey, String(Date.now() + fallbackMs))
   }
 }
 
@@ -354,55 +374,23 @@ function isRefreshOrLoginUrl(url: string): boolean {
 
 // 处理认证失败（显示确认对话框并跳转登录）
 function handleAuthorized(): Promise<never> {
-  // 如果已经到登录页面则不进行弹窗提示
+  // 如果已经到登录页面则不进行弹窗提示，直接返回
   if (window.location.href.includes('/login')) {
     return Promise.reject('登录状态已过期')
   }
-  
-  // 防止重复弹窗
+
+  // 防止重复处理（登出期间可能有多个请求同时触发）
   if (isRelogin.show) {
     return Promise.reject('登录状态已过期')
   }
-  
   isRelogin.show = true
-  
-  // 获取当前路径作为 redirect 参数
+
+  // 直接跳转登录页，不弹窗（弹窗在后台可能被浏览器挂起，导致请求堆积全部失败）
   const currentPath = window.location.pathname + window.location.search
   const redirectPath = currentPath !== '/login' ? currentPath : '/'
-  
-  ElMessageBox.confirm(
-    '登录状态已过期，请重新登录',
-    '提示',
-    {
-      showCancelButton: false,
-      closeOnClickModal: false,
-      showClose: false,
-      closeOnPressEscape: false,
-      confirmButtonText: '重新登录',
-      type: 'warning'
-    }
-  ).then(() => {
-    // 清除认证状态
-    try {
-      const authStore = useAuthStore()
-      authStore.clearAuth()
-    } catch (error) {
-      console.warn('Failed to clear auth store:', error)
-    }
-    
-    clearTokens()
-    isRelogin.show = false
-    
-    // 刷新页面后走路由守卫，自动跳转到登录页
-    window.location.href = window.location.href
-  }).catch(() => {
-    // 用户取消，但还是要跳转（参考文档行为）
-    isRelogin.show = false
-    clearTokens()
-    redirectToLogin(redirectPath)
-  })
-  
-  return Promise.reject('登录状态已过期')
+  clearTokens()
+  window.location.href = `/login?redirect=${encodeURIComponent(redirectPath)}`
+  return Promise.reject('登录状态已过期，请重新登录')
 }
 
 // 处理 401 错误并刷新 token（被动刷新机制）
@@ -464,9 +452,18 @@ export async function handle401Error(config: any, service: any): Promise<any> {
     // 步骤2: 检查是否有refreshToken
     const refreshTokenValue = getRefreshToken()
     if (!refreshTokenValue) {
-      console.warn('无refreshToken，无法刷新token')
+      console.warn('无refreshToken，尝试用当前token直接重试')
       hasNoRefreshToken = true
-      return handleAuthorized()
+      // 没有 refreshToken 时，先尝试用当前 token 重试（有些系统不需要 refreshToken）
+      config._isRetryRequest = true
+      try {
+        const retryRes = await service(config)
+        isRefreshing = false
+        return retryRes
+      } catch {
+        // 重试仍失败，token 确实无效，跳转登录
+        return handleAuthorized()
+      }
     }
     
     // 步骤3: 调用 /system/auth/refresh-token 接口
@@ -474,8 +471,17 @@ export async function handle401Error(config: any, service: any): Promise<any> {
     
     // 步骤4: 获取新的token并更新存储
     if (!refreshTokenRes) {
-      console.error('刷新token失败，返回null')
-      return handleAuthorized()
+      console.error('刷新token失败，返回null，尝试用当前token重试')
+      // 刷新失败时，先尝试用当前 token 重试
+      config._isRetryRequest = true
+      try {
+        const retryRes = await service(config)
+        isRefreshing = false
+        return retryRes
+      } catch {
+        // 重试仍失败，跳转登录
+        return handleAuthorized()
+      }
     }
     
     // 保存新的token到localStorage
@@ -520,23 +526,22 @@ export async function handle401Error(config: any, service: any): Promise<any> {
   } catch (error: any) {
     // 步骤6: 如果刷新失败，清除token并跳转登录页
     const errorMsg = error?.message || String(error) || '未知错误'
-    
+
     // 如果是刷新令牌相关的错误，标记为无refreshToken
-    if (errorMsg.includes('刷新令牌') || errorMsg.includes('无效的刷新令牌') || 
+    if (errorMsg.includes('刷新令牌') || errorMsg.includes('无效的刷新令牌') ||
         errorMsg.includes('刷新令牌已过期') || errorMsg.includes('刷新令牌无效')) {
       hasNoRefreshToken = true
     }
-    
+
     console.error('Token刷新失败:', errorMsg)
-    
+
     // 回放队列中的请求（但不会重试当前请求，避免递归）
     requestList.forEach((cb: any) => {
       cb()
     })
     requestList = []
-    
-    // 清除token并跳转登录页
-    clearTokens()
+
+    // handleAuthorized 内部已调用 clearTokens 并跳转，无需在此重复
     return handleAuthorized()
   } finally {
     isRefreshing = false
@@ -564,10 +569,8 @@ async function checkAndRefreshTokenIfNeeded(): Promise<void> {
   const now = Date.now()
   const timeUntilExpiry = expiresTimestamp - now
 
-  // 如果Token在5分钟内过期，主动刷新
-  // 5分钟 = 5 * 60 * 1000 毫秒
-  const refreshThreshold = 5 * 60 * 1000
-
+  // 如果Token在 refreshThreshold 时间内即将过期，主动刷新
+  // refreshThreshold 已在文件顶部配置（默认15分钟）
   if (timeUntilExpiry > 0 && timeUntilExpiry < refreshThreshold) {
     console.log('Token即将过期，主动刷新...', {
       timeUntilExpiry: Math.floor(timeUntilExpiry / 1000),
@@ -599,6 +602,38 @@ async function checkAndRefreshTokenIfNeeded(): Promise<void> {
   }
 }
 
+// 强制刷新定时任务（无条件每25分钟刷新一次）
+async function forcedTokenRefresh(): Promise<void> {
+  if (isRefreshing) {
+    console.log('正在刷新中，跳过本次强制刷新')
+    return
+  }
+
+  const refreshTokenValue = localStorage.getItem(LocalStorageKey.refreshTokenKey)
+  if (!refreshTokenValue) {
+    console.warn('无refreshToken，无法执行强制刷新')
+    return
+  }
+
+  console.log('执行强制Token刷新...')
+  try {
+    const refreshTokenRes = await refreshToken()
+    if (refreshTokenRes) {
+      saveTokens(refreshTokenRes.accessToken, refreshTokenRes.refreshToken, refreshTokenRes.expiresTime)
+      try {
+        const authStore = useAuthStore()
+        authStore.token = refreshTokenRes.accessToken
+      } catch (storeError) {
+        console.warn('Failed to update auth store token:', storeError)
+      }
+      console.log('Token强制刷新成功')
+      lastForcedRefreshTime = Date.now()
+    }
+  } catch (error: any) {
+    console.error('Token强制刷新失败:', error?.message || error)
+  }
+}
+
 // 处理页面可见性变化
 function handleVisibilityChange(): void {
   if (document.hidden) {
@@ -610,16 +645,19 @@ function handleVisibilityChange(): void {
     // 因为即使隐藏时间很短，token也可能已经过期
     const now = Date.now()
     const hiddenDuration = hiddenTimestamp ? now - hiddenTimestamp : 0
-    
+
     if (hiddenDuration > 0) {
       console.log('页面已恢复可见，隐藏时长:', Math.floor(hiddenDuration / 1000) + '秒')
     } else {
       console.log('页面已恢复可见')
     }
-    
+
     // 立即检查并刷新token（如果已过期或即将过期）
     checkAndRefreshTokenIfNeeded()
-    
+
+    // 检查后台期间是否漏刷强制刷新（定时器在后台可能被暂停）
+    checkAndResumeForcedRefresh(now)
+
     hiddenTimestamp = null
   }
 }
@@ -629,23 +667,42 @@ function handleWindowFocus(): void {
   console.log('窗口获得焦点，检查token状态')
   // 窗口获得焦点时，也检查并刷新token
   checkAndRefreshTokenIfNeeded()
+  // 检查后台期间是否漏刷强制刷新
+  checkAndResumeForcedRefresh(Date.now())
+}
+
+// 检测并补刷后台期间漏掉的强制刷新
+function checkAndResumeForcedRefresh(now: number): void {
+  const interval = 25 * 60 * 1000
+  if (lastForcedRefreshTime > 0 && now - lastForcedRefreshTime > interval) {
+    console.log('检测到后台期间漏刷强制刷新，立即补刷')
+    forcedTokenRefresh()
+  }
 }
 
 // 启动主动刷新定时器
-// 每5分钟检查一次Token是否即将过期
-// 同时监听页面可见性变化，在页面恢复时立即刷新token
+// - 每5分钟检查一次Token是否即将过期，临界期则主动刷新
+// - 每25分钟无条件强制刷新一次（覆盖上面逻辑，作为保底）
+// - 监听页面可见性变化，页面恢复时立即检查
+// - 监听窗口焦点变化，窗口获得焦点时立即检查
 export function startAutoRefresh(): void {
   // 先清除旧的定时器和监听器
   stopAutoRefreshInternal()
+  stopForcedRefreshTimerInternal()
   stopVisibilityListeners()
 
   // 立即检查一次
   checkAndRefreshTokenIfNeeded()
 
-  // 每5分钟检查一次
+  // 每5分钟检查一次（仅在临界期才真正刷新）
   autoRefreshTimer = setInterval(() => {
     checkAndRefreshTokenIfNeeded()
-  }, 5 * 60 * 1000) // 5分钟
+  }, 5 * 60 * 1000)
+
+  // 每25分钟无条件强制刷新一次（保底策略）
+  forcedRefreshTimer = setInterval(() => {
+    forcedTokenRefresh()
+  }, 25 * 60 * 1000)
 
   // 监听页面可见性变化（切屏、休眠等场景）
   visibilityChangeHandler = handleVisibilityChange
@@ -655,16 +712,25 @@ export function startAutoRefresh(): void {
   focusHandler = handleWindowFocus
   window.addEventListener('focus', focusHandler)
 
-  console.log('Token主动刷新机制已启动（每5分钟检查一次，页面恢复时立即检查）')
+  console.log('Token主动刷新机制已启动（每5分钟检查一次，每25分钟强制刷新，页面恢复时立即检查）')
 }
 
 // 停止主动刷新定时器（导出函数）
 export function stopAutoRefresh(): void {
   stopAutoRefreshInternal()
+  stopForcedRefreshTimerInternal()
   stopVisibilityListeners()
 }
+
+// 设置主动刷新阈值（单位：毫秒）
+export function setRefreshThreshold(ms: number): void {
+  refreshThreshold = ms
+}
+
+// 强制刷新定时器间隔（默认25分钟，单位：毫秒）
+const FORCED_REFRESH_INTERVAL = 25 * 60 * 1000
+export { FORCED_REFRESH_INTERVAL }
 
 // 导出工具函数和配置
 export { clearTokens, redirectToLogin, saveTokens, handleAuthorized }
 export { ignoreMsgs, whiteList }
-
